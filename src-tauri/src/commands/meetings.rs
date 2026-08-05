@@ -2,7 +2,10 @@ use tauri::State;
 
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters, MeetingSummary};
+use crate::models::{
+    CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters,
+    MeetingSummary,
+};
 use crate::repository::MeetingRepository;
 
 #[tauri::command]
@@ -42,16 +45,19 @@ pub fn update_meeting_title(
     id: String,
     title: String,
 ) -> Result<Meeting, String> {
-    with_db(&state, |conn| MeetingRepository::update_title(conn, &id, &title))
-        .map_err(|e| e.to_string())
+    with_db(&state, |conn| {
+        MeetingRepository::update_title(conn, &id, &title)
+    })
+    .map_err(|e| e.to_string())
 }
 
 fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>
 where
     F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
 {
-    let db = state.db.lock().map_err(|_| {
-        AppError::Message("impossible d'accéder à la base de données".into())
-    })?;
+    let db = state
+        .db
+        .lock()
+        .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
     f(&db)
 }

@@ -47,9 +47,7 @@ impl MeetingRepository {
             map_meeting_row,
         )
         .optional()?
-        .ok_or_else(|| AppError::MeetingNotFound {
-            id: id.to_string(),
-        })
+        .ok_or_else(|| AppError::MeetingNotFound { id: id.to_string() })
     }
 
     pub fn get_detail(conn: &Connection, id: &str) -> AppResult<MeetingDetail> {
@@ -172,8 +170,7 @@ impl MeetingRepository {
                 Ok(MeetingListItem {
                     id: row.get(0)?,
                     title: row.get(1)?,
-                    status: MeetingStatus::from_str(&status_value)
-                        .unwrap_or(MeetingStatus::Draft),
+                    status: MeetingStatus::from_str(&status_value).unwrap_or(MeetingStatus::Draft),
                     created_at: row.get(3)?,
                     started_at: row.get(4)?,
                     ended_at: row.get(5)?,
@@ -252,9 +249,7 @@ impl MeetingRepository {
 
         let deleted = conn.execute("DELETE FROM meetings WHERE id = ?1", [id])?;
         if deleted == 0 {
-            return Err(AppError::MeetingNotFound {
-                id: id.to_string(),
-            });
+            return Err(AppError::MeetingNotFound { id: id.to_string() });
         }
         Ok(())
     }
@@ -355,9 +350,7 @@ impl MeetingRepository {
         )?;
 
         if updated == 0 {
-            return Err(AppError::MeetingNotFound {
-                id: id.to_string(),
-            });
+            return Err(AppError::MeetingNotFound { id: id.to_string() });
         }
 
         Self::get_by_id(conn, id)
@@ -698,10 +691,8 @@ mod tests {
         )
         .unwrap();
 
-        let dir = std::env::temp_dir().join(format!(
-            "laminute-delete-audio-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("laminute-delete-audio-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let audio_path = dir.join("meeting.mp3");
         std::fs::write(&audio_path, b"audio").unwrap();
@@ -710,11 +701,7 @@ mod tests {
         conn.execute(
             "INSERT INTO audio_files (id, meeting_id, file_path, duration_ms, format, created_at)
              VALUES ('audio-del', ?1, ?2, 1000, 'mp3', ?3)",
-            params![
-                meeting.id,
-                audio_path.to_string_lossy().to_string(),
-                now
-            ],
+            params![meeting.id, audio_path.to_string_lossy().to_string(), now],
         )
         .unwrap();
 
@@ -728,10 +715,8 @@ mod tests {
     #[test]
     fn create_from_imported_audio_sets_processing_status() {
         let conn = open_in_memory().unwrap();
-        let imports_dir = std::env::temp_dir().join(format!(
-            "laminute-imports-repo-{}",
-            std::process::id()
-        ));
+        let imports_dir =
+            std::env::temp_dir().join(format!("laminute-imports-repo-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&imports_dir);
         let dest_path = imports_dir.join("sample.mp3");
         std::fs::write(&dest_path, b"fixture").unwrap();
@@ -742,12 +727,9 @@ mod tests {
             format: "mp3".into(),
         };
 
-        let detail = MeetingRepository::create_from_imported_audio(
-            &conn,
-            "Comité produit",
-            &imported,
-        )
-        .unwrap();
+        let detail =
+            MeetingRepository::create_from_imported_audio(&conn, "Comité produit", &imported)
+                .unwrap();
 
         assert_eq!(detail.meeting.title, "Comité produit");
         assert_eq!(detail.meeting.status, MeetingStatus::Processing);

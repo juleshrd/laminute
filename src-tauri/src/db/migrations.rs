@@ -16,11 +16,9 @@ pub fn run_migrations(conn: &mut Connection) -> AppResult<()> {
 
 #[cfg(test)]
 fn migration_count(conn: &Connection) -> AppResult<usize> {
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM refinery_schema_history",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM refinery_schema_history", [], |row| {
+        row.get(0)
+    })?;
     Ok(count as usize)
 }
 
@@ -86,7 +84,9 @@ mod tests {
             .map(|r| r.unwrap())
             .collect();
 
-        assert!(!columns.iter().any(|c| c.contains("api_key") || c.contains("secret")));
+        assert!(!columns
+            .iter()
+            .any(|c| c.contains("api_key") || c.contains("secret")));
         assert!(columns.contains(&"credential_key_id".to_string()));
     }
 }

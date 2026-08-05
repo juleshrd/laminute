@@ -145,10 +145,8 @@ mod tests {
 
     #[test]
     fn persisted_settings_roundtrip() {
-        let dir = std::env::temp_dir().join(format!(
-            "laminute-audio-settings-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("laminute-audio-settings-{}", std::process::id()));
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("audio-settings.json");
 

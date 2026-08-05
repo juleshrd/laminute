@@ -80,7 +80,11 @@ impl RecordingController {
         self.last_status.clone()
     }
 
-    fn start(&mut self, device_id: &str, recordings_dir: &Path) -> Result<RecordingStatus, AudioError> {
+    fn start(
+        &mut self,
+        device_id: &str,
+        recordings_dir: &Path,
+    ) -> Result<RecordingStatus, AudioError> {
         if self.active.is_some() {
             return Err(AudioError::AlreadyRecording);
         }
@@ -255,7 +259,11 @@ impl RecordingService {
             .map_err(|_| AudioError::Internal("service audio indisponible".into()))
     }
 
-    pub fn start(&self, device_id: &str, recordings_dir: &Path) -> Result<RecordingStatus, AudioError> {
+    pub fn start(
+        &self,
+        device_id: &str,
+        recordings_dir: &Path,
+    ) -> Result<RecordingStatus, AudioError> {
         self.send_start(device_id, recordings_dir)
     }
 
@@ -349,7 +357,12 @@ fn u16_to_f32(data: &[u16]) -> Vec<f32> {
         .collect()
 }
 
-fn write_wav(path: &Path, samples: &[f32], sample_rate: u32, channels: u16) -> Result<(), AudioError> {
+fn write_wav(
+    path: &Path,
+    samples: &[f32],
+    sample_rate: u32,
+    channels: u16,
+) -> Result<(), AudioError> {
     let spec = WavSpec {
         channels,
         sample_rate,

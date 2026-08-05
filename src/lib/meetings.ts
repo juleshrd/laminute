@@ -107,7 +107,9 @@ export function parseStoredSummary(content: string): StructuredSummary | null {
   }
 }
 
-export function meetingDisplayDate(meeting: Pick<MeetingSummary, "startedAt" | "createdAt">): string {
+export function meetingDisplayDate(
+  meeting: Pick<MeetingSummary, "startedAt" | "createdAt">,
+): string {
   const raw = meeting.startedAt ?? meeting.createdAt;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {

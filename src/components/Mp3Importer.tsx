@@ -2,11 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  type MeetingDetail,
-  formatAudioError,
-  formatDuration,
-} from "../lib/audio";
+import { type MeetingDetail, formatAudioError, formatDuration } from "../lib/audio";
 
 function isMp3Path(path: string): boolean {
   return path.toLowerCase().endsWith(".mp3");
@@ -122,9 +118,7 @@ export function Mp3Importer() {
             {importing ? "Import en cours…" : "Choisir un fichier MP3"}
           </button>
         </div>
-        <p className="drop-zone-constraints">
-          MP3 uniquement · 500 Mo max · entre 1 s et 4 h
-        </p>
+        <p className="drop-zone-constraints">MP3 uniquement · 500 Mo max · entre 1 s et 4 h</p>
       </section>
 
       {lastImport && (

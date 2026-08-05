@@ -15,9 +15,7 @@ describe("MeetingHistory", () => {
     invokeMock.mockReset();
     invokeMock.mockImplementation((command: string) => {
       if (command === "list_ai_providers") {
-        return Promise.resolve([
-          { id: "mistral", displayName: "Mistral AI", capabilities: {} },
-        ]);
+        return Promise.resolve([{ id: "mistral", displayName: "Mistral AI", capabilities: {} }]);
       }
       if (command === "search_meetings") {
         return Promise.resolve([
@@ -49,7 +47,6 @@ describe("MeetingHistory", () => {
   });
 
   it("ouvre le détail au clic sur une réunion", async () => {
-
     invokeMock.mockImplementation((command: string) => {
       if (command === "list_ai_providers") {
         return Promise.resolve([]);
@@ -78,7 +75,9 @@ describe("MeetingHistory", () => {
           updatedAt: "2026-08-05T11:00:00Z",
           description: null,
           audioFiles: [],
-          transcriptions: [{ id: "t-1", meetingId: "m-1", content: "Bonjour", createdAt: "", updatedAt: "" }],
+          transcriptions: [
+            { id: "t-1", meetingId: "m-1", content: "Bonjour", createdAt: "", updatedAt: "" },
+          ],
           summaries: [],
           actions: [],
         });

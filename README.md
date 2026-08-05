@@ -1,8 +1,12 @@
 # La Minute
 
+[![CI](https://github.com/juleshrd/laminute/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/juleshrd/laminute/actions/workflows/ci.yml)
+
 Application desktop **La Minute** — monorepo Tauri 2 (Rust) + React + TypeScript + Vite.
 
 Identifiant : `app.laminute.desktop`
+
+Contributions : voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Prérequis
 
@@ -40,13 +44,15 @@ npm run dev
 
 Autres commandes utiles :
 
-| Commande | Description |
-|----------|-------------|
-| `npm run build` | Compile le frontend et le backend Rust |
-| `npm run lint` | ESLint + TypeScript + Clippy |
-| `npm run format` | Prettier + rustfmt |
-| `npm run test` | Tests Vitest (frontend) + `cargo test` (Rust) |
-| `npm run check` | **Lint + tests + build** (commande unique pour CI / validation locale) |
+| Commande               | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `npm run build`        | Compile le frontend et le backend Rust                                          |
+| `npm run build:bundle` | Produit un installable Tauri (`.deb`, `.AppImage`, etc. selon l'OS)             |
+| `npm run lint`         | ESLint + TypeScript + Clippy                                                    |
+| `npm run format`       | Prettier + rustfmt                                                              |
+| `npm run format:check` | Vérifie le formatage sans modifier les fichiers                                 |
+| `npm run test`         | Tests Vitest (frontend) + `cargo test` (Rust)                                   |
+| `npm run check`        | **Format + lint + tests + build** (commande unique pour CI / validation locale) |
 
 ## Structure du dépôt
 
@@ -76,7 +82,11 @@ Avant de pousser ou ouvrir une PR :
 npm run check
 ```
 
-Cette commande enchaîne le lint frontend/Rust, les tests, puis la compilation complète.
+Cette commande enchaîne le contrôle de formatage, le lint frontend/Rust, les tests, puis la compilation complète.
+
+## Releases
+
+Les tags `v*` (ex. `v0.1.0`) déclenchent le workflow GitHub Actions [Release](.github/workflows/release.yml), qui produit des artefacts installables **non signés** pour Linux, macOS et Windows. En local, `npm run build:bundle` exécute la même commande Tauri (`tauri build`).
 
 ## Licence
 
