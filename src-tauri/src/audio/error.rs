@@ -9,7 +9,9 @@ pub enum AudioError {
     #[error("périphérique introuvable : {0}")]
     DeviceNotFound(String),
 
-    #[error("permission microphone refusée — autorisez l'accès au micro dans les réglages système")]
+    #[error(
+        "permission microphone refusée — autorisez l'accès au micro dans les réglages système"
+    )]
     PermissionDenied,
 
     #[error("un enregistrement est déjà en cours")]

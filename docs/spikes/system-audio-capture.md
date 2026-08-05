@@ -9,21 +9,21 @@ Capturer **les deux côtés d’un appel** (micro + audio système / distant) n�
 
 **Recommandation MVP :**
 
-| Capacité | MVP |
-|----------|-----|
-| Enregistrement micro (dont Jabra vue comme input système) | **IN** |
-| Import MP3 | **IN** |
-| Capture audio système / « both sides » automatique | **OUT** (post-MVP) |
+| Capacité                                                  | MVP                |
+| --------------------------------------------------------- | ------------------ |
+| Enregistrement micro (dont Jabra vue comme input système) | **IN**             |
+| Import MP3                                                | **IN**             |
+| Capture audio système / « both sides » automatique        | **OUT** (post-MVP) |
 
 Le MVP reste fiable avec micro + import. L’audio système est un chantier séparé, documenté ici pour le backlog.
 
 ## 2. Matrice par OS
 
-| OS | Faisabilité « both sides » | Dépendances typiques | Permissions / UX | Fiabilité MVP |
-|----|----------------------------|----------------------|------------------|---------------|
-| **Windows** | Bonne (loopback WASAPI) | WASAPI loopback ; parfois Stereo Mix (legacy) | Accès micro standard ; loopback souvent sans install tierce | Élevée pour un best-effort Windows-only |
-| **macOS** | Moyenne / fragile | BlackHole / Loopback / Soundflower ; ou ScreenCaptureKit | Micro + souvent **enregistrement d’écran / audio système** ; TCC strict | Faible sans config utilisateur |
-| **Linux** | Variable | PulseAudio / PipeWire monitor (`*.monitor`) | Droits session audio ; pas de modèle unique | Moyenne selon distro/session |
+| OS          | Faisabilité « both sides » | Dépendances typiques                                     | Permissions / UX                                                        | Fiabilité MVP                           |
+| ----------- | -------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------- |
+| **Windows** | Bonne (loopback WASAPI)    | WASAPI loopback ; parfois Stereo Mix (legacy)            | Accès micro standard ; loopback souvent sans install tierce             | Élevée pour un best-effort Windows-only |
+| **macOS**   | Moyenne / fragile          | BlackHole / Loopback / Soundflower ; ou ScreenCaptureKit | Micro + souvent **enregistrement d’écran / audio système** ; TCC strict | Faible sans config utilisateur          |
+| **Linux**   | Variable                   | PulseAudio / PipeWire monitor (`*.monitor`)              | Droits session audio ; pas de modèle unique                             | Moyenne selon distro/session            |
 
 ### Détails
 
@@ -47,13 +47,13 @@ Le MVP reste fiable avec micro + import. L’audio système est un chantier sép
 
 ## 3. Options techniques Tauri / Rust
 
-| Approche | Rôle | Notes |
-|----------|------|-------|
-| **cpal** | Capture d’entrées (et sorties selon backend) | Bon pour le **micro MVP**. Loopback : OK côté WASAPI si exposé ; limité ailleurs. |
-| **cpal + WASAPI loopback** | Audio système Windows | Chemin le plus réaliste pour un post-MVP Windows-first. |
-| **screencapturekit-rs** / bindings SCK | Audio/écran macOS | Permissions lourdes ; surface API et stabilité à valider. |
-| **Périphérique virtuel (BlackHole, etc.)** | Contournement multi-OS | Hors process app : guide utilisateur + sélection du device comme micro. Compatible avec le flux JUL-146. |
-| **Plugins Tauri audio** | Abstraction frontend | Peuvent masquer cpal ; vérifier support loopback réel (souvent non). |
+| Approche                                   | Rôle                                         | Notes                                                                                                    |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **cpal**                                   | Capture d’entrées (et sorties selon backend) | Bon pour le **micro MVP**. Loopback : OK côté WASAPI si exposé ; limité ailleurs.                        |
+| **cpal + WASAPI loopback**                 | Audio système Windows                        | Chemin le plus réaliste pour un post-MVP Windows-first.                                                  |
+| **screencapturekit-rs** / bindings SCK     | Audio/écran macOS                            | Permissions lourdes ; surface API et stabilité à valider.                                                |
+| **Périphérique virtuel (BlackHole, etc.)** | Contournement multi-OS                       | Hors process app : guide utilisateur + sélection du device comme micro. Compatible avec le flux JUL-146. |
+| **Plugins Tauri audio**                    | Abstraction frontend                         | Peuvent masquer cpal ; vérifier support loopback réel (souvent non).                                     |
 
 Pour La Minute, la couche audio MVP (JUL-146) doit rester centrée sur **liste d’inputs + enregistrement fichier**, sans brancher SCK ni loopback dans le chemin critique.
 
@@ -61,10 +61,10 @@ Pour La Minute, la couche audio MVP (JUL-146) doit rester centrée sur **liste d
 
 1. **IN MVP** — Micro via cpal (ou équivalent), sélection de device, fichier WAV/MP3 local, import MP3 (JUL-149).
 2. **OUT MVP** — Capture audio système native automatique « both sides ».
-3. **Post-MVP (ordre suggéré)**  
-   - **P0 doc UX** : guide « enregistrement d’appel » (BlackHole / agrégat sur macOS ; monitor PipeWire ; loopback Windows).  
-   - **P1** : loopback WASAPI Windows optionnel.  
-   - **P2** : exploration ScreenCaptureKit macOS si la demande produit le justifie.  
+3. **Post-MVP (ordre suggéré)**
+   - **P0 doc UX** : guide « enregistrement d’appel » (BlackHole / agrégat sur macOS ; monitor PipeWire ; loopback Windows).
+   - **P1** : loopback WASAPI Windows optionnel.
+   - **P2** : exploration ScreenCaptureKit macOS si la demande produit le justifie.
    - **P3** : détection assistée des sources monitor Linux.
 
 Tant que l’audio système n’est pas productisé, le produit doit **expliquer clairement** que seul le micro (et l’import) sont garantis.
@@ -79,13 +79,13 @@ Tant que l’audio système n’est pas productisé, le produit doit **expliquer
 
 ## 6. Suites backlog
 
-| Ticket / thème | Description |
-|----------------|-------------|
-| JUL-146 | Micro — **MVP** (ne pas dériver vers system audio) |
+| Ticket / thème           | Description                                               |
+| ------------------------ | --------------------------------------------------------- |
+| JUL-146                  | Micro — **MVP** (ne pas dériver vers system audio)        |
 | Guide « call recording » | Doc in-app : config OS pour both sides via device virtuel |
-| Feature Windows loopback | Option avancée post-MVP |
-| Spike SCK macOS | PoC permissions + stabilité si priorisé |
-| Linux monitor picker | UI de sélection source PipeWire/Pulse |
+| Feature Windows loopback | Option avancée post-MVP                                   |
+| Spike SCK macOS          | PoC permissions + stabilité si priorisé                   |
+| Linux monitor picker     | UI de sélection source PipeWire/Pulse                     |
 
 ## Décision
 

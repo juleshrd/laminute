@@ -163,7 +163,11 @@ fn build_export(conn: &rusqlite::Connection, id: &str) -> AppResult<MeetingExpor
             .into_iter()
             .map(map_export_transcription)
             .collect(),
-        summaries: detail.summaries.into_iter().map(map_export_summary).collect(),
+        summaries: detail
+            .summaries
+            .into_iter()
+            .map(map_export_summary)
+            .collect(),
         actions: detail.actions,
     })
 }
@@ -240,9 +244,7 @@ fn remove_file_if_present(path: &Path) {
 }
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map_err(|err| err.to_string())
+    app.path().app_data_dir().map_err(|err| err.to_string())
 }
 
 fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>

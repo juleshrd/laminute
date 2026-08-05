@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatDurationMs,
-  meetingStatusLabel,
-  parseStoredSummary,
-} from "./meetings";
+import { formatDurationMs, meetingStatusLabel, parseStoredSummary } from "./meetings";
 
 describe("meetings", () => {
   it("affiche les libellés de statut en français", () => {
@@ -28,7 +24,8 @@ describe("meetings", () => {
   });
 
   it("parse un JSON entouré de balises markdown", () => {
-    const content = '```json\n{"synthese":"OK","decisions":[],"actions":[],"risques":[],"questionsOuvertes":[]}\n```';
+    const content =
+      '```json\n{"synthese":"OK","decisions":[],"actions":[],"risques":[],"questionsOuvertes":[]}\n```';
     const parsed = parseStoredSummary(content);
     expect(parsed?.synthese).toBe("OK");
   });

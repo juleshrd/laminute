@@ -65,7 +65,9 @@ async fn generate_structured_summary_inner(
     let api_key = secrets::get_api_key(&provider_id)
         .map_err(|e| AppError::Message(e.to_string()))?
         .filter(|key| !key.trim().is_empty())
-        .ok_or_else(|| AppError::Message("aucune clé API enregistrée pour ce fournisseur".into()))?;
+        .ok_or_else(|| {
+            AppError::Message("aucune clé API enregistrée pour ce fournisseur".into())
+        })?;
 
     let model = input.model.clone();
     let (meeting_id, transcription_text) = resolve_input(db_state, input)?;
@@ -113,11 +115,15 @@ fn resolve_input(
             if text.trim().is_empty() {
                 return Err(AppError::Message("le texte fourni est vide".into()));
             }
-            with_db(db_state, |conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
+            with_db(db_state, |conn| {
+                MeetingRepository::get_by_id(conn, &meeting_id)
+            })?;
             Ok((meeting_id, text))
         }
         (Some(meeting_id), None) => {
-            with_db(db_state, |conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
+            with_db(db_state, |conn| {
+                MeetingRepository::get_by_id(conn, &meeting_id)
+            })?;
             let text = with_db(db_state, |conn| {
                 SummaryRepository::latest_transcription_text(conn, &meeting_id)
             })?
@@ -134,10 +140,7 @@ fn resolve_input(
                 MeetingRepository::create(
                     conn,
                     CreateMeetingInput {
-                        title: format!(
-                            "Compte-rendu {}",
-                            Utc::now().format("%Y-%m-%d %H:%M")
-                        ),
+                        title: format!("Compte-rendu {}", Utc::now().format("%Y-%m-%d %H:%M")),
                         description: Some("Généré à partir d'un texte importé".into()),
                     },
                 )

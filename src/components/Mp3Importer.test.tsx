@@ -19,9 +19,7 @@ describe("Mp3Importer", () => {
     render(<Mp3Importer />);
 
     expect(screen.getByRole("heading", { name: "Import MP3" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Glissez-déposez un fichier MP3 ici/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Glissez-déposez un fichier MP3 ici/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
     expect(screen.getByText(/MP3 uniquement · 500 Mo max/i)).toBeInTheDocument();
   });

@@ -53,11 +53,10 @@ export function MeetingWorkspace() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [transcription, setTranscription] = useState<Transcription | null>(null);
   const [summary, setSummary] = useState<GenerateStructuredSummaryOutput | null>(null);
-  const [transcriptionProgress, setTranscriptionProgress] =
-    useState<TranscriptionProgress | null>(null);
-  const [processingStep, setProcessingStep] = useState<"transcribing" | "summarizing" | null>(
+  const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(
     null,
   );
+  const [processingStep, setProcessingStep] = useState<"transcribing" | "summarizing" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
@@ -129,7 +128,9 @@ export function MeetingWorkspace() {
       return;
     }
 
-    void getTranscriptionProgress().then(setTranscriptionProgress).catch(() => undefined);
+    void getTranscriptionProgress()
+      .then(setTranscriptionProgress)
+      .catch(() => undefined);
 
     let unlisten: (() => void) | undefined;
     void listenTranscriptionProgress((progress) => {
@@ -312,8 +313,7 @@ export function MeetingWorkspace() {
           meetingId: meetingId ?? undefined,
           meetingTitle: meetingId ? undefined : title.trim() || undefined,
           language: "fr",
-          durationMs:
-            durationSecs != null ? Math.round(durationSecs * 1000) : undefined,
+          durationMs: durationSecs != null ? Math.round(durationSecs * 1000) : undefined,
         });
         setTranscription(nextTranscription);
         setMeetingId(nextTranscription.meetingId);
@@ -354,11 +354,7 @@ export function MeetingWorkspace() {
 
   return (
     <div className="meeting-workspace">
-      <div
-        className={`status-banner status-banner--${flowPhase}`}
-        role="status"
-        aria-live="polite"
-      >
+      <div className={`status-banner status-banner--${flowPhase}`} role="status" aria-live="polite">
         {meetingFlowStatusLabel(flowPhase)}
         {isRecording && recordingStatus?.durationSecs != null && (
           <span className="status-banner__timer">
@@ -412,11 +408,11 @@ export function MeetingWorkspace() {
               <section className="panel">
                 <h2>Enregistrement</h2>
                 <div className="row controls">
-                    <button
-                      type="button"
-                      onClick={requestStartRecording}
-                      disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
-                    >
+                  <button
+                    type="button"
+                    onClick={requestStartRecording}
+                    disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
+                  >
                     Démarrer
                   </button>
                   <button
@@ -444,11 +440,7 @@ export function MeetingWorkspace() {
                     Glissez-déposez un fichier MP3 ici ou sélectionnez-le depuis votre ordinateur.
                   </p>
                   <div className="row controls">
-                    <button
-                      type="button"
-                      onClick={() => void handlePickMp3()}
-                      disabled={importing}
-                    >
+                    <button type="button" onClick={() => void handlePickMp3()} disabled={importing}>
                       {importing ? "Import en cours…" : "Choisir un fichier MP3"}
                     </button>
                   </div>
@@ -493,8 +485,8 @@ export function MeetingWorkspace() {
 
               {!hasApiKey && (flowPhase === "ready" || flowPhase === "error") && (
                 <p className="warning">
-                  Configurez une clé API Mistral dans les réglages IA ci-dessous avant de traiter
-                  la réunion.
+                  Configurez une clé API Mistral dans les réglages IA ci-dessous avant de traiter la
+                  réunion.
                 </p>
               )}
 

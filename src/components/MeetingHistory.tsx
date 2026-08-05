@@ -206,7 +206,10 @@ export function MeetingHistory() {
             </label>
             <label>
               Statut
-              <select value={status} onChange={(event) => setStatus(event.target.value as MeetingStatus | "")}>
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value as MeetingStatus | "")}
+              >
                 <option value="">Tous</option>
                 <option value="draft">Brouillon</option>
                 <option value="recording">Enregistrement</option>
@@ -264,7 +267,11 @@ export function MeetingHistory() {
           </button>
         </div>
 
-        <div className="meeting-history__calendar-grid" role="grid" aria-label="Calendrier des réunions">
+        <div
+          className="meeting-history__calendar-grid"
+          role="grid"
+          aria-label="Calendrier des réunions"
+        >
           {WEEKDAY_LABELS.map((label) => (
             <div key={label} className="meeting-history__calendar-weekday" role="columnheader">
               {label}
@@ -272,7 +279,12 @@ export function MeetingHistory() {
           ))}
           {calendarCells.map((cell, index) => {
             if (cell.day === null || cell.key === null) {
-              return <div key={`empty-${index}`} className="meeting-history__calendar-cell meeting-history__calendar-cell--empty" />;
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className="meeting-history__calendar-cell meeting-history__calendar-cell--empty"
+                />
+              );
             }
 
             const count = countsByDay.get(cell.key) ?? 0;

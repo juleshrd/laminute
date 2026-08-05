@@ -17,9 +17,7 @@ describe("RecordingConsentModal", () => {
 
     render(<RecordingConsentModal onConfirm={onConfirm} onCancel={onCancel} />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /J'ai informé les participants/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /J'ai informé les participants/i }));
 
     expect(onConfirm).toHaveBeenCalledOnce();
     expect(onCancel).not.toHaveBeenCalled();
