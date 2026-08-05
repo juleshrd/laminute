@@ -1,0 +1,135 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+import type { StructuredSummary } from "../lib/ai/types";
+import {
+  formatDurationMs,
+  meetingDisplayDate,
+  meetingDurationMs,
+  meetingStatusLabel,
+  parseStoredSummary,
+  type MeetingDetail,
+} from "../lib/meetings";
+import "../components/StructuredSummaryPanel.css";
+
+interface MeetingDetailSheetProps {
+  detail: MeetingDetail;
+  onBack: () => void;
+}
+
+export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) {
+  const audioFile = detail.audioFiles[0];
+  const transcription = detail.transcriptions[detail.transcriptions.length - 1];
+  const summaryRecord = detail.summaries[detail.summaries.length - 1];
+  const structured: StructuredSummary | null = summaryRecord
+    ? parseStoredSummary(summaryRecord.content)
+    : null;
+  const durationMs = meetingDurationMs(detail);
+
+  return (
+    <section className="panel meeting-detail">
+      <div className="meeting-detail__header">
+        <button type="button" className="meeting-detail__back" onClick={onBack}>
+          ← Retour à la liste
+        </button>
+        <h2>{detail.title}</h2>
+      </div>
+
+      <dl className="status-grid">
+        <div>
+          <dt>Statut</dt>
+          <dd>{meetingStatusLabel(detail.status)}</dd>
+        </div>
+        <div>
+          <dt>Date</dt>
+          <dd>{meetingDisplayDate(detail)}</dd>
+        </div>
+        <div>
+          <dt>Durée</dt>
+          <dd>{formatDurationMs(durationMs)}</dd>
+        </div>
+      </dl>
+
+      {audioFile && (
+        <article className="meeting-detail__block">
+          <h3>Audio</h3>
+          <audio controls src={convertFileSrc(audioFile.filePath)} className="meeting-detail__audio">
+            Votre navigateur ne supporte pas la lecture audio.
+          </audio>
+        </article>
+      )}
+
+      {transcription && (
+        <article className="meeting-detail__block">
+          <h3>Transcription</h3>
+          <div className="meeting-detail__scroll">
+            <p>{transcription.content}</p>
+            {transcription.language && (
+              <p className="meta">Langue détectée : {transcription.language}</p>
+            )}
+          </div>
+        </article>
+      )}
+
+      {structured && (
+        <article className="meeting-detail__block structured-summary-inline">
+          <h3>Compte-rendu structuré</h3>
+
+          <div className="structured-summary__block">
+            <h4>Synthèse</h4>
+            <p>{structured.synthese}</p>
+          </div>
+
+          <div className="structured-summary__block">
+            <h4>Décisions</h4>
+            {structured.decisions.length > 0 ? (
+              <ul>
+                {structured.decisions.map((decision) => (
+                  <li key={decision}>{decision}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="structured-summary__empty">Aucune décision identifiée.</p>
+            )}
+          </div>
+
+          <div className="structured-summary__block">
+            <h4>Actions</h4>
+            {structured.actions.length > 0 ? (
+              <ul>
+                {structured.actions.map((action) => (
+                  <li key={`${action.titre}-${action.responsable ?? ""}`}>
+                    <strong>{action.titre}</strong>
+                    {action.description && <span> — {action.description}</span>}
+                    {action.responsable && (
+                      <span className="structured-summary__tag">{action.responsable}</span>
+                    )}
+                    {action.echeance && (
+                      <span className="structured-summary__tag">{action.echeance}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="structured-summary__empty">Aucune action identifiée.</p>
+            )}
+          </div>
+        </article>
+      )}
+
+      {detail.actions.length > 0 && (
+        <article className="meeting-detail__block">
+          <h3>Actions enregistrées</h3>
+          <ul className="meeting-detail__actions-list">
+            {detail.actions.map((action) => (
+              <li key={action.id}>
+                <strong>{action.title}</strong>
+                {action.assignee && <span className="structured-summary__tag">{action.assignee}</span>}
+                {action.dueDate && <span className="structured-summary__tag">{action.dueDate}</span>}
+              </li>
+            ))}
+          </ul>
+        </article>
+      )}
+    </section>
+  );
+}

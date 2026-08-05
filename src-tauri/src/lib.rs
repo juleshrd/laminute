@@ -15,7 +15,7 @@ use tauri::Manager;
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
 use commands::{
     create_meeting, delete_meeting, generate_structured_summary, get_meeting, import_mp3_meeting,
-    list_meetings, update_meeting_title,
+    list_meetings, search_meetings, update_meeting_title,
 };
 use db::open_and_migrate;
 
@@ -107,6 +107,7 @@ pub fn run() {
             create_meeting,
             get_meeting,
             list_meetings,
+            search_meetings,
             delete_meeting,
             update_meeting_title,
             ai::commands::list_ai_providers,

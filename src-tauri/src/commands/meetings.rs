@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateMeetingInput, Meeting, MeetingDetail, MeetingSummary};
+use crate::models::{CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters, MeetingSummary};
 use crate::repository::MeetingRepository;
 
 #[tauri::command]
@@ -21,6 +21,14 @@ pub fn get_meeting(state: State<'_, AppState>, id: String) -> Result<MeetingDeta
 #[tauri::command]
 pub fn list_meetings(state: State<'_, AppState>) -> Result<Vec<MeetingSummary>, String> {
     with_db(&state, MeetingRepository::list).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn search_meetings(
+    state: State<'_, AppState>,
+    filters: MeetingSearchFilters,
+) -> Result<Vec<MeetingListItem>, String> {
+    with_db(&state, |conn| MeetingRepository::search(conn, &filters)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

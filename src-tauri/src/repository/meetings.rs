@@ -8,8 +8,8 @@ use crate::audio::import::{import_mp3, title_from_path, ImportedAudio};
 use crate::audio::AudioError;
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingStatus,
-    MeetingSummary, Summary, Transcription,
+    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem,
+    MeetingSearchFilters, MeetingStatus, MeetingSummary, Summary, Transcription,
 };
 
 pub struct MeetingRepository;
@@ -82,6 +82,106 @@ impl MeetingRepository {
                 updated_at: row.get(6)?,
             })
         })?;
+
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn search(
+        conn: &Connection,
+        filters: &MeetingSearchFilters,
+    ) -> AppResult<Vec<MeetingListItem>> {
+        let query = filters
+            .query
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+
+        let like_pattern = query.map(|value| format!("%{}%", escape_like(value)));
+
+        let status_str = filters.status.map(|status| status.as_str().to_string());
+
+        let sql = r#"
+            SELECT
+                m.id,
+                m.title,
+                m.status,
+                m.created_at,
+                m.started_at,
+                m.ended_at,
+                m.updated_at,
+                CASE
+                    WHEN ?1 IS NOT NULL THEN COALESCE(
+                        CASE WHEN m.title LIKE ?2 ESCAPE '\' THEN substr(m.title, 1, 120) END,
+                        (
+                            SELECT substr(t.content, 1, 120)
+                            FROM transcriptions t
+                            WHERE t.meeting_id = m.id AND t.content LIKE ?2 ESCAPE '\'
+                            LIMIT 1
+                        ),
+                        (
+                            SELECT substr(s.content, 1, 120)
+                            FROM summaries s
+                            WHERE s.meeting_id = m.id AND s.content LIKE ?2 ESCAPE '\'
+                            LIMIT 1
+                        )
+                    )
+                END AS snippet
+            FROM meetings m
+            WHERE (?3 IS NULL OR m.status = ?3)
+              AND (?4 IS NULL OR date(COALESCE(m.started_at, m.created_at)) >= date(?4))
+              AND (?5 IS NULL OR date(COALESCE(m.started_at, m.created_at)) <= date(?5))
+              AND (
+                    ?6 IS NULL
+                    OR EXISTS (
+                        SELECT 1 FROM transcriptions t
+                        WHERE t.meeting_id = m.id AND t.provider_id = ?6
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM summaries s
+                        WHERE s.meeting_id = m.id AND s.provider_id = ?6
+                    )
+              )
+              AND (
+                    ?1 IS NULL
+                    OR m.title LIKE ?2 ESCAPE '\'
+                    OR EXISTS (
+                        SELECT 1 FROM transcriptions t
+                        WHERE t.meeting_id = m.id AND t.content LIKE ?2 ESCAPE '\'
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM summaries s
+                        WHERE s.meeting_id = m.id AND s.content LIKE ?2 ESCAPE '\'
+                    )
+              )
+            ORDER BY m.created_at DESC
+        "#;
+
+        let mut stmt = conn.prepare(sql)?;
+
+        let rows = stmt.query_map(
+            params![
+                query,
+                like_pattern,
+                status_str,
+                filters.date_from,
+                filters.date_to,
+                filters.provider_id,
+            ],
+            |row| {
+                let status_value: String = row.get(2)?;
+                Ok(MeetingListItem {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    status: MeetingStatus::from_str(&status_value)
+                        .unwrap_or(MeetingStatus::Draft),
+                    created_at: row.get(3)?,
+                    started_at: row.get(4)?,
+                    ended_at: row.get(5)?,
+                    updated_at: row.get(6)?,
+                    snippet: row.get(7)?,
+                })
+            },
+        )?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
@@ -362,10 +462,6 @@ impl MeetingRepository {
     }
 }
 
-fn map_audio_error(error: AudioError) -> AppError {
-    AppError::Message(error.to_string())
-}
-
 fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
     let status_str: String = row.get(3)?;
     Ok(Meeting {
@@ -378,6 +474,17 @@ fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
     })
+}
+
+fn map_audio_error(error: AudioError) -> AppError {
+    AppError::Message(error.to_string())
+}
+
+fn escape_like(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 #[cfg(test)]
@@ -606,5 +713,178 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(imports_dir);
+    }
+
+    fn empty_filters() -> MeetingSearchFilters {
+        MeetingSearchFilters {
+            query: None,
+            status: None,
+            provider_id: None,
+            date_from: None,
+            date_to: None,
+        }
+    }
+
+    #[test]
+    fn search_empty_query_returns_all_meetings() {
+        let conn = open_in_memory().unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Alpha".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Beta".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(&conn, &empty_filters()).unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn search_by_title() {
+        let conn = open_in_memory().unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Comité produit".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Stand-up".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                query: Some("produit".into()),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Comité produit");
+        assert!(results[0].snippet.is_some());
+    }
+
+    #[test]
+    fn search_by_status() {
+        let conn = open_in_memory().unwrap();
+        let draft = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Brouillon".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        let completed = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Terminée".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        MeetingRepository::update_status(&conn, &completed.id, MeetingStatus::Completed).unwrap();
+        let _ = draft;
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                status: Some(MeetingStatus::Completed),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Terminée");
+    }
+
+    #[test]
+    fn search_by_provider_id() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Avec IA".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        seed_related_data(&conn, &meeting.id);
+
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Sans IA".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                provider_id: Some("provider-1".into()),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Avec IA");
+    }
+
+    #[test]
+    fn search_by_date_range() {
+        let conn = open_in_memory().unwrap();
+        let now = Utc::now().to_rfc3339();
+        let yesterday = (Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO meetings (id, title, description, status, started_at, created_at, updated_at)
+             VALUES ('old', 'Ancienne réunion', NULL, 'completed', ?1, ?1, ?1)",
+            [&yesterday],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO meetings (id, title, description, status, started_at, created_at, updated_at)
+             VALUES ('new', 'Réunion du jour', NULL, 'completed', ?1, ?1, ?1)",
+            [&now],
+        )
+        .unwrap();
+
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                date_from: Some(today.clone()),
+                date_to: Some(today),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Réunion du jour");
     }
 }
