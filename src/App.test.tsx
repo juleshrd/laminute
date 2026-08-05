@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 
@@ -34,6 +34,8 @@ vi.mock("./components/PrivacySettings", () => ({
 vi.mock("./components/UpdateAvailableModal", () => ({
   UpdateAvailableModal: () => <div>Modal de mise à jour test</div>,
 }));
+
+afterEach(cleanup);
 
 describe("App", () => {
   it("n'affiche que la vue choisie dans la navigation principale", () => {
