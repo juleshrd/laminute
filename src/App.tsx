@@ -10,7 +10,7 @@ import { PrivacySettings } from "./components/PrivacySettings";
 import { UpdateAvailableModal } from "./components/UpdateAvailableModal";
 import "./App.css";
 
-type AppTab = "new" | "history";
+type AppTab = "new" | "history" | "settings";
 
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("new");
@@ -60,39 +60,49 @@ function App() {
   };
 
   return (
-    <main className="container">
-      <h1>{APP_NAME}</h1>
+    <div className="app-shell">
+      <header className="app-header">
+        <h1 className="app-header__brand">{APP_NAME}</h1>
+        <p className="app-header__tagline">Enregistrez, importez, compte-rendu.</p>
+        <nav className="app-nav" aria-label="Navigation principale">
+          <button
+            type="button"
+            className={activeTab === "new" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"}
+            onClick={() => setActiveTab("new")}
+          >
+            Réunion
+          </button>
+          <button
+            type="button"
+            className={
+              activeTab === "history" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"
+            }
+            onClick={() => setActiveTab("history")}
+          >
+            Historique
+          </button>
+          <button
+            type="button"
+            className={
+              activeTab === "settings" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"
+            }
+            onClick={() => setActiveTab("settings")}
+          >
+            Réglages
+          </button>
+        </nav>
+      </header>
 
-      <nav className="app-tabs" aria-label="Navigation principale">
-        <button
-          type="button"
-          className={activeTab === "new" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"}
-          onClick={() => setActiveTab("new")}
-        >
-          Nouvelle réunion
-        </button>
-        <button
-          type="button"
-          className={
-            activeTab === "history" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"
-          }
-          onClick={() => setActiveTab("history")}
-        >
-          Historique
-        </button>
-      </nav>
-
-      {activeTab === "new" ? <MeetingWorkspace /> : <MeetingHistory />}
-
-      <details className="ai-settings-collapsible">
-        <summary>Réglages IA</summary>
-        <AiProviderSettings />
-      </details>
-
-      <details className="ai-settings-collapsible">
-        <summary>Confidentialité</summary>
-        <PrivacySettings />
-      </details>
+      <main className="app-main" key={activeTab}>
+        {activeTab === "new" ? <MeetingWorkspace /> : null}
+        {activeTab === "history" ? <MeetingHistory /> : null}
+        {activeTab === "settings" ? (
+          <div className="app-settings">
+            <AiProviderSettings />
+            <PrivacySettings />
+          </div>
+        ) : null}
+      </main>
 
       {pendingUpdate ? (
         <UpdateAvailableModal
@@ -112,7 +122,7 @@ function App() {
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

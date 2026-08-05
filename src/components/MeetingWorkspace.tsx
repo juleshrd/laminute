@@ -411,8 +411,57 @@ export function MeetingWorkspace() {
         <>
           {showHomeControls && (
             <>
+              <p className="meeting-workspace__intro">
+                Importez un MP3 ou lancez un enregistrement — le compte-rendu suit.
+              </p>
+
+              {flowPhase === "idle" && (
+                <section
+                  className={`panel drop-zone${dragOver ? " drop-zone-active" : ""}`}
+                  onDragEnter={() => setDragOver(true)}
+                  onDragLeave={() => setDragOver(false)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                  }}
+                >
+                  <h2>Import MP3</h2>
+                  <p className="drop-zone-hint">
+                    Glissez-déposez un fichier MP3 ici ou sélectionnez-le depuis votre ordinateur.
+                  </p>
+                  <div className="row controls">
+                    <button type="button" onClick={() => void handlePickMp3()} disabled={importing}>
+                      {importing ? "Import en cours…" : "Choisir un fichier MP3"}
+                    </button>
+                  </div>
+                  <p className="drop-zone-constraints">
+                    MP3 uniquement · 500 Mo max · entre 1 s et 4 h
+                  </p>
+                </section>
+              )}
+
               <section className="panel">
-                <h2>Périphérique d&apos;entrée</h2>
+                <h2>Enregistrement</h2>
+                <div className="row controls">
+                  <button
+                    type="button"
+                    onClick={requestStartRecording}
+                    disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
+                  >
+                    Démarrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleStopRecording()}
+                    disabled={!isRecording}
+                  >
+                    Arrêter
+                  </button>
+                </div>
+              </section>
+
+              <details className="meeting-workspace__options">
+                <summary>Périphérique d&apos;entrée</summary>
                 {devices.length === 0 ? (
                   <p className="warning">Aucun périphérique d&apos;entrée détecté.</p>
                 ) : (
@@ -445,52 +494,7 @@ export function MeetingWorkspace() {
                     </button>
                   </div>
                 )}
-              </section>
-
-              <section className="panel">
-                <h2>Enregistrement</h2>
-                <div className="row controls">
-                  <button
-                    type="button"
-                    onClick={requestStartRecording}
-                    disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
-                  >
-                    Démarrer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleStopRecording()}
-                    disabled={!isRecording}
-                  >
-                    Arrêter
-                  </button>
-                </div>
-              </section>
-
-              {flowPhase === "idle" && (
-                <section
-                  className={`panel drop-zone${dragOver ? " drop-zone-active" : ""}`}
-                  onDragEnter={() => setDragOver(true)}
-                  onDragLeave={() => setDragOver(false)}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                >
-                  <h2>Import MP3</h2>
-                  <p className="drop-zone-hint">
-                    Glissez-déposez un fichier MP3 ici ou sélectionnez-le depuis votre ordinateur.
-                  </p>
-                  <div className="row controls">
-                    <button type="button" onClick={() => void handlePickMp3()} disabled={importing}>
-                      {importing ? "Import en cours…" : "Choisir un fichier MP3"}
-                    </button>
-                  </div>
-                  <p className="drop-zone-constraints">
-                    MP3 uniquement · 500 Mo max · entre 1 s et 4 h
-                  </p>
-                </section>
-              )}
+              </details>
             </>
           )}
 
@@ -528,7 +532,7 @@ export function MeetingWorkspace() {
               {!hasApiKey && (flowPhase === "ready" || flowPhase === "error") && (
                 <p className="warning">
                   Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour {providerName}{" "}
-                  dans les réglages IA ci-dessous avant de traiter la réunion.
+                  dans l&apos;onglet Réglages avant de traiter la réunion.
                 </p>
               )}
 
