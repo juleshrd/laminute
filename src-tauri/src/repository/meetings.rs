@@ -234,6 +234,27 @@ impl MeetingRepository {
         })
     }
 
+    pub fn update_title(conn: &Connection, id: &str, title: &str) -> AppResult<Meeting> {
+        let trimmed = title.trim();
+        if trimmed.is_empty() {
+            return Err(AppError::Message("le titre est obligatoire".into()));
+        }
+
+        let now = Utc::now().to_rfc3339();
+        let updated = conn.execute(
+            "UPDATE meetings SET title = ?1, updated_at = ?2 WHERE id = ?3",
+            params![trimmed, now, id],
+        )?;
+
+        if updated == 0 {
+            return Err(AppError::MeetingNotFound {
+                id: id.to_string(),
+            });
+        }
+
+        Self::get_by_id(conn, id)
+    }
+
     pub fn update_status(
         conn: &Connection,
         meeting_id: &str,
@@ -435,6 +456,42 @@ mod tests {
         )
         .unwrap_err();
 
+        assert!(err.to_string().contains("titre"));
+    }
+
+    #[test]
+    fn update_title_ok() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Stand-up".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let updated =
+            MeetingRepository::update_title(&conn, &meeting.id, "Comité produit").unwrap();
+        assert_eq!(updated.title, "Comité produit");
+
+        let fetched = MeetingRepository::get_by_id(&conn, &meeting.id).unwrap();
+        assert_eq!(fetched.title, "Comité produit");
+    }
+
+    #[test]
+    fn reject_empty_title_on_update() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Stand-up".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let err = MeetingRepository::update_title(&conn, &meeting.id, "   ").unwrap_err();
         assert!(err.to_string().contains("titre"));
     }
 

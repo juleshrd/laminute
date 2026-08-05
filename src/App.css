@@ -160,6 +160,100 @@ select {
   color: #667085;
 }
 
+.meeting-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.status-banner {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status-banner--recording {
+  border-color: #fecdca;
+  background: #fef3f2;
+}
+
+.status-banner--ready {
+  border-color: #abefc6;
+  background: #f6fef9;
+}
+
+.status-banner--processing {
+  border-color: #b2ddff;
+  background: #eff8ff;
+}
+
+.status-banner--done {
+  border-color: #abefc6;
+  background: #f6fef9;
+}
+
+.status-banner--error {
+  border-color: #fecdca;
+  background: #fef3f2;
+}
+
+.status-banner__timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.1rem;
+}
+
+.meeting-workspace__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.meeting-workspace__field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.meeting-workspace__field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ai-settings-collapsible {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  padding: 0.75rem 1rem 1rem;
+  background: #fff;
+}
+
+.ai-settings-collapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style-position: outside;
+}
+
+.ai-settings-collapsible .ai-settings {
+  margin-top: 1rem;
+  padding: 0;
+  max-width: none;
+}
+
+.structured-summary-inline .structured-summary__block {
+  margin-top: 0.75rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

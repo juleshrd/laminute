@@ -28,6 +28,16 @@ pub fn delete_meeting(state: State<'_, AppState>, id: String) -> Result<(), Stri
     with_db(&state, |conn| MeetingRepository::delete(conn, &id)).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn update_meeting_title(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+) -> Result<Meeting, String> {
+    with_db(&state, |conn| MeetingRepository::update_title(conn, &id, &title))
+        .map_err(|e| e.to_string())
+}
+
 fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>
 where
     F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
