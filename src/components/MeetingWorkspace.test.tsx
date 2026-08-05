@@ -19,6 +19,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 vi.mock("../lib/ai/api", () => ({
   getAiSettings: vi.fn().mockResolvedValue({ hasApiKey: true, selectedProviderId: "mistral" }),
+  listAiProviders: vi
+    .fn()
+    .mockResolvedValue([{ id: "mistral", displayName: "Mistral AI", capabilities: {} }]),
   generateStructuredSummary: vi.fn(),
 }));
 
@@ -64,6 +67,18 @@ describe("MeetingWorkspace", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
+  });
+
+  it("demande le consentement avant de démarrer l'enregistrement", async () => {
+    render(<MeetingWorkspace />);
+    await screen.findByRole("button", { name: "Démarrer" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Démarrer" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: /Avertissement d'enregistrement/i }),
+    ).toBeInTheDocument();
+    expect(invokeMock).not.toHaveBeenCalledWith("start_microphone_recording", expect.anything());
   });
 
   it("passe en phase ready après import MP3", async () => {

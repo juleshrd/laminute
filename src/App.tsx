@@ -4,6 +4,7 @@ import { APP_NAME } from "./lib/app";
 import { AiProviderSettings } from "./components/AiProviderSettings";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingWorkspace } from "./components/MeetingWorkspace";
+import { PrivacySettings } from "./components/PrivacySettings";
 import "./App.css";
 
 type AppTab = "new" | "history";
@@ -39,6 +40,11 @@ function App() {
       <details className="ai-settings-collapsible">
         <summary>Réglages IA</summary>
         <AiProviderSettings />
+      </details>
+
+      <details className="ai-settings-collapsible">
+        <summary>Confidentialité</summary>
+        <PrivacySettings />
       </details>
     </main>
   );

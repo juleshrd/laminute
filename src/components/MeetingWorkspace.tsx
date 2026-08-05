@@ -3,10 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { getAiSettings } from "../lib/ai/api";
+import { getAiSettings, listAiProviders } from "../lib/ai/api";
 import { generateStructuredSummary } from "../lib/ai/api";
 import type { GenerateStructuredSummaryOutput } from "../lib/ai/types";
 import "../components/StructuredSummaryPanel.css";
+import { DataProcessingNotice } from "./DataProcessingNotice";
+import { RecordingConsentModal } from "./RecordingConsentModal";
 import {
   type AudioInputDevice,
   type MeetingDetail,
@@ -60,6 +62,8 @@ export function MeetingWorkspace() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [showRecordingConsent, setShowRecordingConsent] = useState(false);
+  const [providerName, setProviderName] = useState("Mistral");
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -91,8 +95,10 @@ export function MeetingWorkspace() {
 
   const refreshAiSettings = useCallback(async () => {
     try {
-      const settings = await getAiSettings();
+      const [settings, providers] = await Promise.all([getAiSettings(), listAiProviders()]);
       setHasApiKey(settings.hasApiKey);
+      const selected = providers.find((provider) => provider.id === settings.selectedProviderId);
+      setProviderName(selected?.displayName ?? providers[0]?.displayName ?? "Mistral");
     } catch (err) {
       setError(formatError(err));
     }
@@ -223,10 +229,15 @@ export function MeetingWorkspace() {
       setTranscription(null);
       setSummary(null);
       setFlowPhase("recording");
+      setShowRecordingConsent(false);
     } catch (err) {
       setError(formatError(err));
       await refreshRecordingStatus();
     }
+  }
+
+  function requestStartRecording() {
+    setShowRecordingConsent(true);
   }
 
   async function handleStopRecording() {
@@ -401,11 +412,11 @@ export function MeetingWorkspace() {
               <section className="panel">
                 <h2>Enregistrement</h2>
                 <div className="row controls">
-                  <button
-                    type="button"
-                    onClick={() => void handleStartRecording()}
-                    disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
-                  >
+                    <button
+                      type="button"
+                      onClick={requestStartRecording}
+                      disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
+                    >
                     Démarrer
                   </button>
                   <button
@@ -485,6 +496,10 @@ export function MeetingWorkspace() {
                   Configurez une clé API Mistral dans les réglages IA ci-dessous avant de traiter
                   la réunion.
                 </p>
+              )}
+
+              {(flowPhase === "ready" || flowPhase === "error") && hasApiKey && (
+                <DataProcessingNotice providerName={providerName} />
               )}
 
               {(flowPhase === "ready" || flowPhase === "error") && (
@@ -569,6 +584,13 @@ export function MeetingWorkspace() {
         <p className="error" role="alert">
           {error}
         </p>
+      )}
+
+      {showRecordingConsent && (
+        <RecordingConsentModal
+          onConfirm={() => void handleStartRecording()}
+          onCancel={() => setShowRecordingConsent(false)}
+        />
       )}
     </div>
   );

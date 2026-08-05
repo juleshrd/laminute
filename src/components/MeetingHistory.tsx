@@ -165,7 +165,13 @@ export function MeetingHistory() {
   }
 
   if (selectedId && detail) {
-    return <MeetingDetailSheet detail={detail} onBack={() => setSelectedId(null)} />;
+    return (
+      <MeetingDetailSheet
+        detail={detail}
+        onBack={() => setSelectedId(null)}
+        onDeleted={() => void loadResults()}
+      />
+    );
   }
 
   return (

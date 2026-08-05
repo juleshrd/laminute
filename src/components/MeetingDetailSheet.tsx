@@ -1,6 +1,14 @@
+import { useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 
 import type { StructuredSummary } from "../lib/ai/types";
+import { deleteMeeting } from "../lib/meetings";
+import {
+  buildExportFilename,
+  exportMeeting,
+  writeExportFile,
+} from "../lib/privacy";
 import {
   formatDurationMs,
   meetingDisplayDate,
@@ -14,9 +22,14 @@ import "../components/StructuredSummaryPanel.css";
 interface MeetingDetailSheetProps {
   detail: MeetingDetail;
   onBack: () => void;
+  onDeleted?: () => void;
 }
 
-export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) {
+export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailSheetProps) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
   const audioFile = detail.audioFiles[0];
   const transcription = detail.transcriptions[detail.transcriptions.length - 1];
   const summaryRecord = detail.summaries[detail.summaries.length - 1];
@@ -25,6 +38,53 @@ export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) 
     : null;
   const durationMs = meetingDurationMs(detail);
 
+  async function handleExport() {
+    setBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const exportedAt = new Date().toISOString();
+      const contents = await exportMeeting(detail.id);
+      const defaultPath = buildExportFilename(detail.title, exportedAt);
+      const path = await save({
+        defaultPath,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (path === null) {
+        return;
+      }
+      await writeExportFile(path, contents);
+      setStatusMessage("Export enregistré.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (
+      !window.confirm(
+        `Supprimer définitivement la réunion « ${detail.title} » et son fichier audio ?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      await deleteMeeting(detail.id);
+      onDeleted?.();
+      onBack();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Suppression impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="panel meeting-detail">
       <div className="meeting-detail__header">
@@ -32,6 +92,19 @@ export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) 
           ← Retour à la liste
         </button>
         <h2>{detail.title}</h2>
+        <div className="row controls meeting-detail__actions">
+          <button type="button" disabled={busy} onClick={() => void handleExport()}>
+            Exporter (JSON)
+          </button>
+          <button
+            type="button"
+            className="meeting-detail__danger"
+            disabled={busy}
+            onClick={() => void handleDelete()}
+          >
+            Supprimer
+          </button>
+        </div>
       </div>
 
       <dl className="status-grid">
@@ -49,6 +122,18 @@ export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) 
         </div>
       </dl>
 
+      {statusMessage && (
+        <p className="meeting-detail__status" role="status">
+          {statusMessage}
+        </p>
+      )}
+
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+
       {audioFile && (
         <article className="meeting-detail__block">
           <h3>Audio</h3>
@@ -61,6 +146,9 @@ export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) 
       {transcription && (
         <article className="meeting-detail__block">
           <h3>Transcription</h3>
+          {transcription.providerId && (
+            <p className="meta">Fournisseur : {transcription.providerId}</p>
+          )}
           <div className="meeting-detail__scroll">
             <p>{transcription.content}</p>
             {transcription.language && (
@@ -73,6 +161,9 @@ export function MeetingDetailSheet({ detail, onBack }: MeetingDetailSheetProps) 
       {structured && (
         <article className="meeting-detail__block structured-summary-inline">
           <h3>Compte-rendu structuré</h3>
+          {summaryRecord?.providerId && (
+            <p className="meta">Fournisseur : {summaryRecord.providerId}</p>
+          )}
 
           <div className="structured-summary__block">
             <h4>Synthèse</h4>

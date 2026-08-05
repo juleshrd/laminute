@@ -81,3 +81,5 @@ Cette commande enchaîne le lint frontend/Rust, les tests, puis la compilation c
 ## Licence
 
 GPL-3.0 — voir [LICENSE](LICENSE).
+
+Politique de confidentialité : [PRIVACY.md](PRIVACY.md).
