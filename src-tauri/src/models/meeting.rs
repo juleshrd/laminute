@@ -55,6 +55,29 @@ pub struct MeetingSummary {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingSearchFilters {
+    pub query: Option<String>,
+    pub status: Option<MeetingStatus>,
+    pub provider_id: Option<String>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingListItem {
+    pub id: String,
+    pub title: String,
+    pub status: MeetingStatus,
+    pub created_at: String,
+    pub started_at: Option<String>,
+    pub ended_at: Option<String>,
+    pub updated_at: String,
+    pub snippet: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeetingDetail {

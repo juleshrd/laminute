@@ -4,6 +4,7 @@ mod summary;
 
 pub use audio::import_mp3_meeting;
 pub use meetings::{
-    create_meeting, delete_meeting, get_meeting, list_meetings, update_meeting_title,
+    create_meeting, delete_meeting, get_meeting, list_meetings, search_meetings,
+    update_meeting_title,
 };
 pub use summary::generate_structured_summary;
