@@ -101,6 +101,31 @@ select {
   color: #b42318;
 }
 
+.success-panel {
+  border-color: #abefc6;
+  background: #f6fef9;
+}
+
+.drop-zone {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.drop-zone-active {
+  border-color: #396cd8;
+  background: #f5f8ff;
+}
+
+.drop-zone-hint {
+  margin: 0 0 1rem;
+  color: #475467;
+}
+
+.drop-zone-constraints {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: #667085;
+}
+
 .error {
   margin: 0;
   padding: 0.75rem 1rem;

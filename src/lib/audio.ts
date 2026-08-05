@@ -1,5 +1,7 @@
 export type RecordingPhase = "idle" | "recording" | "stopped";
 
+export type MeetingStatus = "draft" | "recording" | "processing" | "completed";
+
 export interface AudioInputDevice {
   id: string;
   name: string;
@@ -12,6 +14,30 @@ export interface RecordingStatus {
   filePath: string | null;
   durationSecs: number | null;
   error: string | null;
+}
+
+export interface AudioFile {
+  id: string;
+  meetingId: string;
+  filePath: string;
+  durationMs: number | null;
+  format: string | null;
+  createdAt: string;
+}
+
+export interface MeetingDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  status: MeetingStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  audioFiles: AudioFile[];
+  transcriptions: unknown[];
+  summaries: unknown[];
+  actions: unknown[];
 }
 
 export interface AudioErrorPayload {
@@ -28,6 +54,16 @@ export function isAudioError(value: unknown): value is AudioErrorPayload {
     typeof (value as AudioErrorPayload).code === "string" &&
     typeof (value as AudioErrorPayload).message === "string"
   );
+}
+
+export function formatAudioError(error: unknown): string {
+  if (isAudioError(error)) {
+    return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 export function formatDuration(seconds: number | null): string {

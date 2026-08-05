@@ -23,6 +23,21 @@ pub enum AudioError {
 
     #[error("erreur audio : {0}")]
     Internal(String),
+
+    #[error("format non supporté — seuls les fichiers MP3 sont acceptés pour l'import")]
+    UnsupportedFormat,
+
+    #[error("fichier trop volumineux (maximum {max_mb} Mo)")]
+    FileTooLarge { max_mb: u64 },
+
+    #[error("durée audio trop courte (minimum {min_secs} s)")]
+    DurationTooShort { min_secs: i64 },
+
+    #[error("durée audio trop longue (maximum {max_hours} h)")]
+    DurationTooLong { max_hours: i64 },
+
+    #[error("fichier audio invalide : {0}")]
+    InvalidAudio(String),
 }
 
 impl AudioError {
@@ -35,6 +50,11 @@ impl AudioError {
             Self::NotRecording => "not_recording",
             Self::Io(_) => "io_error",
             Self::Internal(_) => "internal_error",
+            Self::UnsupportedFormat => "unsupported_format",
+            Self::FileTooLarge { .. } => "file_too_large",
+            Self::DurationTooShort { .. } => "duration_too_short",
+            Self::DurationTooLong { .. } => "duration_too_long",
+            Self::InvalidAudio(_) => "invalid_audio",
         }
     }
 

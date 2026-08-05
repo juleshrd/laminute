@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isAudioError } from "./audio";
+import { formatAudioError, formatDuration, isAudioError } from "./audio";
 
 describe("audio helpers", () => {
   it("formats duration as mm:ss", () => {
@@ -16,5 +16,14 @@ describe("audio helpers", () => {
       }),
     ).toBe(true);
     expect(isAudioError("permission denied")).toBe(false);
+  });
+
+  it("formats structured audio errors as readable messages", () => {
+    expect(
+      formatAudioError({
+        code: "unsupported_format",
+        message: "format non supporté — seuls les fichiers MP3 sont acceptés pour l'import",
+      }),
+    ).toBe("format non supporté — seuls les fichiers MP3 sont acceptés pour l'import");
   });
 });

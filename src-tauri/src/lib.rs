@@ -13,7 +13,9 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
-use commands::{create_meeting, delete_meeting, get_meeting, list_meetings};
+use commands::{
+    create_meeting, delete_meeting, get_meeting, import_mp3_meeting, list_meetings,
+};
 use db::open_and_migrate;
 
 /// État IA (providers BYOK) — distinct de l'état SQLite et audio.
@@ -73,6 +75,7 @@ fn get_recording_status(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_data_dir = app
@@ -115,6 +118,7 @@ pub fn run() {
             start_microphone_recording,
             stop_microphone_recording,
             get_recording_status,
+            import_mp3_meeting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

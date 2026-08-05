@@ -1,7 +1,11 @@
+use std::path::Path;
+
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
 
+use crate::audio::import::{import_mp3, title_from_path, ImportedAudio};
+use crate::audio::AudioError;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingStatus,
@@ -80,6 +84,61 @@ impl MeetingRepository {
         })?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn create_from_mp3_import(
+        conn: &Connection,
+        source: &Path,
+        imports_dir: &Path,
+    ) -> AppResult<MeetingDetail> {
+        let imported = import_mp3(source, imports_dir).map_err(map_audio_error)?;
+        let title = title_from_path(source);
+        Self::create_from_imported_audio(conn, &title, &imported)
+    }
+
+    pub fn create_from_imported_audio(
+        conn: &Connection,
+        title: &str,
+        imported: &ImportedAudio,
+    ) -> AppResult<MeetingDetail> {
+        let meeting_id = Uuid::new_v4().to_string();
+        let audio_id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let trimmed_title = title.trim();
+        if trimmed_title.is_empty() {
+            return Err(AppError::Message("le titre est obligatoire".into()));
+        }
+
+        let tx = conn.unchecked_transaction()?;
+
+        tx.execute(
+            "INSERT INTO meetings (id, title, description, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5)",
+            params![
+                meeting_id,
+                trimmed_title,
+                MeetingStatus::Processing.as_str(),
+                now,
+                now,
+            ],
+        )?;
+
+        tx.execute(
+            "INSERT INTO audio_files (id, meeting_id, file_path, duration_ms, format, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                audio_id,
+                meeting_id,
+                imported.dest_path.to_string_lossy().to_string(),
+                imported.duration_ms,
+                imported.format,
+                now,
+            ],
+        )?;
+
+        tx.commit()?;
+
+        Self::get_detail(conn, &meeting_id)
     }
 
     pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
@@ -177,6 +236,10 @@ impl MeetingRepository {
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+}
+
+fn map_audio_error(error: AudioError) -> AppError {
+    AppError::Message(error.to_string())
 }
 
 fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
@@ -346,5 +409,42 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let err = MeetingRepository::delete(&conn, "missing").unwrap_err();
         assert!(err.to_string().contains("introuvable"));
+    }
+
+    #[test]
+    fn create_from_imported_audio_sets_processing_status() {
+        let conn = open_in_memory().unwrap();
+        let imports_dir = std::env::temp_dir().join(format!(
+            "laminute-imports-repo-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::create_dir_all(&imports_dir);
+        let dest_path = imports_dir.join("sample.mp3");
+        std::fs::write(&dest_path, b"fixture").unwrap();
+
+        let imported = ImportedAudio {
+            dest_path: dest_path.clone(),
+            duration_ms: 120_000,
+            format: "mp3".into(),
+        };
+
+        let detail = MeetingRepository::create_from_imported_audio(
+            &conn,
+            "Comité produit",
+            &imported,
+        )
+        .unwrap();
+
+        assert_eq!(detail.meeting.title, "Comité produit");
+        assert_eq!(detail.meeting.status, MeetingStatus::Processing);
+        assert_eq!(detail.audio_files.len(), 1);
+        assert_eq!(detail.audio_files[0].duration_ms, Some(120_000));
+        assert_eq!(detail.audio_files[0].format.as_deref(), Some("mp3"));
+        assert_eq!(
+            detail.audio_files[0].file_path,
+            dest_path.to_string_lossy().to_string()
+        );
+
+        let _ = std::fs::remove_dir_all(imports_dir);
     }
 }

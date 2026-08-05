@@ -3,18 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   type AudioInputDevice,
   type RecordingStatus,
+  formatAudioError,
   formatDuration,
-  isAudioError,
 } from "../lib/audio";
 
 function formatError(error: unknown): string {
-  if (isAudioError(error)) {
-    return `[${error.code}] ${error.message}`;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+  return formatAudioError(error);
 }
 
 export function MicrophoneRecorder() {

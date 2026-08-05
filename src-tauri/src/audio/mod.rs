@@ -1,5 +1,6 @@
 pub mod devices;
 pub mod error;
+pub mod import;
 pub mod recording;
 pub mod state;
 
