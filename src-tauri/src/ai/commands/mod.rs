@@ -5,15 +5,15 @@ use tauri::{AppHandle, Manager, State};
 use crate::ai::models::{AiSettings, KeyValidationResult, ProviderInfo};
 use crate::ai::secrets;
 use crate::ai::settings::SettingsStore;
-use crate::AppState;
+use crate::AiAppState;
 
 #[tauri::command]
-pub fn list_ai_providers(state: State<'_, AppState>) -> Result<Vec<ProviderInfo>, String> {
+pub fn list_ai_providers(state: State<'_, AiAppState>) -> Result<Vec<ProviderInfo>, String> {
     Ok(state.registry.list())
 }
 
 #[tauri::command]
-pub fn get_ai_settings(state: State<'_, AppState>) -> Result<AiSettings, String> {
+pub fn get_ai_settings(state: State<'_, AiAppState>) -> Result<AiSettings, String> {
     let settings = state
         .settings
         .lock()
@@ -35,7 +35,7 @@ pub fn get_ai_settings(state: State<'_, AppState>) -> Result<AiSettings, String>
 
 #[tauri::command]
 pub fn set_selected_provider(
-    state: State<'_, AppState>,
+    state: State<'_, AiAppState>,
     provider_id: String,
 ) -> Result<AiSettings, String> {
     state
@@ -61,7 +61,7 @@ pub fn set_selected_provider(
 
 #[tauri::command]
 pub fn save_api_key(
-    state: State<'_, AppState>,
+    state: State<'_, AiAppState>,
     provider_id: String,
     api_key: String,
 ) -> Result<(), String> {
@@ -79,7 +79,7 @@ pub fn save_api_key(
 }
 
 #[tauri::command]
-pub fn delete_api_key(state: State<'_, AppState>, provider_id: String) -> Result<(), String> {
+pub fn delete_api_key(state: State<'_, AiAppState>, provider_id: String) -> Result<(), String> {
     state
         .registry
         .require(&provider_id)
@@ -91,7 +91,7 @@ pub fn delete_api_key(state: State<'_, AppState>, provider_id: String) -> Result
 
 #[tauri::command]
 pub async fn validate_api_key(
-    state: State<'_, AppState>,
+    state: State<'_, AiAppState>,
     provider_id: String,
     api_key: Option<String>,
 ) -> Result<KeyValidationResult, String> {
