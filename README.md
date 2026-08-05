@@ -8,7 +8,24 @@ Identifiant : `app.laminute.desktop`
 
 Contributions : voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Prérequis
+## Téléchargement (utilisateurs)
+
+Installez La Minute sans Node ni Rust via la [dernière Release GitHub](https://github.com/juleshrd/laminute/releases/latest) :
+
+| OS      | Fichier                    |
+| ------- | -------------------------- |
+| Windows | installateur `.exe` (NSIS) |
+| macOS   | `.dmg`                     |
+| Linux   | `.AppImage`                |
+
+Après installation, ouvrez **Réglages IA** et renseignez votre clé API Mistral (BYOK) pour la transcription et les comptes-rendus.
+
+- **macOS** (si l’app n’est pas notariée) : clic droit sur l’app → **Ouvrir**.
+- **Windows** (si non signé Authenticode) : SmartScreen peut afficher un avertissement.
+
+Au démarrage, si une nouvelle version est publiée sur GitHub, l’application propose une mise à jour en un clic.
+
+## Prérequis (développement)
 
 ### macOS
 
