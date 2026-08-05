@@ -506,7 +506,7 @@ export function MeetingWorkspace() {
 
           {showReadyControls && filePath && (
             <section className="panel">
-              <h2>Réunion</h2>
+              <h2>{flowPhase === "ready" ? "Réunion créée" : "Réunion"}</h2>
               <div className="meeting-workspace__field">
                 <label htmlFor="meeting-title">Titre</label>
                 <input

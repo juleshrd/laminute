@@ -135,6 +135,7 @@ describe("MeetingWorkspace", () => {
     await waitFor(() => {
       expect(screen.getByText(/Audio prêt/i)).toBeInTheDocument();
     });
+    expect(screen.getByRole("heading", { name: "Réunion créée" })).toBeInTheDocument();
     expect(screen.getByLabelText("Titre")).toHaveValue("Comité produit");
     expect(screen.getByRole("button", { name: "Traiter" })).toBeInTheDocument();
   });
