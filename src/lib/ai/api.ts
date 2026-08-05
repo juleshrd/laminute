@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import type { AiSettings, KeyValidationResult, ProviderInfo } from "./types";
+import type {
+  AiSettings,
+  GenerateStructuredSummaryInput,
+  GenerateStructuredSummaryOutput,
+  KeyValidationResult,
+  ProviderInfo,
+} from "./types";
 
 export function listAiProviders(): Promise<ProviderInfo[]> {
   return invoke<ProviderInfo[]>("list_ai_providers");
@@ -29,5 +35,13 @@ export function validateApiKey(
   return invoke<KeyValidationResult>("validate_api_key", {
     providerId,
     apiKey: apiKey ?? null,
+  });
+}
+
+export function generateStructuredSummary(
+  input: GenerateStructuredSummaryInput,
+): Promise<GenerateStructuredSummaryOutput> {
+  return invoke<GenerateStructuredSummaryOutput>("generate_structured_summary", {
+    input,
   });
 }

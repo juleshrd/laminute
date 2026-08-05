@@ -52,7 +52,6 @@ pub struct TranscriptionResult {
 }
 
 /// Options de résumé (consommées par JUL-153+).
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SummaryOptions {
     pub model: Option<String>,
@@ -60,7 +59,6 @@ pub struct SummaryOptions {
 }
 
 /// Résultat de résumé (consommé par JUL-153+).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SummaryResult {
