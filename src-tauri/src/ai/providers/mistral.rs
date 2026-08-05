@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use reqwest::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
@@ -9,11 +9,13 @@ use crate::ai::models::{
     TranscriptionResult,
 };
 use crate::ai::provider::AiProvider;
+use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
 use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
 const MISTRAL_API_BASE: &str = "https://api.mistral.ai/v1";
 const DEFAULT_TRANSCRIPTION_MODEL: &str = "voxtral-mini-latest";
+const DEFAULT_SUMMARY_MODEL: &str = "mistral-small-latest";
 const MAX_AUDIO_BYTES: usize = 100 * 1024 * 1024;
 
 pub struct MistralProvider {
@@ -270,17 +272,100 @@ impl TranscriptionProvider for MistralProvider {
     }
 }
 
+#[derive(Debug, Serialize)]
+struct ChatCompletionRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    max_tokens: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<ChatCompletionChoice>,
+    model: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionChoice {
+    message: ChatCompletionMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionMessage {
+    content: String,
+}
+
 #[async_trait]
 impl SummaryProvider for MistralProvider {
     async fn summarize(
         &self,
-        _api_key: &str,
-        _text: &str,
-        _options: SummaryOptions,
+        api_key: &str,
+        text: &str,
+        options: SummaryOptions,
     ) -> Result<SummaryResult, AiError> {
-        Err(AiError::NotImplemented(
-            "Résumé Mistral — hors périmètre JUL-152.".to_string(),
-        ))
+        let model = options
+            .model
+            .unwrap_or_else(|| DEFAULT_SUMMARY_MODEL.to_string());
+
+        let request = ChatCompletionRequest {
+            model: model.clone(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: SYSTEM_PROMPT.to_string(),
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: structured_summary::build_user_prompt(text),
+                },
+            ],
+            max_tokens: options.max_tokens,
+        };
+
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", self.api_base))
+            .header("Authorization", format!("Bearer {api_key}"))
+            .json(&request)
+            .send()
+            .await?;
+
+        if response.status() == StatusCode::UNAUTHORIZED {
+            return Err(AiError::Provider {
+                provider: self.id().to_string(),
+                message: "Clé API invalide ou expirée.".to_string(),
+            });
+        }
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AiError::Provider {
+                provider: self.id().to_string(),
+                message: format!("réponse inattendue ({status}) : {body}"),
+            });
+        }
+
+        let payload: ChatCompletionResponse = response.json().await?;
+        let text = payload
+            .choices
+            .first()
+            .map(|choice| choice.message.content.clone())
+            .ok_or_else(|| AiError::Provider {
+                provider: self.id().to_string(),
+                message: "réponse vide du modèle".to_string(),
+            })?;
+
+        Ok(SummaryResult {
+            text,
+            model: payload.model,
+        })
     }
 }
 

@@ -13,7 +13,9 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
-use commands::{create_meeting, delete_meeting, get_meeting, list_meetings};
+use commands::{
+    create_meeting, delete_meeting, generate_structured_summary, get_meeting, list_meetings,
+};
 use db::open_and_migrate;
 
 /// État IA (providers BYOK) — distinct de l'état SQLite et audio.
@@ -118,6 +120,7 @@ pub fn run() {
             start_microphone_recording,
             stop_microphone_recording,
             get_recording_status,
+            generate_structured_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
