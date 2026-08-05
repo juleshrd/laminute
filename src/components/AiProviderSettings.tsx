@@ -9,6 +9,7 @@ import {
   validateApiKey,
 } from "../lib/ai/api";
 import type { KeyValidationResult, ProviderInfo } from "../lib/ai/types";
+import { DataProcessingNotice } from "./DataProcessingNotice";
 import "./AiProviderSettings.css";
 
 const CAPABILITY_LABELS: Record<string, string> = {
@@ -171,9 +172,12 @@ export function AiProviderSettings() {
       </div>
 
       {selectedProvider && (
-        <p className="ai-settings__capabilities">
-          Capacités : {formatCapabilities(selectedProvider)}
-        </p>
+        <>
+          <p className="ai-settings__capabilities">
+            Capacités : {formatCapabilities(selectedProvider)}
+          </p>
+          <DataProcessingNotice providerName={selectedProvider.displayName} />
+        </>
       )}
 
       <div className="ai-settings__field">

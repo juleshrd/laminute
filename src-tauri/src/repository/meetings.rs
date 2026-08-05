@@ -242,6 +242,14 @@ impl MeetingRepository {
     }
 
     pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
+        let audio_files = Self::list_audio_files(conn, id)?;
+        for audio in &audio_files {
+            let path = Path::new(&audio.file_path);
+            if path.is_file() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+
         let deleted = conn.execute("DELETE FROM meetings WHERE id = ?1", [id])?;
         if deleted == 0 {
             return Err(AppError::MeetingNotFound {
@@ -676,6 +684,45 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let err = MeetingRepository::delete(&conn, "missing").unwrap_err();
         assert!(err.to_string().contains("introuvable"));
+    }
+
+    #[test]
+    fn delete_meeting_removes_audio_file_from_disk() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Avec fichier".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let dir = std::env::temp_dir().join(format!(
+            "laminute-delete-audio-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let audio_path = dir.join("meeting.mp3");
+        std::fs::write(&audio_path, b"audio").unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO audio_files (id, meeting_id, file_path, duration_ms, format, created_at)
+             VALUES ('audio-del', ?1, ?2, 1000, 'mp3', ?3)",
+            params![
+                meeting.id,
+                audio_path.to_string_lossy().to_string(),
+                now
+            ],
+        )
+        .unwrap();
+
+        assert!(audio_path.is_file());
+        MeetingRepository::delete(&conn, &meeting.id).unwrap();
+        assert!(!audio_path.exists());
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
