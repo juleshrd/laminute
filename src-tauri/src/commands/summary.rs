@@ -57,15 +57,21 @@ async fn generate_structured_summary_inner(
             .ok_or_else(|| AppError::Message("aucun fournisseur IA sélectionné".into()))?
     };
 
-    ai_state
+    let provider = ai_state
         .registry
         .require(&provider_id)
         .map_err(|e| AppError::Message(e.to_string()))?;
 
-    let api_key = secrets::get_api_key(&provider_id)
-        .map_err(|e| AppError::Message(e.to_string()))?
-        .filter(|key| !key.trim().is_empty())
-        .ok_or_else(|| AppError::Message("aucune clé API enregistrée pour ce fournisseur".into()))?;
+    let api_key = if provider.capabilities().local {
+        String::new()
+    } else {
+        secrets::get_api_key(&provider_id)
+            .map_err(|e| AppError::Message(e.to_string()))?
+            .filter(|key| !key.trim().is_empty())
+            .ok_or_else(|| {
+                AppError::Message("aucune clé API enregistrée pour ce fournisseur".into())
+            })?
+    };
 
     let model = input.model.clone();
     let (meeting_id, transcription_text) = resolve_input(db_state, input)?;

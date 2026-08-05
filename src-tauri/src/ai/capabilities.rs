@@ -28,4 +28,22 @@ impl ProviderCapabilities {
             streaming: true,
         }
     }
+
+    pub const fn openai() -> Self {
+        Self {
+            transcription: true,
+            summary: true,
+            local: false,
+            streaming: false,
+        }
+    }
+
+    pub const fn ollama() -> Self {
+        Self {
+            transcription: false,
+            summary: true,
+            local: true,
+            streaming: false,
+        }
+    }
 }

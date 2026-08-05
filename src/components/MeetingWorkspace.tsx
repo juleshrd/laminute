@@ -5,7 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 import { getAiSettings, listAiProviders } from "../lib/ai/api";
 import { generateStructuredSummary } from "../lib/ai/api";
-import type { GenerateStructuredSummaryOutput } from "../lib/ai/types";
+import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../lib/ai/types";
 import "../components/StructuredSummaryPanel.css";
 import { DataProcessingNotice } from "./DataProcessingNotice";
 import { RecordingConsentModal } from "./RecordingConsentModal";
@@ -64,6 +64,8 @@ export function MeetingWorkspace() {
   const [dragOver, setDragOver] = useState(false);
   const [showRecordingConsent, setShowRecordingConsent] = useState(false);
   const [providerName, setProviderName] = useState("Mistral");
+  const [selectedProvider, setSelectedProvider] = useState<ProviderInfo | null>(null);
+  const [pastedText, setPastedText] = useState("");
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -98,6 +100,7 @@ export function MeetingWorkspace() {
       const [settings, providers] = await Promise.all([getAiSettings(), listAiProviders()]);
       setHasApiKey(settings.hasApiKey);
       const selected = providers.find((provider) => provider.id === settings.selectedProviderId);
+      setSelectedProvider(selected ?? providers[0] ?? null);
       setProviderName(selected?.displayName ?? providers[0]?.displayName ?? "Mistral");
     } catch (err) {
       setError(formatError(err));
@@ -299,14 +302,16 @@ export function MeetingWorkspace() {
       return;
     }
 
+    const canTranscribe = selectedProvider?.capabilities.transcription ?? true;
+
     setFlowPhase("processing");
     setError(null);
-    setProcessingStep("transcribing");
 
     try {
       let nextTranscription = transcription;
 
-      if (!nextTranscription) {
+      if (!nextTranscription && canTranscribe) {
+        setProcessingStep("transcribing");
         nextTranscription = await transcribeAudioFile({
           filePath,
           meetingId: meetingId ?? undefined,
@@ -319,16 +324,54 @@ export function MeetingWorkspace() {
         setMeetingId(nextTranscription.meetingId);
       }
 
-      if (title.trim()) {
-        await updateMeetingTitle(nextTranscription.meetingId, title.trim());
+      const summaryText = nextTranscription?.content ?? pastedText.trim();
+      if (!summaryText) {
+        throw new Error("Aucun texte disponible pour générer le compte-rendu.");
+      }
+
+      if (title.trim() && (nextTranscription?.meetingId ?? meetingId)) {
+        await updateMeetingTitle(
+          nextTranscription?.meetingId ?? meetingId!,
+          title.trim(),
+        );
       }
 
       setProcessingStep("summarizing");
       const nextSummary = await generateStructuredSummary({
-        meetingId: nextTranscription.meetingId,
-        text: nextTranscription.content,
+        meetingId: nextTranscription?.meetingId ?? meetingId ?? undefined,
+        text: nextTranscription ? undefined : summaryText,
       });
       setSummary(nextSummary);
+      if (!meetingId) {
+        setMeetingId(nextSummary.meetingId);
+      }
+      setFlowPhase("done");
+    } catch (err) {
+      setError(formatError(err));
+      setFlowPhase("error");
+    } finally {
+      setProcessingStep(null);
+      await refreshAiSettings();
+    }
+  }
+
+  async function runSummarizeFromText() {
+    const text = pastedText.trim();
+    if (!text) {
+      return;
+    }
+
+    setFlowPhase("processing");
+    setError(null);
+    setProcessingStep("summarizing");
+
+    try {
+      const nextSummary = await generateStructuredSummary({
+        meetingId: meetingId ?? undefined,
+        text,
+      });
+      setSummary(nextSummary);
+      setMeetingId(nextSummary.meetingId);
       setFlowPhase("done");
     } catch (err) {
       setError(formatError(err));
@@ -348,6 +391,8 @@ export function MeetingWorkspace() {
       : transcriptionProgress
         ? transcriptionPhaseLabel(transcriptionProgress.phase)
         : null;
+  const canTranscribe = selectedProvider?.capabilities.transcription ?? true;
+  const isSummarizeOnly = !canTranscribe;
   const isBusy =
     flowPhase === "processing" ||
     (transcriptionProgress != null && isTranscriptionBusy(transcriptionProgress.phase));
@@ -493,16 +538,49 @@ export function MeetingWorkspace() {
 
               {!hasApiKey && (flowPhase === "ready" || flowPhase === "error") && (
                 <p className="warning">
-                  Configurez une clé API Mistral dans les réglages IA ci-dessous avant de traiter
-                  la réunion.
+                  Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour{" "}
+                  {providerName} dans les réglages IA ci-dessous avant de traiter la réunion.
                 </p>
               )}
 
               {(flowPhase === "ready" || flowPhase === "error") && hasApiKey && (
-                <DataProcessingNotice providerName={providerName} />
+                <DataProcessingNotice
+                  providerName={providerName}
+                  capabilities={selectedProvider?.capabilities}
+                />
               )}
 
-              {(flowPhase === "ready" || flowPhase === "error") && (
+              {isSummarizeOnly && (flowPhase === "ready" || flowPhase === "error") && (
+                <>
+                  <p className="warning" role="note">
+                    {providerName} ne prend pas en charge la transcription audio. Collez le texte
+                    de la réunion ci-dessous, ou choisissez OpenAI ou Mistral pour transcrire
+                    automatiquement.
+                  </p>
+                  <div className="meeting-workspace__field">
+                    <label htmlFor="pasted-transcript">Texte de la réunion</label>
+                    <textarea
+                      id="pasted-transcript"
+                      rows={8}
+                      value={pastedText}
+                      disabled={isBusy}
+                      onChange={(event) => setPastedText(event.target.value)}
+                      placeholder="Collez ici la transcription ou les notes de la réunion…"
+                    />
+                  </div>
+                  <div className="row controls">
+                    <button
+                      type="button"
+                      onClick={() => void runSummarizeFromText()}
+                      disabled={!hasApiKey || isBusy || !pastedText.trim()}
+                    >
+                      Générer le compte-rendu
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {!isSummarizeOnly && (flowPhase === "ready" || flowPhase === "error") && (
                 <div className="row controls">
                   <button
                     type="button"

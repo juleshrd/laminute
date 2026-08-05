@@ -92,10 +92,12 @@ pub fn run() {
             });
 
             let settings = ai::commands::init_settings(app.handle())?;
-            app.manage(AiAppState {
+            let ai_state = AiAppState {
                 registry: ai::ProviderRegistry::new(),
                 settings,
-            });
+            };
+            ai::commands::sync_ollama_base_url(&ai_state);
+            app.manage(ai_state);
             app.manage(ai::TranscriptionState::new());
 
             let audio_state = AudioState::initialize(app.handle())?;
@@ -114,6 +116,7 @@ pub fn run() {
             ai::commands::list_ai_providers,
             ai::commands::get_ai_settings,
             ai::commands::set_selected_provider,
+            ai::commands::set_ollama_base_url,
             ai::commands::save_api_key,
             ai::commands::delete_api_key,
             ai::commands::validate_api_key,

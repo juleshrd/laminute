@@ -204,7 +204,7 @@ describe("MeetingWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
 
     expect(
-      await screen.findByText(/Configurez une clé API Mistral dans les réglages IA/i),
+      await screen.findByText(/Configurez .* dans les réglages IA/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Traiter" })).toBeDisabled();
   });

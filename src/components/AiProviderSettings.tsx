@@ -5,6 +5,7 @@ import {
   getAiSettings,
   listAiProviders,
   saveApiKey,
+  setOllamaBaseUrl,
   setSelectedProvider,
   validateApiKey,
 } from "../lib/ai/api";
@@ -30,6 +31,7 @@ export function AiProviderSettings() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [ollamaBaseUrl, setOllamaBaseUrlState] = useState("http://127.0.0.1:11434");
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [validation, setValidation] = useState<KeyValidationResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,9 @@ export function AiProviderSettings() {
         settings.selectedProviderId ?? providerList[0]?.id ?? "";
       setSelectedProviderId(initialId);
       setHasStoredKey(settings.hasApiKey);
+      setOllamaBaseUrlState(
+        settings.ollamaBaseUrl ?? "http://127.0.0.1:11434",
+      );
       setValidation(null);
       setApiKey("");
     } catch (err) {
@@ -64,6 +69,8 @@ export function AiProviderSettings() {
   }, [load]);
 
   const selectedProvider = providers.find((p) => p.id === selectedProviderId);
+  const isLocalProvider = selectedProvider?.capabilities.local ?? false;
+  const hasTranscription = selectedProvider?.capabilities.transcription ?? false;
 
   async function handleProviderChange(nextId: string) {
     setBusy(true);
@@ -77,6 +84,20 @@ export function AiProviderSettings() {
       setHasStoredKey(settings.hasApiKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sélection impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveOllamaBaseUrl() {
+    setBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      await setOllamaBaseUrl(ollamaBaseUrl);
+      setStatusMessage("URL Ollama enregistrée.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement impossible.");
     } finally {
       setBusy(false);
     }
@@ -176,44 +197,81 @@ export function AiProviderSettings() {
           <p className="ai-settings__capabilities">
             Capacités : {formatCapabilities(selectedProvider)}
           </p>
-          <DataProcessingNotice providerName={selectedProvider.displayName} />
+          {!hasTranscription && (
+            <p className="ai-settings__note" role="note">
+              Ce fournisseur ne prend pas en charge la transcription audio. Vous
+              pourrez générer un compte-rendu à partir d&apos;un texte collé.
+            </p>
+          )}
+          <DataProcessingNotice
+            providerName={selectedProvider.displayName}
+            capabilities={selectedProvider.capabilities}
+          />
         </>
       )}
 
-      <div className="ai-settings__field">
-        <label htmlFor="api-key-input">Clé API</label>
-        <input
-          id="api-key-input"
-          type="password"
-          autoComplete="off"
-          placeholder={
-            hasStoredKey
-              ? "Clé enregistrée — saisir une nouvelle clé pour remplacer"
-              : "Collez votre clé API"
-          }
-          value={apiKey}
-          disabled={busy}
-          onChange={(event) => setApiKey(event.target.value)}
-        />
-        {hasStoredKey && (
-          <span className="ai-settings__badge" role="status">
-            Clé enregistrée
-          </span>
-        )}
-      </div>
+      {selectedProviderId === "ollama" && (
+        <div className="ai-settings__field">
+          <label htmlFor="ollama-base-url">URL du serveur Ollama</label>
+          <input
+            id="ollama-base-url"
+            type="url"
+            value={ollamaBaseUrl}
+            disabled={busy}
+            onChange={(event) => setOllamaBaseUrlState(event.target.value)}
+          />
+          <button
+            type="button"
+            disabled={busy || !ollamaBaseUrl.trim()}
+            onClick={() => void handleSaveOllamaBaseUrl()}
+          >
+            Enregistrer l&apos;URL
+          </button>
+        </div>
+      )}
+
+      {!isLocalProvider && (
+        <div className="ai-settings__field">
+          <label htmlFor="api-key-input">Clé API</label>
+          <input
+            id="api-key-input"
+            type="password"
+            autoComplete="off"
+            placeholder={
+              hasStoredKey
+                ? "Clé enregistrée — saisir une nouvelle clé pour remplacer"
+                : "Collez votre clé API"
+            }
+            value={apiKey}
+            disabled={busy}
+            onChange={(event) => setApiKey(event.target.value)}
+          />
+          {hasStoredKey && (
+            <span className="ai-settings__badge" role="status">
+              Clé enregistrée
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="ai-settings__actions">
-        <button type="button" disabled={busy || !apiKey.trim()} onClick={() => void handleSave()}>
-          Enregistrer
-        </button>
+        {!isLocalProvider && (
+          <button
+            type="button"
+            disabled={busy || !apiKey.trim()}
+            onClick={() => void handleSave()}
+          >
+            Enregistrer
+          </button>
+        )}
         <button
           type="button"
-          disabled={busy || (!apiKey.trim() && !hasStoredKey)}
+          disabled={busy || (!isLocalProvider && !apiKey.trim() && !hasStoredKey)}
           onClick={() => void handleValidate()}
         >
-          Valider la clé
+          {isLocalProvider ? "Tester la connexion" : "Valider la clé"}
         </button>
-        {hasStoredKey && (
+        {!isLocalProvider && hasStoredKey && (
           <button
             type="button"
             className="ai-settings__danger"
@@ -238,7 +296,7 @@ export function AiProviderSettings() {
           }`}
           role="status"
         >
-          <strong>{validation.valid ? "Clé valide" : "Clé invalide"}</strong>
+          <strong>{validation.valid ? "Connexion valide" : "Connexion invalide"}</strong>
           <p>{validation.message}</p>
           {validation.models && validation.models.length > 0 && (
             <p>{validation.models.length} modèle(s) détecté(s).</p>

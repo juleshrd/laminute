@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { getAiSettings } from "../lib/ai/api";
+import { getAiSettings, listAiProviders } from "../lib/ai/api";
+import type { ProviderInfo } from "../lib/ai/types";
 import {
   getTranscriptionProgress,
   listenTranscriptionProgress,
@@ -25,6 +26,7 @@ export function TranscriptionPanel({
   durationSecs,
 }: TranscriptionPanelProps) {
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [provider, setProvider] = useState<ProviderInfo | null>(null);
   const [progress, setProgress] = useState<TranscriptionProgress | null>(null);
   const [result, setResult] = useState<Transcription | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,8 +34,10 @@ export function TranscriptionPanel({
 
   const refreshSettings = useCallback(async () => {
     try {
-      const settings = await getAiSettings();
+      const [settings, providers] = await Promise.all([getAiSettings(), listAiProviders()]);
       setHasApiKey(settings.hasApiKey);
+      const selected = providers.find((item) => item.id === settings.selectedProviderId);
+      setProvider(selected ?? providers[0] ?? null);
     } catch (err) {
       setError(formatError(err));
     }
@@ -80,6 +84,9 @@ export function TranscriptionPanel({
     }
   }
 
+  const canTranscribe = provider?.capabilities.transcription ?? false;
+  const providerName = provider?.displayName ?? "le fournisseur sélectionné";
+
   const isBusy =
     loading ||
     progress?.phase === "preparing" ||
@@ -89,11 +96,18 @@ export function TranscriptionPanel({
 
   return (
     <section className="panel">
-      <h3>Transcription Mistral</h3>
+      <h3>Transcription</h3>
 
-      {!hasApiKey && (
+      {!canTranscribe && (
         <p className="warning">
-          Configurez une clé API Mistral dans les réglages IA avant de transcrire.
+          {providerName} ne prend pas en charge la transcription. Choisissez OpenAI ou Mistral
+          dans les réglages IA.
+        </p>
+      )}
+
+      {canTranscribe && !hasApiKey && (
+        <p className="warning">
+          Configurez une clé API pour {providerName} dans les réglages IA avant de transcrire.
         </p>
       )}
 
@@ -101,7 +115,7 @@ export function TranscriptionPanel({
         <button
           type="button"
           onClick={() => void handleTranscribe()}
-          disabled={!filePath || !hasApiKey || isBusy}
+          disabled={!filePath || !hasApiKey || !canTranscribe || isBusy}
         >
           {isBusy ? "Transcription…" : "Transcrire"}
         </button>

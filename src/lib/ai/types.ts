@@ -26,6 +26,7 @@ export interface KeyValidationResult {
 export interface AiSettings {
   selectedProviderId?: string;
   hasApiKey: boolean;
+  ollamaBaseUrl?: string;
 }
 
 export interface StructuredActionItem {
