@@ -8,6 +8,6 @@
     "dialog:default",
     "opener:default",
     "updater:default",
-    "process:allow-relaunch"
+    "process:allow-restart"
   ]
 }
