@@ -61,7 +61,7 @@ impl SettingsStore {
         self.data.selected_provider_id.as_deref()
     }
 
-pub fn ollama_base_url(&self) -> &str {
+    pub fn ollama_base_url(&self) -> &str {
         &self.data.ollama_base_url
     }
 

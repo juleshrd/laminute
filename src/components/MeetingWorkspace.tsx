@@ -330,10 +330,7 @@ export function MeetingWorkspace() {
       }
 
       if (title.trim() && (nextTranscription?.meetingId ?? meetingId)) {
-        await updateMeetingTitle(
-          nextTranscription?.meetingId ?? meetingId!,
-          title.trim(),
-        );
+        await updateMeetingTitle(nextTranscription?.meetingId ?? meetingId!, title.trim());
       }
 
       setProcessingStep("summarizing");
@@ -530,8 +527,8 @@ export function MeetingWorkspace() {
 
               {!hasApiKey && (flowPhase === "ready" || flowPhase === "error") && (
                 <p className="warning">
-Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour{" "}
-                  {providerName} dans les réglages IA ci-dessous avant de traiter la réunion.
+                  Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour {providerName}{" "}
+                  dans les réglages IA ci-dessous avant de traiter la réunion.
                 </p>
               )}
 
@@ -545,8 +542,8 @@ Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour{" "}
               {isSummarizeOnly && (flowPhase === "ready" || flowPhase === "error") && (
                 <>
                   <p className="warning" role="note">
-                    {providerName} ne prend pas en charge la transcription audio. Collez le texte
-                    de la réunion ci-dessous, ou choisissez OpenAI ou Mistral pour transcrire
+                    {providerName} ne prend pas en charge la transcription audio. Collez le texte de
+                    la réunion ci-dessous, ou choisissez OpenAI ou Mistral pour transcrire
                     automatiquement.
                   </p>
                   <div className="meeting-workspace__field">

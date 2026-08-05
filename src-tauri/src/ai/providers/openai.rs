@@ -94,8 +94,9 @@ impl OpenAiProvider {
             StatusCode::UNSUPPORTED_MEDIA_TYPE => {
                 "Format audio non supporté par OpenAI.".to_string()
             }
-            _ if status.is_client_error() => extract_api_message(body)
-                .unwrap_or_else(|| format!("requête refusée ({status})")),
+            _ if status.is_client_error() => {
+                extract_api_message(body).unwrap_or_else(|| format!("requête refusée ({status})"))
+            }
             _ => extract_api_message(body)
                 .unwrap_or_else(|| format!("erreur serveur OpenAI ({status})")),
         };
@@ -276,12 +277,11 @@ impl TranscriptionProvider for OpenAiProvider {
             return Err(Self::map_http_error(status, &body));
         }
 
-        let payload: OpenAiTranscriptionResponse = serde_json::from_str(&body).map_err(|err| {
-            AiError::Provider {
+        let payload: OpenAiTranscriptionResponse =
+            serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
                 message: format!("réponse transcription illisible : {err}"),
-            }
-        })?;
+            })?;
 
         if payload.text.trim().is_empty() {
             return Err(AiError::Provider {

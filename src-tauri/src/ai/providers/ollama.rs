@@ -54,10 +54,7 @@ impl OllamaProvider {
         if !response.status().is_success() {
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
-                message: format!(
-                    "impossible de joindre Ollama ({})",
-                    response.status()
-                ),
+                message: format!("impossible de joindre Ollama ({})", response.status()),
             });
         }
 
@@ -80,7 +77,10 @@ impl OllamaProvider {
         if let Some(model) = &options.model {
             return model.clone();
         }
-        if models.iter().any(|m| m.id.starts_with(DEFAULT_SUMMARY_MODEL)) {
+        if models
+            .iter()
+            .any(|m| m.id.starts_with(DEFAULT_SUMMARY_MODEL))
+        {
             return DEFAULT_SUMMARY_MODEL.to_string();
         }
         models

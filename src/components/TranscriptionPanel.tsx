@@ -98,8 +98,8 @@ export function TranscriptionPanel({ filePath, durationSecs }: TranscriptionPane
 
       {!canTranscribe && (
         <p className="warning">
-          {providerName} ne prend pas en charge la transcription. Choisissez OpenAI ou Mistral
-          dans les réglages IA.
+          {providerName} ne prend pas en charge la transcription. Choisissez OpenAI ou Mistral dans
+          les réglages IA.
         </p>
       )}
 

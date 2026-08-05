@@ -197,9 +197,7 @@ describe("MeetingWorkspace", () => {
     await screen.findByRole("button", { name: "Choisir un fichier MP3" });
     fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
 
-    expect(
-      await screen.findByText(/Configurez .* dans les réglages IA/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Configurez .* dans les réglages IA/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Traiter" })).toBeDisabled();
   });
 });

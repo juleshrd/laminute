@@ -7,19 +7,16 @@ interface DataProcessingNoticeProps {
   };
 }
 
-export function DataProcessingNotice({
-  providerName,
-  capabilities,
-}: DataProcessingNoticeProps) {
+export function DataProcessingNotice({ providerName, capabilities }: DataProcessingNoticeProps) {
   const isLocal = capabilities?.local ?? false;
   const hasTranscription = capabilities?.transcription ?? true;
 
   if (isLocal) {
     return (
       <p className="data-processing-notice" role="note">
-        <strong>Traitement local via {providerName} :</strong> le compte-rendu est généré sur
-        votre machine via Ollama. Aucune donnée n&apos;est envoyée à un service cloud. La
-        transcription audio n&apos;est pas disponible avec ce fournisseur.
+        <strong>Traitement local via {providerName} :</strong> le compte-rendu est généré sur votre
+        machine via Ollama. Aucune donnée n&apos;est envoyée à un service cloud. La transcription
+        audio n&apos;est pas disponible avec ce fournisseur.
       </p>
     );
   }

@@ -48,9 +48,7 @@ export function AiProviderSettings() {
       const initialId = settings.selectedProviderId ?? providerList[0]?.id ?? "";
       setSelectedProviderId(initialId);
       setHasStoredKey(settings.hasApiKey);
-      setOllamaBaseUrlState(
-        settings.ollamaBaseUrl ?? "http://127.0.0.1:11434",
-      );
+      setOllamaBaseUrlState(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
       setValidation(null);
       setApiKey("");
     } catch (err) {
@@ -191,8 +189,8 @@ export function AiProviderSettings() {
           </p>
           {!hasTranscription && (
             <p className="ai-settings__note" role="note">
-              Ce fournisseur ne prend pas en charge la transcription audio. Vous
-              pourrez générer un compte-rendu à partir d&apos;un texte collé.
+              Ce fournisseur ne prend pas en charge la transcription audio. Vous pourrez générer un
+              compte-rendu à partir d&apos;un texte collé.
             </p>
           )}
           <DataProcessingNotice
@@ -248,11 +246,7 @@ export function AiProviderSettings() {
 
       <div className="ai-settings__actions">
         {!isLocalProvider && (
-          <button
-            type="button"
-            disabled={busy || !apiKey.trim()}
-            onClick={() => void handleSave()}
-          >
+          <button type="button" disabled={busy || !apiKey.trim()} onClick={() => void handleSave()}>
             Enregistrer
           </button>
         )}

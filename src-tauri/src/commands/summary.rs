@@ -62,7 +62,7 @@ async fn generate_structured_summary_inner(
         .require(&provider_id)
         .map_err(|e| AppError::Message(e.to_string()))?;
 
-let api_key = if provider.capabilities().local {
+    let api_key = if provider.capabilities().local {
         String::new()
     } else {
         secrets::get_api_key(&provider_id)
