@@ -600,6 +600,13 @@ button {
   background: transparent;
 }
 
+.update-modal__notes {
+  margin: 0.75rem 0 0;
+  white-space: pre-line;
+  font-size: 0.9rem;
+  color: #344054;
+}
+
 .privacy-settings__header p {
   margin: 0.25rem 0 0;
   color: #475467;

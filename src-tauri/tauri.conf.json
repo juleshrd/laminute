@@ -29,7 +29,8 @@
     "macOS": {
       "infoPlist": "Info.plist"
     },
-    "targets": "all",
+    "targets": ["nsis", "dmg", "appimage"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +38,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM3REI2M0ExQjE5MkJGNzUKUldSMXY1S3hvV1BieCthbFdHV3B2RXhzRGRXMU5jWVB5L3J5WXNMelRBY3BkQmpzdzBIdFN3WnoK",
+      "endpoints": ["https://github.com/juleshrd/laminute/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
