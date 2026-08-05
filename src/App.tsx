@@ -1,50 +1,197 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { APP_NAME } from "./lib/app";
+import {
+  type AudioInputDevice,
+  type RecordingStatus,
+  formatDuration,
+  isAudioError,
+} from "./lib/audio";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+function formatError(error: unknown): string {
+  if (isAudioError(error)) {
+    return `[${error.code}] ${error.message}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+function App() {
+  const [devices, setDevices] = useState<AudioInputDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+  const [status, setStatus] = useState<RecordingStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshDevices = useCallback(async () => {
+    setError(null);
+    try {
+      const listed = await invoke<AudioInputDevice[]>("list_audio_input_devices");
+      setDevices(listed);
+
+      const selected = await invoke<AudioInputDevice | null>(
+        "get_selected_audio_input_device",
+      );
+      if (selected) {
+        setSelectedDeviceId(selected.id);
+      } else if (listed.length > 0) {
+        const fallback = listed.find((device) => device.isDefault) ?? listed[0];
+        setSelectedDeviceId(fallback.id);
+      }
+    } catch (err) {
+      setError(formatError(err));
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const nextStatus = await invoke<RecordingStatus>("get_recording_status");
+      setStatus(nextStatus);
+    } catch (err) {
+      setError(formatError(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      await refreshDevices();
+      await refreshStatus();
+      setLoading(false);
+    })();
+  }, [refreshDevices, refreshStatus]);
+
+  useEffect(() => {
+    if (status?.phase !== "recording") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshStatus();
+    }, 500);
+
+    return () => window.clearInterval(timer);
+  }, [refreshStatus, status?.phase]);
+
+  async function handleSelectDevice() {
+    if (!selectedDeviceId) {
+      return;
+    }
+
+    setError(null);
+    try {
+      const selected = await invoke<AudioInputDevice>(
+        "set_selected_audio_input_device",
+        { deviceId: selectedDeviceId },
+      );
+      setSelectedDeviceId(selected.id);
+    } catch (err) {
+      setError(formatError(err));
+    }
   }
 
+  async function handleStartRecording() {
+    setError(null);
+    try {
+      const nextStatus = await invoke<RecordingStatus>("start_microphone_recording");
+      setStatus(nextStatus);
+    } catch (err) {
+      setError(formatError(err));
+      await refreshStatus();
+    }
+  }
+
+  async function handleStopRecording() {
+    setError(null);
+    try {
+      const nextStatus = await invoke<RecordingStatus>("stop_microphone_recording");
+      setStatus(nextStatus);
+    } catch (err) {
+      setError(formatError(err));
+      await refreshStatus();
+    }
+  }
+
+  const isRecording = status?.phase === "recording";
+
   return (
-    <main className="container">
+    <main className="container audio-test">
       <h1>{APP_NAME}</h1>
+      <p className="subtitle">Test audio — JUL-146</p>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      {loading ? (
+        <p>Chargement des périphériques…</p>
+      ) : (
+        <section className="panel">
+          <h2>Périphérique d&apos;entrée</h2>
+          {devices.length === 0 ? (
+            <p className="warning">Aucun périphérique d&apos;entrée détecté.</p>
+          ) : (
+            <div className="row controls">
+              <select
+                value={selectedDeviceId}
+                onChange={(event) => setSelectedDeviceId(event.currentTarget.value)}
+                disabled={isRecording}
+              >
+                {devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name}
+                    {device.isDefault ? " (défaut)" : ""}
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => void handleSelectDevice()} disabled={isRecording}>
+                Mémoriser
+              </button>
+              <button type="button" onClick={() => void refreshDevices()} disabled={isRecording}>
+                Actualiser
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      <section className="panel">
+        <h2>Enregistrement</h2>
+        <div className="row controls">
+          <button
+            type="button"
+            onClick={() => void handleStartRecording()}
+            disabled={isRecording || !selectedDeviceId}
+          >
+            Démarrer
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleStopRecording()}
+            disabled={!isRecording}
+          >
+            Arrêter
+          </button>
+        </div>
+
+        {status && (
+          <dl className="status-grid">
+            <div>
+              <dt>Statut</dt>
+              <dd>{status.phase}</dd>
+            </div>
+            <div>
+              <dt>Durée</dt>
+              <dd>{formatDuration(status.durationSecs)}</dd>
+            </div>
+            <div>
+              <dt>Fichier</dt>
+              <dd className="mono">{status.filePath ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
+      </section>
+
+      {error && <p className="error">{error}</p>}
     </main>
   );
 }
