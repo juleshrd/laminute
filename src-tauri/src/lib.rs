@@ -1,4 +1,5 @@
 mod ai;
+mod audio;
 mod commands;
 mod db;
 mod error;
@@ -11,10 +12,11 @@ use std::sync::Mutex;
 
 use tauri::Manager;
 
+use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
 use commands::{create_meeting, delete_meeting, get_meeting, list_meetings};
 use db::open_and_migrate;
 
-/// État IA (providers BYOK) — distinct de l'état SQLite.
+/// État IA (providers BYOK) — distinct de l'état SQLite et audio.
 pub struct AiAppState {
     pub registry: ai::ProviderRegistry,
     pub settings: Mutex<ai::SettingsStore>,
@@ -23,6 +25,49 @@ pub struct AiAppState {
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {name}! You've been greeted from Rust!")
+}
+
+#[tauri::command]
+fn list_audio_input_devices(
+    state: tauri::State<'_, AudioState>,
+) -> Result<Vec<AudioInputDevice>, AudioError> {
+    state.list_devices()
+}
+
+#[tauri::command]
+fn get_selected_audio_input_device(
+    state: tauri::State<'_, AudioState>,
+) -> Result<Option<AudioInputDevice>, AudioError> {
+    state.get_selected_device()
+}
+
+#[tauri::command]
+fn set_selected_audio_input_device(
+    state: tauri::State<'_, AudioState>,
+    device_id: String,
+) -> Result<AudioInputDevice, AudioError> {
+    state.set_selected_device(device_id)
+}
+
+#[tauri::command]
+fn start_microphone_recording(
+    state: tauri::State<'_, AudioState>,
+) -> Result<RecordingStatus, AudioError> {
+    state.start_recording()
+}
+
+#[tauri::command]
+fn stop_microphone_recording(
+    state: tauri::State<'_, AudioState>,
+) -> Result<RecordingStatus, AudioError> {
+    state.stop_recording()
+}
+
+#[tauri::command]
+fn get_recording_status(
+    state: tauri::State<'_, AudioState>,
+) -> Result<RecordingStatus, AudioError> {
+    state.recording_status()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -47,6 +92,9 @@ pub fn run() {
                 settings,
             });
 
+            let audio_state = AudioState::initialize(app.handle())?;
+            app.manage(audio_state);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -61,6 +109,12 @@ pub fn run() {
             ai::commands::save_api_key,
             ai::commands::delete_api_key,
             ai::commands::validate_api_key,
+            list_audio_input_devices,
+            get_selected_audio_input_device,
+            set_selected_audio_input_device,
+            start_microphone_recording,
+            stop_microphone_recording,
+            get_recording_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
