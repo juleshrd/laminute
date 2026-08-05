@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export type RecordingPhase = "idle" | "recording" | "stopped";
 
 export type MeetingStatus = "draft" | "recording" | "processing" | "completed";
@@ -23,6 +25,17 @@ export interface AudioFile {
   durationMs: number | null;
   format: string | null;
   createdAt: string;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  description: string | null;
+  status: MeetingStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MeetingDetail {
@@ -75,4 +88,8 @@ export function formatDuration(seconds: number | null): string {
   const minutes = Math.floor(wholeSeconds / 60);
   const remaining = wholeSeconds % 60;
   return `${minutes}:${remaining.toString().padStart(2, "0")}`;
+}
+
+export function updateMeetingTitle(id: string, title: string): Promise<Meeting> {
+  return invoke<Meeting>("update_meeting_title", { id, title });
 }
