@@ -32,6 +32,8 @@ pub struct AiSettings {
     pub selected_provider_id: Option<String>,
     /// Indique si une clé est enregistrée pour le fournisseur sélectionné (jamais la clé elle-même).
     pub has_api_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ollama_base_url: Option<String>,
 }
 
 /// Options de transcription (consommées par JUL-148+).

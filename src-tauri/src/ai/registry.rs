@@ -2,26 +2,39 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::ai::error::AiError;
-use crate::ai::models::{ProviderInfo, SummaryOptions, SummaryResult};
+use crate::ai::models::{
+    ProviderInfo, SummaryOptions, SummaryResult, TranscriptionOptions, TranscriptionResult,
+};
 use crate::ai::provider::AiProvider;
 use crate::ai::providers::mistral::MistralProvider;
+use crate::ai::providers::ollama::OllamaProvider;
+use crate::ai::providers::openai::OpenAiProvider;
 use crate::ai::summary::SummaryProvider;
+use crate::ai::transcription::TranscriptionProvider;
 
 /// Registre central des fournisseurs IA. Ajouter un fournisseur ici suffit — aucun changement UI requis.
 pub struct ProviderRegistry {
     providers: HashMap<String, Arc<dyn AiProvider>>,
     mistral: Arc<MistralProvider>,
+    openai: Arc<OpenAiProvider>,
+    ollama: Arc<OllamaProvider>,
 }
 
 impl ProviderRegistry {
     pub fn new() -> Self {
         let mistral = Arc::new(MistralProvider::new());
+        let openai = Arc::new(OpenAiProvider::new());
+        let ollama = Arc::new(OllamaProvider::new());
         let mut registry = Self {
             providers: HashMap::new(),
             mistral: mistral.clone(),
+            openai: openai.clone(),
+            ollama: ollama.clone(),
         };
 
         registry.register(mistral);
+        registry.register(openai);
+        registry.register(ollama);
 
         registry
     }
@@ -45,6 +58,10 @@ impl ProviderRegistry {
             .ok_or_else(|| AiError::UnknownProvider(id.to_string()))
     }
 
+    pub fn ollama(&self) -> &OllamaProvider {
+        &self.ollama
+    }
+
     pub async fn summarize_text(
         &self,
         provider_id: &str,
@@ -52,13 +69,42 @@ impl ProviderRegistry {
         text: &str,
         options: SummaryOptions,
     ) -> Result<SummaryResult, AiError> {
-        if provider_id == "mistral" {
-            return SummaryProvider::summarize(self.mistral.as_ref(), api_key, text, options).await;
+        match provider_id {
+            "mistral" => {
+                SummaryProvider::summarize(self.mistral.as_ref(), api_key, text, options).await
+            }
+            "openai" => {
+                SummaryProvider::summarize(self.openai.as_ref(), api_key, text, options).await
+            }
+            "ollama" => {
+                SummaryProvider::summarize(self.ollama.as_ref(), api_key, text, options).await
+            }
+            _ => Err(AiError::Other(format!(
+                "le fournisseur « {provider_id} » ne prend pas en charge le résumé structuré"
+            ))),
         }
+    }
 
-        Err(AiError::Other(format!(
-            "le fournisseur « {provider_id} » ne prend pas en charge le résumé structuré"
-        )))
+    pub async fn transcribe_audio(
+        &self,
+        provider_id: &str,
+        api_key: &str,
+        audio: &[u8],
+        options: TranscriptionOptions,
+    ) -> Result<TranscriptionResult, AiError> {
+        match provider_id {
+            "mistral" => {
+                TranscriptionProvider::transcribe(self.mistral.as_ref(), api_key, audio, options)
+                    .await
+            }
+            "openai" => {
+                TranscriptionProvider::transcribe(self.openai.as_ref(), api_key, audio, options)
+                    .await
+            }
+            _ => Err(AiError::Other(format!(
+                "le fournisseur « {provider_id} » ne prend pas en charge la transcription audio"
+            ))),
+        }
     }
 }
 
@@ -73,12 +119,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_lists_mistral_provider() {
+    fn registry_lists_all_providers() {
         let registry = ProviderRegistry::new();
         let providers = registry.list();
-        assert_eq!(providers.len(), 1);
-        assert_eq!(providers[0].id, "mistral");
-        assert!(providers[0].capabilities.transcription);
+        assert_eq!(providers.len(), 3);
+        let ids: Vec<_> = providers.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"mistral"));
+        assert!(ids.contains(&"openai"));
+        assert!(ids.contains(&"ollama"));
     }
 
     #[test]
@@ -99,6 +147,24 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                },
+            )
+            .await;
+        assert!(matches!(result, Err(AiError::Other(_))));
+    }
+
+    #[tokio::test]
+    async fn transcribe_audio_rejects_ollama() {
+        let registry = ProviderRegistry::new();
+        let result = registry
+            .transcribe_audio(
+                "ollama",
+                "",
+                b"audio",
+                TranscriptionOptions {
+                    model: None,
+                    language: None,
+                    file_name: None,
                 },
             )
             .await;

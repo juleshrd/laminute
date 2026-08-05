@@ -6,15 +6,13 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::ai::models::TranscriptionOptions;
-use crate::ai::providers::mistral::MistralProvider;
 use crate::ai::secrets;
-use crate::ai::transcription::TranscriptionProvider;
 use crate::db::AppState;
 use crate::models::{CreateMeetingInput, MeetingStatus, Transcription};
 use crate::repository::MeetingRepository;
 use crate::AiAppState;
 
-const MISTRAL_PROVIDER_ID: &str = "mistral";
+const DEFAULT_PROVIDER_ID: &str = "mistral";
 const TRANSCRIPTION_PROGRESS_EVENT: &str = "transcription-progress";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,24 +103,30 @@ pub async fn transcribe_audio_file(
         .map_err(|_| "verrou des réglages indisponible".to_string())?
         .selected_provider_id()
         .map(str::to_string)
-        .unwrap_or_else(|| MISTRAL_PROVIDER_ID.to_string());
+        .unwrap_or_else(|| DEFAULT_PROVIDER_ID.to_string());
 
-    if provider_id != MISTRAL_PROVIDER_ID {
-        return Err(format!(
-            "Le fournisseur « {provider_id} » ne prend pas encore en charge la transcription."
-        ));
-    }
-
-    ai_state
+    let provider = ai_state
         .registry
         .require(&provider_id)
         .map_err(|e| e.to_string())?;
 
+    if !provider.capabilities().transcription {
+        return Err(format!(
+            "Le fournisseur « {} » ne prend pas en charge la transcription audio. Choisissez OpenAI ou Mistral dans les réglages IA.",
+            provider.display_name()
+        ));
+    }
+
     let api_key = secrets::get_api_key(&provider_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| {
-            "Aucune clé API enregistrée — configurez Mistral dans les réglages.".to_string()
+            format!(
+                "Aucune clé API enregistrée — configurez {} dans les réglages.",
+                provider.display_name()
+            )
         })?;
+
+    let provider_display_name = provider.display_name().to_string();
 
     emit_progress(
         &app,
@@ -233,14 +237,15 @@ pub async fn transcribe_audio_file(
         &transcription_state,
         TranscriptionProgress {
             phase: TranscriptionPhase::Uploading,
-            message: "Envoi de l'audio à Mistral…".to_string(),
+            message: format!("Envoi de l'audio à {provider_display_name}…"),
             meeting_id: Some(meeting_id.clone()),
         },
     );
 
-    let provider = MistralProvider::new();
-    let result = provider
-        .transcribe(
+    let result = ai_state
+        .registry
+        .transcribe_audio(
+            &provider_id,
             &api_key,
             &audio_bytes,
             TranscriptionOptions {
@@ -287,7 +292,8 @@ pub async fn transcribe_audio_file(
             &db,
             &meeting_id,
             Some(&audio_file.id),
-            MISTRAL_PROVIDER_ID,
+            &provider_id,
+            &provider_display_name,
             &result.text,
             result.language.as_deref(),
         )
@@ -349,7 +355,8 @@ mod tests {
             &conn,
             &meeting.id,
             Some(&audio.id),
-            MISTRAL_PROVIDER_ID,
+            "mistral",
+            "Mistral AI",
             "Bonjour",
             Some("fr"),
         )

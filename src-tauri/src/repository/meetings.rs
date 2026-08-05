@@ -302,11 +302,12 @@ impl MeetingRepository {
         meeting_id: &str,
         audio_file_id: Option<&str>,
         provider_id: &str,
+        provider_display_name: &str,
         content: &str,
         language: Option<&str>,
     ) -> AppResult<Transcription> {
         Self::get_by_id(conn, meeting_id)?;
-        Self::ensure_ai_provider(conn, provider_id, "Mistral AI", provider_id)?;
+        Self::ensure_ai_provider(conn, provider_id, provider_display_name, provider_id)?;
 
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();

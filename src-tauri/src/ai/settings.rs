@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::ai::providers::ollama::DEFAULT_OLLAMA_BASE;
+
 #[derive(Debug, Error)]
 pub enum SettingsError {
     #[error("impossible de résoudre le répertoire de données : {0}")]
@@ -16,10 +18,25 @@ pub enum SettingsError {
     Serde(#[from] serde_json::Error),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PersistedAiSettings {
     selected_provider_id: Option<String>,
+    #[serde(default = "default_ollama_base_url")]
+    ollama_base_url: String,
+}
+
+fn default_ollama_base_url() -> String {
+    DEFAULT_OLLAMA_BASE.to_string()
+}
+
+impl Default for PersistedAiSettings {
+    fn default() -> Self {
+        Self {
+            selected_provider_id: None,
+            ollama_base_url: default_ollama_base_url(),
+        }
+    }
 }
 
 pub struct SettingsStore {
@@ -44,11 +61,25 @@ impl SettingsStore {
         self.data.selected_provider_id.as_deref()
     }
 
+    pub fn ollama_base_url(&self) -> &str {
+        &self.data.ollama_base_url
+    }
+
     pub fn set_selected_provider_id(
         &mut self,
         provider_id: Option<String>,
     ) -> Result<(), SettingsError> {
         self.data.selected_provider_id = provider_id;
+        self.save()
+    }
+
+    pub fn set_ollama_base_url(&mut self, base_url: String) -> Result<(), SettingsError> {
+        let trimmed = base_url.trim();
+        self.data.ollama_base_url = if trimmed.is_empty() {
+            default_ollama_base_url()
+        } else {
+            trimmed.to_string()
+        };
         self.save()
     }
 
