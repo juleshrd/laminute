@@ -63,8 +63,8 @@ export function StructuredSummaryPanel() {
       <header className="structured-summary__header">
         <h2 id="structured-summary-title">Compte-rendu structuré</h2>
         <p>
-          Collez une transcription ou indiquez l&apos;identifiant d&apos;une réunion existante,
-          puis générez un compte-rendu avec synthèse, décisions et actions.
+          Collez une transcription ou indiquez l&apos;identifiant d&apos;une réunion existante, puis
+          générez un compte-rendu avec synthèse, décisions et actions.
         </p>
       </header>
 
@@ -128,9 +128,7 @@ export function StructuredSummaryPanel() {
               <h3>Décisions</h3>
               <button
                 type="button"
-                onClick={() =>
-                  void handleCopy("decisions", result.structured.decisions.join("\n"))
-                }
+                onClick={() => void handleCopy("decisions", result.structured.decisions.join("\n"))}
               >
                 Copier
               </button>
@@ -149,7 +147,10 @@ export function StructuredSummaryPanel() {
           <article className="structured-summary__block">
             <div className="structured-summary__block-header">
               <h3>Actions</h3>
-              <button type="button" onClick={() => void handleCopy("actions", formatActions(result))}>
+              <button
+                type="button"
+                onClick={() => void handleCopy("actions", formatActions(result))}
+              >
                 Copier
               </button>
             </div>

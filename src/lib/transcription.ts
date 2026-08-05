@@ -2,13 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type TranscriptionPhase =
-  | "idle"
-  | "preparing"
-  | "uploading"
-  | "transcribing"
-  | "saving"
-  | "completed"
-  | "failed";
+  "idle" | "preparing" | "uploading" | "transcribing" | "saving" | "completed" | "failed";
 
 export interface TranscriptionProgress {
   phase: TranscriptionPhase;
@@ -39,9 +33,7 @@ export function getTranscriptionProgress(): Promise<TranscriptionProgress> {
   return invoke<TranscriptionProgress>("get_transcription_progress");
 }
 
-export function transcribeAudioFile(
-  input: TranscribeAudioInput,
-): Promise<Transcription> {
+export function transcribeAudioFile(input: TranscribeAudioInput): Promise<Transcription> {
   return invoke<Transcription>("transcribe_audio_file", { input });
 }
 

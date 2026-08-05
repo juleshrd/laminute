@@ -1,6 +1,6 @@
 # Politique de confidentialité — La Minute
 
-*Dernière mise à jour : août 2026*
+_Dernière mise à jour : août 2026_
 
 ## Données stockées localement
 
@@ -12,11 +12,11 @@ La Minute est une application **desktop** : vos réunions, fichiers audio import
 
 Ce répertoire contient notamment :
 
-| Élément | Fichier / dossier |
-|---------|-------------------|
-| Base de données | `laminute.db` |
-| Imports MP3 | `imports/` |
-| Enregistrements micro | `recordings/` |
+| Élément               | Fichier / dossier |
+| --------------------- | ----------------- |
+| Base de données       | `laminute.db`     |
+| Imports MP3           | `imports/`        |
+| Enregistrements micro | `recordings/`     |
 
 Les données y restent **jusqu'à ce que vous les supprimiez** (réunion par réunion ou effacement complet depuis les réglages « Confidentialité »).
 

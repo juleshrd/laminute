@@ -32,10 +32,7 @@ export function deleteApiKey(providerId: string): Promise<void> {
   return invoke<void>("delete_api_key", { providerId });
 }
 
-export function validateApiKey(
-  providerId: string,
-  apiKey?: string,
-): Promise<KeyValidationResult> {
+export function validateApiKey(providerId: string, apiKey?: string): Promise<KeyValidationResult> {
   return invoke<KeyValidationResult>("validate_api_key", {
     providerId,
     apiKey: apiKey ?? null,

@@ -84,9 +84,7 @@ impl MistralProvider {
 
     fn map_http_error(status: StatusCode, body: &str) -> AiError {
         let message = match status {
-            StatusCode::UNAUTHORIZED => {
-                "Clé API invalide ou expirée.".to_string()
-            }
+            StatusCode::UNAUTHORIZED => "Clé API invalide ou expirée.".to_string(),
             StatusCode::PAYLOAD_TOO_LARGE => {
                 "Fichier audio trop volumineux pour l'API Mistral.".to_string()
             }
@@ -97,8 +95,7 @@ impl MistralProvider {
                 "Format audio non supporté par Mistral.".to_string()
             }
             _ if status.is_client_error() => {
-                extract_api_message(body)
-                    .unwrap_or_else(|| format!("requête refusée ({status})"))
+                extract_api_message(body).unwrap_or_else(|| format!("requête refusée ({status})"))
             }
             _ => extract_api_message(body)
                 .unwrap_or_else(|| format!("erreur serveur Mistral ({status})")),
@@ -250,12 +247,11 @@ impl TranscriptionProvider for MistralProvider {
             return Err(Self::map_http_error(status, &body));
         }
 
-        let payload: MistralTranscriptionResponse = serde_json::from_str(&body).map_err(|err| {
-            AiError::Provider {
+        let payload: MistralTranscriptionResponse =
+            serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
                 message: format!("réponse transcription illisible : {err}"),
-            }
-        })?;
+            })?;
 
         if payload.text.trim().is_empty() {
             return Err(AiError::Provider {
@@ -438,11 +434,9 @@ mod tests {
         let mock_server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/v1/audio/transcriptions"))
-            .respond_with(
-                ResponseTemplate::new(401).set_body_json(serde_json::json!({
-                    "message": "Unauthorized"
-                })),
-            )
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "message": "Unauthorized"
+            })))
             .mount(&mock_server)
             .await;
 

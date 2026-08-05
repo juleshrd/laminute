@@ -21,10 +21,7 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
-export function TranscriptionPanel({
-  filePath,
-  durationSecs,
-}: TranscriptionPanelProps) {
+export function TranscriptionPanel({ filePath, durationSecs }: TranscriptionPanelProps) {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [provider, setProvider] = useState<ProviderInfo | null>(null);
   const [progress, setProgress] = useState<TranscriptionProgress | null>(null);
@@ -45,7 +42,9 @@ export function TranscriptionPanel({
 
   useEffect(() => {
     void refreshSettings();
-    void getTranscriptionProgress().then(setProgress).catch(() => undefined);
+    void getTranscriptionProgress()
+      .then(setProgress)
+      .catch(() => undefined);
 
     let unlisten: (() => void) | undefined;
     void listenTranscriptionProgress((nextProgress) => {
@@ -72,8 +71,7 @@ export function TranscriptionPanel({
       const transcription = await transcribeAudioFile({
         filePath,
         language: "fr",
-        durationMs:
-          durationSecs != null ? Math.round(durationSecs * 1000) : undefined,
+        durationMs: durationSecs != null ? Math.round(durationSecs * 1000) : undefined,
       });
       setResult(transcription);
     } catch (err) {
@@ -129,9 +127,7 @@ export function TranscriptionPanel({
         <div className="transcription-result">
           <h4>Résultat</h4>
           <p>{result.content}</p>
-          {result.language && (
-            <p className="meta">Langue détectée : {result.language}</p>
-          )}
+          {result.language && <p className="meta">Langue détectée : {result.language}</p>}
         </div>
       )}
 

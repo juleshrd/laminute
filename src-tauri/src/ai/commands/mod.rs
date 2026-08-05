@@ -114,8 +114,7 @@ pub fn save_api_key(
         return Err("La clé API ne peut pas être vide.".to_string());
     }
 
-    secrets::store_api_key(&provider_id, api_key.trim())
-        .map_err(|e| e.to_string())
+    secrets::store_api_key(&provider_id, api_key.trim()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -125,8 +124,7 @@ pub fn delete_api_key(state: State<'_, AiAppState>, provider_id: String) -> Resu
         .require(&provider_id)
         .map_err(|e| e.to_string())?;
 
-    secrets::delete_api_key(&provider_id)
-        .map_err(|e| e.to_string())
+    secrets::delete_api_key(&provider_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -148,21 +146,13 @@ pub async fn validate_api_key(
             .ok_or_else(|| "Aucune clé API fournie ni enregistrée.".to_string())?,
     };
 
-    provider
-        .validate_key(&key)
-        .await
-        .map_err(|e| e.to_string())
+    provider.validate_key(&key).await.map_err(|e| e.to_string())
 }
 
 pub fn init_settings(app: &AppHandle) -> Result<Mutex<SettingsStore>, crate::ai::error::AiError> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| {
-            crate::ai::error::AiError::Settings(crate::ai::settings::SettingsError::Path(
-                e.to_string(),
-            ))
-        })?;
+    let app_data_dir = app.path().app_data_dir().map_err(|e| {
+        crate::ai::error::AiError::Settings(crate::ai::settings::SettingsError::Path(e.to_string()))
+    })?;
 
     let store = SettingsStore::load(app_data_dir)?;
     Ok(Mutex::new(store))

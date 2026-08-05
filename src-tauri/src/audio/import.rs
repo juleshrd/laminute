@@ -186,10 +186,7 @@ mod tests {
 
     #[test]
     fn rejects_non_mp3_extension() {
-        let dir = std::env::temp_dir().join(format!(
-            "laminute-import-ext-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("laminute-import-ext-{}", std::process::id()));
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("sample.wav");
         fs::write(&path, [0xFF, 0xFB, 0x00]).unwrap();

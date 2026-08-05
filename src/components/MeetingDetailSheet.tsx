@@ -4,11 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 
 import type { StructuredSummary } from "../lib/ai/types";
 import { deleteMeeting } from "../lib/meetings";
-import {
-  buildExportFilename,
-  exportMeeting,
-  writeExportFile,
-} from "../lib/privacy";
+import { buildExportFilename, exportMeeting, writeExportFile } from "../lib/privacy";
 import {
   formatDurationMs,
   meetingDisplayDate,
@@ -137,7 +133,11 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
       {audioFile && (
         <article className="meeting-detail__block">
           <h3>Audio</h3>
-          <audio controls src={convertFileSrc(audioFile.filePath)} className="meeting-detail__audio">
+          <audio
+            controls
+            src={convertFileSrc(audioFile.filePath)}
+            className="meeting-detail__audio"
+          >
             Votre navigateur ne supporte pas la lecture audio.
           </audio>
         </article>
@@ -214,8 +214,12 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
             {detail.actions.map((action) => (
               <li key={action.id}>
                 <strong>{action.title}</strong>
-                {action.assignee && <span className="structured-summary__tag">{action.assignee}</span>}
-                {action.dueDate && <span className="structured-summary__tag">{action.dueDate}</span>}
+                {action.assignee && (
+                  <span className="structured-summary__tag">{action.assignee}</span>
+                )}
+                {action.dueDate && (
+                  <span className="structured-summary__tag">{action.dueDate}</span>
+                )}
               </li>
             ))}
           </ul>

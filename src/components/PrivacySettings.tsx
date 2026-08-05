@@ -35,7 +35,11 @@ export function PrivacySettings() {
   }, [load]);
 
   function startWipe() {
-    if (!window.confirm("Supprimer toutes les réunions et fichiers audio locaux ? Cette action est irréversible.")) {
+    if (
+      !window.confirm(
+        "Supprimer toutes les réunions et fichiers audio locaux ? Cette action est irréversible.",
+      )
+    ) {
       return;
     }
     setConfirmStep("typing");
@@ -90,7 +94,10 @@ export function PrivacySettings() {
             <dd className="mono">
               {storage.importsDir}
               {storage.importsBytes != null && (
-                <span className="privacy-settings__size"> ({formatBytes(storage.importsBytes)})</span>
+                <span className="privacy-settings__size">
+                  {" "}
+                  ({formatBytes(storage.importsBytes)})
+                </span>
               )}
             </dd>
           </div>

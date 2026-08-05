@@ -29,9 +29,7 @@ function setupDefaultInvoke() {
   invokeMock.mockImplementation((command: string) => {
     switch (command) {
       case "list_audio_input_devices":
-        return Promise.resolve([
-          { id: "mic-1", name: "Micro intégré", isDefault: true },
-        ]);
+        return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
       case "get_selected_audio_input_device":
         return Promise.resolve({ id: "mic-1", name: "Micro intégré", isDefault: true });
       case "get_recording_status":
@@ -109,9 +107,7 @@ describe("MeetingWorkspace", () => {
         });
       }
       if (command === "list_audio_input_devices") {
-        return Promise.resolve([
-          { id: "mic-1", name: "Micro intégré", isDefault: true },
-        ]);
+        return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
       }
       if (command === "get_selected_audio_input_device") {
         return Promise.resolve({ id: "mic-1", name: "Micro intégré", isDefault: true });
@@ -177,9 +173,7 @@ describe("MeetingWorkspace", () => {
         });
       }
       if (command === "list_audio_input_devices") {
-        return Promise.resolve([
-          { id: "mic-1", name: "Micro intégré", isDefault: true },
-        ]);
+        return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
       }
       if (command === "get_selected_audio_input_device") {
         return Promise.resolve({ id: "mic-1", name: "Micro intégré", isDefault: true });

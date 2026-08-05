@@ -43,13 +43,9 @@ export function AiProviderSettings() {
     setLoading(true);
     setError(null);
     try {
-      const [providerList, settings] = await Promise.all([
-        listAiProviders(),
-        getAiSettings(),
-      ]);
+      const [providerList, settings] = await Promise.all([listAiProviders(), getAiSettings()]);
       setProviders(providerList);
-      const initialId =
-        settings.selectedProviderId ?? providerList[0]?.id ?? "";
+      const initialId = settings.selectedProviderId ?? providerList[0]?.id ?? "";
       setSelectedProviderId(initialId);
       setHasStoredKey(settings.hasApiKey);
       setOllamaBaseUrlState(
@@ -126,10 +122,7 @@ export function AiProviderSettings() {
     setError(null);
     setStatusMessage(null);
     try {
-      const result = await validateApiKey(
-        selectedProviderId,
-        apiKey.trim() ? apiKey : undefined,
-      );
+      const result = await validateApiKey(selectedProviderId, apiKey.trim() ? apiKey : undefined);
       setValidation(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Validation impossible.");
@@ -170,9 +163,8 @@ export function AiProviderSettings() {
       <header className="ai-settings__header">
         <h2 id="ai-settings-title">Fournisseurs IA (BYOK)</h2>
         <p>
-          Sélectionnez un fournisseur et enregistrez votre clé API. Les secrets
-          sont stockés dans le trousseau système, jamais en clair dans
-          l&apos;application.
+          Sélectionnez un fournisseur et enregistrez votre clé API. Les secrets sont stockés dans le
+          trousseau système, jamais en clair dans l&apos;application.
         </p>
       </header>
 

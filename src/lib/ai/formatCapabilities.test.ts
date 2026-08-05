@@ -29,9 +29,7 @@ describe("formatCapabilities", () => {
       },
     };
 
-    expect(formatCapabilities(provider)).toBe(
-      "Transcription · Résumé · Streaming",
-    );
+    expect(formatCapabilities(provider)).toBe("Transcription · Résumé · Streaming");
   });
 
   it("affiche transcription et résumé pour OpenAI", () => {

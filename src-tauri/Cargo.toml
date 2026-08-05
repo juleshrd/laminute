@@ -3,6 +3,7 @@ name = "laminute"
 version = "0.1.0"
 description = "La Minute — application desktop"
 authors = ["La Minute"]
+license = "GPL-3.0-only"
 edition = "2021"
 
 [lib]

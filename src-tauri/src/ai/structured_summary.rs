@@ -52,9 +52,8 @@ impl StructuredSummary {
 /// Extrait et valide le JSON structuré depuis la réponse brute du modèle.
 pub fn parse_structured_summary(raw: &str) -> Result<StructuredSummary, AiError> {
     let json_str = extract_json_payload(raw);
-    let summary: StructuredSummary = serde_json::from_str(&json_str).map_err(|error| {
-        AiError::Other(format!("JSON de compte-rendu invalide : {error}"))
-    })?;
+    let summary: StructuredSummary = serde_json::from_str(&json_str)
+        .map_err(|error| AiError::Other(format!("JSON de compte-rendu invalide : {error}")))?;
     summary.validate()?;
     Ok(summary)
 }

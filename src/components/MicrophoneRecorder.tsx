@@ -25,9 +25,7 @@ export function MicrophoneRecorder() {
       const listed = await invoke<AudioInputDevice[]>("list_audio_input_devices");
       setDevices(listed);
 
-      const selected = await invoke<AudioInputDevice | null>(
-        "get_selected_audio_input_device",
-      );
+      const selected = await invoke<AudioInputDevice | null>("get_selected_audio_input_device");
       if (selected) {
         setSelectedDeviceId(selected.id);
       } else if (listed.length > 0) {
@@ -76,10 +74,9 @@ export function MicrophoneRecorder() {
 
     setError(null);
     try {
-      const selected = await invoke<AudioInputDevice>(
-        "set_selected_audio_input_device",
-        { deviceId: selectedDeviceId },
-      );
+      const selected = await invoke<AudioInputDevice>("set_selected_audio_input_device", {
+        deviceId: selectedDeviceId,
+      });
       setSelectedDeviceId(selected.id);
     } catch (err) {
       setError(formatError(err));
@@ -135,7 +132,11 @@ export function MicrophoneRecorder() {
                   </option>
                 ))}
               </select>
-              <button type="button" onClick={() => void handleSelectDevice()} disabled={isRecording}>
+              <button
+                type="button"
+                onClick={() => void handleSelectDevice()}
+                disabled={isRecording}
+              >
                 Mémoriser
               </button>
               <button type="button" onClick={() => void refreshDevices()} disabled={isRecording}>
@@ -179,10 +180,7 @@ export function MicrophoneRecorder() {
         )}
       </section>
 
-      <TranscriptionPanel
-        filePath={status?.filePath ?? null}
-        durationSecs={status?.durationSecs}
-      />
+      <TranscriptionPanel filePath={status?.filePath ?? null} durationSecs={status?.durationSecs} />
 
       {error && <p className="error">{error}</p>}
     </div>

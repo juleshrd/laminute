@@ -61,11 +61,14 @@ impl SettingsStore {
         self.data.selected_provider_id.as_deref()
     }
 
-    pub fn ollama_base_url(&self) -> &str {
+pub fn ollama_base_url(&self) -> &str {
         &self.data.ollama_base_url
     }
 
-    pub fn set_selected_provider_id(&mut self, provider_id: Option<String>) -> Result<(), SettingsError> {
+    pub fn set_selected_provider_id(
+        &mut self,
+        provider_id: Option<String>,
+    ) -> Result<(), SettingsError> {
         self.data.selected_provider_id = provider_id;
         self.save()
     }
