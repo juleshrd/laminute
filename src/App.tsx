@@ -10,10 +10,11 @@ import { PrivacySettings } from "./components/PrivacySettings";
 import { UpdateAvailableModal } from "./components/UpdateAvailableModal";
 import "./App.css";
 
-type AppTab = "new" | "history";
+type AppTab = "new" | "history" | "settings";
 
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("new");
+  const [visitedTabs, setVisitedTabs] = useState<Set<AppTab>>(() => new Set(["new"]));
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
@@ -59,40 +60,78 @@ function App() {
     })();
   };
 
+  const selectTab = (tab: AppTab) => {
+    setActiveTab(tab);
+    setVisitedTabs((current) => {
+      if (current.has(tab)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(tab);
+      return next;
+    });
+  };
+
   return (
-    <main className="container">
-      <h1>{APP_NAME}</h1>
+    <div className="app-shell">
+      <header className="app-header">
+        <h1 className="app-header__brand">{APP_NAME}</h1>
+        <p className="app-header__tagline">Enregistrez, importez, compte-rendu.</p>
+        <nav className="app-nav" aria-label="Navigation principale">
+          <button
+            type="button"
+            className={activeTab === "new" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"}
+            aria-current={activeTab === "new" ? "page" : undefined}
+            aria-controls="app-view-new"
+            onClick={() => selectTab("new")}
+          >
+            Réunion
+          </button>
+          <button
+            type="button"
+            className={
+              activeTab === "history" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"
+            }
+            aria-current={activeTab === "history" ? "page" : undefined}
+            aria-controls="app-view-history"
+            onClick={() => selectTab("history")}
+          >
+            Historique
+          </button>
+          <button
+            type="button"
+            className={
+              activeTab === "settings" ? "app-nav__tab app-nav__tab--active" : "app-nav__tab"
+            }
+            aria-current={activeTab === "settings" ? "page" : undefined}
+            aria-controls="app-view-settings"
+            onClick={() => selectTab("settings")}
+          >
+            Réglages
+          </button>
+        </nav>
+      </header>
 
-      <nav className="app-tabs" aria-label="Navigation principale">
-        <button
-          type="button"
-          className={activeTab === "new" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"}
-          onClick={() => setActiveTab("new")}
-        >
-          Nouvelle réunion
-        </button>
-        <button
-          type="button"
-          className={
-            activeTab === "history" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"
-          }
-          onClick={() => setActiveTab("history")}
-        >
-          Historique
-        </button>
-      </nav>
-
-      {activeTab === "new" ? <MeetingWorkspace /> : <MeetingHistory />}
-
-      <details className="ai-settings-collapsible">
-        <summary>Réglages IA</summary>
-        <AiProviderSettings />
-      </details>
-
-      <details className="ai-settings-collapsible">
-        <summary>Confidentialité</summary>
-        <PrivacySettings />
-      </details>
+      <main className="app-main">
+        <section id="app-view-new" className="app-view" hidden={activeTab !== "new"}>
+          <MeetingWorkspace />
+        </section>
+        {visitedTabs.has("history") ? (
+          <section id="app-view-history" className="app-view" hidden={activeTab !== "history"}>
+            <MeetingHistory />
+          </section>
+        ) : null}
+        {visitedTabs.has("settings") ? (
+          <section
+            id="app-view-settings"
+            className="app-view app-settings"
+            hidden={activeTab !== "settings"}
+          >
+            <AiProviderSettings />
+            <PrivacySettings />
+          </section>
+        ) : null}
+      </main>
 
       {pendingUpdate ? (
         <UpdateAvailableModal
@@ -112,7 +151,7 @@ function App() {
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

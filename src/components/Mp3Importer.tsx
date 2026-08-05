@@ -114,7 +114,12 @@ export function Mp3Importer() {
           Glissez-déposez un fichier MP3 ici ou sélectionnez-le depuis votre ordinateur.
         </p>
         <div className="row controls">
-          <button type="button" onClick={() => void handlePickFile()} disabled={importing}>
+          <button
+            type="button"
+            className="button--primary"
+            onClick={() => void handlePickFile()}
+            disabled={importing}
+          >
             {importing ? "Import en cours…" : "Choisir un fichier MP3"}
           </button>
         </div>

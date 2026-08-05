@@ -112,6 +112,7 @@ export function TranscriptionPanel({ filePath, durationSecs }: TranscriptionPane
       <div className="row controls">
         <button
           type="button"
+          className="button--primary"
           onClick={() => void handleTranscribe()}
           disabled={!filePath || !hasApiKey || !canTranscribe || isBusy}
         >

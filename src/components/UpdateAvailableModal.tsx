@@ -46,7 +46,7 @@ export function UpdateAvailableModal({
           </p>
         ) : null}
         <div className="row controls modal-dialog__actions">
-          <button type="button" onClick={onConfirm} disabled={busy}>
+          <button type="button" className="button--primary" onClick={onConfirm} disabled={busy}>
             Mettre à jour
           </button>
           <button type="button" className="modal-dialog__cancel" onClick={onCancel} disabled={busy}>

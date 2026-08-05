@@ -72,8 +72,8 @@ export function PrivacySettings() {
       <header className="privacy-settings__header">
         <h2 id="privacy-settings-title">Confidentialité et données locales</h2>
         <p>
-          Vos réunions restent sur cet ordinateur jusqu&apos;à suppression. Les clés API Mistral
-          restent dans le trousseau système (réglages IA).
+          Vos réunions restent sur cet ordinateur jusqu&apos;à suppression. Les clés API restent
+          dans le trousseau système (onglet Réglages).
         </p>
       </header>
 

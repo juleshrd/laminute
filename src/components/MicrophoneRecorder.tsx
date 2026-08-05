@@ -152,6 +152,7 @@ export function MicrophoneRecorder() {
         <div className="row controls">
           <button
             type="button"
+            className="button--primary"
             onClick={() => void handleStartRecording()}
             disabled={isRecording || !selectedDeviceId}
           >

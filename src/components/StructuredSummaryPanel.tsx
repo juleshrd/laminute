@@ -93,7 +93,12 @@ export function StructuredSummaryPanel() {
       </div>
 
       <div className="structured-summary__actions">
-        <button type="button" disabled={busy} onClick={() => void handleGenerate()}>
+        <button
+          type="button"
+          className="button--primary"
+          disabled={busy}
+          onClick={() => void handleGenerate()}
+        >
           {busy ? "Génération…" : "Générer"}
         </button>
       </div>

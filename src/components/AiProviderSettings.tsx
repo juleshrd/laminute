@@ -212,6 +212,7 @@ export function AiProviderSettings() {
           />
           <button
             type="button"
+            className="button--primary"
             disabled={busy || !ollamaBaseUrl.trim()}
             onClick={() => void handleSaveOllamaBaseUrl()}
           >
@@ -246,12 +247,18 @@ export function AiProviderSettings() {
 
       <div className="ai-settings__actions">
         {!isLocalProvider && (
-          <button type="button" disabled={busy || !apiKey.trim()} onClick={() => void handleSave()}>
+          <button
+            type="button"
+            className="button--primary"
+            disabled={busy || !apiKey.trim()}
+            onClick={() => void handleSave()}
+          >
             Enregistrer
           </button>
         )}
         <button
           type="button"
+          className={isLocalProvider ? "button--primary" : undefined}
           disabled={busy || (!isLocalProvider && !apiKey.trim() && !hasStoredKey)}
           onClick={() => void handleValidate()}
         >

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { listAiProviders } from "../lib/ai/api";
 import type { ProviderInfo } from "../lib/ai/types";
@@ -38,6 +38,28 @@ function meetingDateKey(meeting: MeetingListItem): string {
   }
   return toDateKey(date);
 }
+
+const MeetingHistoryItem = memo(function MeetingHistoryItem({
+  meeting,
+  onSelect,
+}: {
+  meeting: MeetingListItem;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <li>
+      <button type="button" className="meeting-history__item" onClick={() => onSelect(meeting.id)}>
+        <span className="meeting-history__item-title">{meeting.title}</span>
+        <span className="meeting-history__item-meta">
+          {meetingDisplayDate(meeting)} · {meetingStatusLabel(meeting.status)}
+        </span>
+        {meeting.snippet && (
+          <span className="meeting-history__item-snippet">{meeting.snippet}</span>
+        )}
+      </button>
+    </li>
+  );
+});
 
 export function MeetingHistory() {
   const today = new Date();
@@ -131,6 +153,7 @@ export function MeetingHistory() {
     }
     return counts;
   }, [calendarMeetings]);
+  const selectMeeting = useCallback((id: string) => setSelectedId(id), []);
 
   const calendarCells = useMemo(() => {
     const { year, month } = calendarMonth;
@@ -323,21 +346,7 @@ export function MeetingHistory() {
 
         <ul className="meeting-history__list">
           {results.map((meeting) => (
-            <li key={meeting.id}>
-              <button
-                type="button"
-                className="meeting-history__item"
-                onClick={() => setSelectedId(meeting.id)}
-              >
-                <span className="meeting-history__item-title">{meeting.title}</span>
-                <span className="meeting-history__item-meta">
-                  {meetingDisplayDate(meeting)} · {meetingStatusLabel(meeting.status)}
-                </span>
-                {meeting.snippet && (
-                  <span className="meeting-history__item-snippet">{meeting.snippet}</span>
-                )}
-              </button>
-            </li>
+            <MeetingHistoryItem key={meeting.id} meeting={meeting} onSelect={selectMeeting} />
           ))}
         </ul>
       </section>

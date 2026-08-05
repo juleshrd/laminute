@@ -19,7 +19,7 @@ export function RecordingConsentModal({ onConfirm, onCancel }: RecordingConsentM
           les participants et obtenez leur accord avant de commencer.
         </p>
         <div className="row controls modal-dialog__actions">
-          <button type="button" onClick={onConfirm}>
+          <button type="button" className="button--primary" onClick={onConfirm}>
             J&apos;ai informé les participants — Démarrer
           </button>
           <button type="button" className="modal-dialog__cancel" onClick={onCancel}>
