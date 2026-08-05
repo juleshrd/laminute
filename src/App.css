@@ -109,6 +109,32 @@ select {
   border: 1px solid #fecdca;
 }
 
+.progress-message {
+  margin: 0.75rem 0 0;
+  color: #475467;
+}
+
+.transcription-result {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.transcription-result h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.transcription-result p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.transcription-result .meta {
+  font-size: 0.85rem;
+  color: #667085;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

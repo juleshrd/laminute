@@ -91,6 +91,7 @@ pub fn run() {
                 registry: ai::ProviderRegistry::new(),
                 settings,
             });
+            app.manage(ai::TranscriptionState::new());
 
             let audio_state = AudioState::initialize(app.handle())?;
             app.manage(audio_state);
@@ -109,6 +110,8 @@ pub fn run() {
             ai::commands::save_api_key,
             ai::commands::delete_api_key,
             ai::commands::validate_api_key,
+            ai::commands::transcription::transcribe_audio_file,
+            ai::commands::transcription::get_transcription_progress,
             list_audio_input_devices,
             get_selected_audio_input_device,
             set_selected_audio_input_device,
