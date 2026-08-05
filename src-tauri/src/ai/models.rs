@@ -34,12 +34,16 @@ pub struct AiSettings {
     pub has_api_key: bool,
 }
 
+/// Options de transcription (consommées par JUL-148+).
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TranscriptionOptions {
     pub model: Option<String>,
     pub language: Option<String>,
 }
 
+/// Résultat de transcription (consommée par JUL-148+).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionResult {
@@ -47,12 +51,16 @@ pub struct TranscriptionResult {
     pub model: String,
 }
 
+/// Options de résumé (consommées par JUL-153+).
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SummaryOptions {
     pub model: Option<String>,
     pub max_tokens: Option<u32>,
 }
 
+/// Résultat de résumé (consommé par JUL-153+).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SummaryResult {
