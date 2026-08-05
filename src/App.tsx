@@ -2,6 +2,7 @@ import { APP_NAME } from "./lib/app";
 import { AiProviderSettings } from "./components/AiProviderSettings";
 import { MicrophoneRecorder } from "./components/MicrophoneRecorder";
 import { Mp3Importer } from "./components/Mp3Importer";
+import { StructuredSummaryPanel } from "./components/StructuredSummaryPanel";
 import "./App.css";
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
       <Mp3Importer />
       <MicrophoneRecorder />
       <AiProviderSettings />
+      <StructuredSummaryPanel />
     </main>
   );
 }

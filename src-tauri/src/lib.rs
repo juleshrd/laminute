@@ -14,7 +14,8 @@ use tauri::Manager;
 
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
 use commands::{
-    create_meeting, delete_meeting, get_meeting, import_mp3_meeting, list_meetings,
+    create_meeting, delete_meeting, generate_structured_summary, get_meeting, import_mp3_meeting,
+    list_meetings,
 };
 use db::open_and_migrate;
 
@@ -94,6 +95,7 @@ pub fn run() {
                 registry: ai::ProviderRegistry::new(),
                 settings,
             });
+            app.manage(ai::TranscriptionState::new());
 
             let audio_state = AudioState::initialize(app.handle())?;
             app.manage(audio_state);
@@ -112,6 +114,8 @@ pub fn run() {
             ai::commands::save_api_key,
             ai::commands::delete_api_key,
             ai::commands::validate_api_key,
+            ai::commands::transcription::transcribe_audio_file,
+            ai::commands::transcription::get_transcription_progress,
             list_audio_input_devices,
             get_selected_audio_input_device,
             set_selected_audio_input_device,
@@ -119,6 +123,7 @@ pub fn run() {
             stop_microphone_recording,
             get_recording_status,
             import_mp3_meeting,
+            generate_structured_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -10,7 +10,6 @@ pub enum ActionStatus {
 }
 
 impl ActionStatus {
-    #[allow(dead_code)]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Pending => "pending",

@@ -7,6 +7,10 @@ use crate::ai::secrets;
 use crate::ai::settings::SettingsStore;
 use crate::AiAppState;
 
+pub mod transcription;
+
+pub use transcription::TranscriptionState;
+
 #[tauri::command]
 pub fn list_ai_providers(state: State<'_, AiAppState>) -> Result<Vec<ProviderInfo>, String> {
     Ok(state.registry.list())

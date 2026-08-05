@@ -6,6 +6,7 @@ import {
   formatAudioError,
   formatDuration,
 } from "../lib/audio";
+import { TranscriptionPanel } from "./TranscriptionPanel";
 
 function formatError(error: unknown): string {
   return formatAudioError(error);
@@ -177,6 +178,11 @@ export function MicrophoneRecorder() {
           </dl>
         )}
       </section>
+
+      <TranscriptionPanel
+        filePath={status?.filePath ?? null}
+        durationSecs={status?.durationSecs}
+      />
 
       {error && <p className="error">{error}</p>}
     </div>

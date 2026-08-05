@@ -35,24 +35,24 @@ pub struct AiSettings {
 }
 
 /// Options de transcription (consommées par JUL-148+).
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TranscriptionOptions {
     pub model: Option<String>,
     pub language: Option<String>,
+    pub file_name: Option<String>,
 }
 
 /// Résultat de transcription (consommée par JUL-148+).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionResult {
     pub text: String,
     pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
 }
 
 /// Options de résumé (consommées par JUL-153+).
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SummaryOptions {
     pub model: Option<String>,
@@ -60,7 +60,6 @@ pub struct SummaryOptions {
 }
 
 /// Résultat de résumé (consommé par JUL-153+).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SummaryResult {

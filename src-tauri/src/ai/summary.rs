@@ -5,7 +5,6 @@ use crate::ai::models::{SummaryOptions, SummaryResult};
 use crate::ai::provider::AiProvider;
 
 /// Extension pour les fournisseurs capables de résumer du texte.
-#[allow(dead_code)]
 #[async_trait]
 pub trait SummaryProvider: AiProvider {
     async fn summarize(
