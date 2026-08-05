@@ -10,5 +10,6 @@ pub mod settings;
 pub mod summary;
 pub mod transcription;
 
+pub use commands::TranscriptionState;
 pub use registry::ProviderRegistry;
 pub use settings::SettingsStore;

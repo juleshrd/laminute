@@ -92,6 +92,109 @@ impl MeetingRepository {
         Ok(())
     }
 
+    pub fn ensure_ai_provider(
+        conn: &Connection,
+        provider_id: &str,
+        name: &str,
+        provider_type: &str,
+    ) -> AppResult<()> {
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT OR IGNORE INTO ai_providers (id, name, provider_type, is_enabled, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 1, ?4, ?4)",
+            params![provider_id, name, provider_type, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn attach_audio_file(
+        conn: &Connection,
+        meeting_id: &str,
+        file_path: &str,
+        duration_ms: Option<i64>,
+        format: Option<&str>,
+    ) -> AppResult<AudioFile> {
+        Self::get_by_id(conn, meeting_id)?;
+
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO audio_files (id, meeting_id, file_path, duration_ms, format, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, meeting_id, file_path, duration_ms, format, now],
+        )?;
+
+        Ok(AudioFile {
+            id,
+            meeting_id: meeting_id.to_string(),
+            file_path: file_path.to_string(),
+            duration_ms,
+            format: format.map(str::to_string),
+            created_at: now,
+        })
+    }
+
+    pub fn create_transcription(
+        conn: &Connection,
+        meeting_id: &str,
+        audio_file_id: Option<&str>,
+        provider_id: &str,
+        content: &str,
+        language: Option<&str>,
+    ) -> AppResult<Transcription> {
+        Self::get_by_id(conn, meeting_id)?;
+        Self::ensure_ai_provider(conn, provider_id, "Mistral AI", provider_id)?;
+
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+            params![
+                id,
+                meeting_id,
+                audio_file_id,
+                provider_id,
+                content,
+                language,
+                now,
+            ],
+        )?;
+
+        Ok(Transcription {
+            id,
+            meeting_id: meeting_id.to_string(),
+            audio_file_id: audio_file_id.map(str::to_string),
+            provider_id: Some(provider_id.to_string()),
+            content: content.to_string(),
+            language: language.map(str::to_string),
+            created_at: now.clone(),
+            updated_at: now,
+        })
+    }
+
+    pub fn update_status(
+        conn: &Connection,
+        meeting_id: &str,
+        status: MeetingStatus,
+    ) -> AppResult<Meeting> {
+        let now = Utc::now().to_rfc3339();
+        let updated = conn.execute(
+            "UPDATE meetings SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status.as_str(), now, meeting_id],
+        )?;
+
+        if updated == 0 {
+            return Err(AppError::MeetingNotFound {
+                id: meeting_id.to_string(),
+            });
+        }
+
+        Self::get_by_id(conn, meeting_id)
+    }
+
     fn list_audio_files(conn: &Connection, meeting_id: &str) -> AppResult<Vec<AudioFile>> {
         let mut stmt = conn.prepare(
             "SELECT id, meeting_id, file_path, duration_ms, format, created_at
