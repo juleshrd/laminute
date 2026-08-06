@@ -163,7 +163,7 @@ fn format_diarized_text(segments: &[MistralTranscriptionSegment], fallback: &str
             .unwrap_or("Locuteur");
         match (segment.start, segment.end) {
             (Some(start), Some(end)) => {
-                lines.push(format!("[{speaker} {start:.1f}s–{end:.1f}s] {text}"));
+                lines.push(format!("[{speaker} {start:.1}s–{end:.1}s] {text}"));
             }
             _ => lines.push(format!("[{speaker}] {text}")),
         }
@@ -554,7 +554,11 @@ mod tests {
 
         let provider = MistralProvider::with_api_base(format!("{}/v1", mock_server.uri()));
         let error = provider
-            .transcribe("sk-test", b"fake-audio-bytes", opts(None, None, None, false))
+            .transcribe(
+                "sk-test",
+                b"fake-audio-bytes",
+                opts(None, None, None, false),
+            )
             .await
             .unwrap_err();
 

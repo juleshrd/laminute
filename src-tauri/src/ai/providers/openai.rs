@@ -159,7 +159,7 @@ fn format_diarized_text(segments: &[OpenAiTranscriptionSegment], fallback: &str)
             .unwrap_or("Locuteur");
         match (segment.start, segment.end) {
             (Some(start), Some(end)) => {
-                lines.push(format!("[{speaker} {start:.1f}s–{end:.1f}s] {text}"));
+                lines.push(format!("[{speaker} {start:.1}s–{end:.1}s] {text}"));
             }
             _ => lines.push(format!("[{speaker}] {text}")),
         }

@@ -106,9 +106,7 @@ impl SettingsStore {
             .provider_models
             .get(provider_id)
             .and_then(|prefs| prefs.transcription_model.clone())
-            .or_else(|| {
-                model_catalog::default_transcription_model(provider_id).map(str::to_string)
-            })
+            .or_else(|| model_catalog::default_transcription_model(provider_id).map(str::to_string))
     }
 
     pub fn summary_model_for(&self, provider_id: &str) -> Option<String> {

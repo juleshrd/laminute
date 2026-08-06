@@ -102,7 +102,10 @@ mod tests {
 
     #[test]
     fn mistral_offers_small_and_medium_for_summary() {
-        let ids: Vec<_> = summary_models("mistral").into_iter().map(|m| m.id).collect();
+        let ids: Vec<_> = summary_models("mistral")
+            .into_iter()
+            .map(|m| m.id)
+            .collect();
         assert!(ids.contains(&"mistral-small-latest".to_string()));
         assert!(ids.contains(&"mistral-medium-latest".to_string()));
     }
