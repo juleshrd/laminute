@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  getAiSettings,
-  listAiProviders,
-  setSelectedProvider,
-} from "../lib/ai/api";
+import { getAiSettings, listAiProviders, setSelectedProvider } from "../lib/ai/api";
 import type { ProviderInfo } from "../lib/ai/types";
 import { formatCapabilities } from "../lib/ai/formatCapabilities";
 import { DataProcessingNotice } from "./DataProcessingNotice";

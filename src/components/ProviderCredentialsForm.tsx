@@ -1,11 +1,6 @@
 import { useState } from "react";
 
-import {
-  deleteApiKey,
-  saveApiKey,
-  setOllamaBaseUrl,
-  validateApiKey,
-} from "../lib/ai/api";
+import { deleteApiKey, saveApiKey, setOllamaBaseUrl, validateApiKey } from "../lib/ai/api";
 import type { KeyValidationResult } from "../lib/ai/types";
 
 export interface ProviderCredentialsFormProps {

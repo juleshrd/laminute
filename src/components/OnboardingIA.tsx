@@ -173,10 +173,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                     aria-pressed={selected}
                   >
                     <span className="lm-provider-head">
-                      <ProviderLogo
-                        providerId={provider.id}
-                        displayName={provider.displayName}
-                      />
+                      <ProviderLogo providerId={provider.id} displayName={provider.displayName} />
                       <span className="lm-provider-title">
                         {provider.displayName}
                         {featured ? <span className="lm-recommended">Recommandé</span> : null}
@@ -212,9 +209,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
 
         {step === "config" ? (
           <>
-            <h2>
-              Configurer {selectedProvider?.displayName ?? "le fournisseur"}
-            </h2>
+            <h2>Configurer {selectedProvider?.displayName ?? "le fournisseur"}</h2>
             <p className="lm-subtle lm-onboarding-lead">
               Optionnel pour l’instant — vous pourrez configurer plus tard dans Réglages.
             </p>
