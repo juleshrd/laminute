@@ -35,15 +35,15 @@ npm run dev
 
 `npm run dev` lance Tauri en mode développement (Vite sur le port 1420 + fenêtre native).
 
-| Commande | Description |
-| -------- | ----------- |
-| `npm run build` | Compile le frontend et le backend Rust |
-| `npm run build:bundle` | Produit un installable Tauri (selon l’OS) |
-| `npm run lint` | ESLint + TypeScript + Clippy |
-| `npm run format` | Prettier + rustfmt |
+| Commande               | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `npm run build`        | Compile le frontend et le backend Rust          |
+| `npm run build:bundle` | Produit un installable Tauri (selon l’OS)       |
+| `npm run lint`         | ESLint + TypeScript + Clippy                    |
+| `npm run format`       | Prettier + rustfmt                              |
 | `npm run format:check` | Vérifie le formatage sans modifier les fichiers |
-| `npm run test` | Tests Vitest (frontend) + `cargo test` (Rust) |
-| `npm run check` | Format + lint + tests + build |
+| `npm run test`         | Tests Vitest (frontend) + `cargo test` (Rust)   |
+| `npm run check`        | Format + lint + tests + build                   |
 
 ## Structure du dépôt
 

@@ -12,10 +12,10 @@ Enregistrez ou importez un audio, lancez le traitement, et consultez le résulta
 
 Téléchargez la [dernière version](https://github.com/juleshrd/laminute/releases/latest) pour votre ordinateur :
 
-| Système | Fichier |
-| ------- | ------- |
+| Système | Fichier             |
+| ------- | ------------------- |
 | Windows | Installateur `.exe` |
-| macOS   | Fichier `.dmg` |
+| macOS   | Fichier `.dmg`      |
 | Linux   | Fichier `.AppImage` |
 
 Installez, puis ouvrez **La Minute**.
@@ -63,18 +63,13 @@ Utile si vous préférez ne rien envoyer dans le cloud.
 
 **Limite** : Ollama ne transcrit pas l’audio. Collez le texte de la réunion dans l’app pour générer le compte-rendu.
 
-### Anthropic
-
-Pas encore disponible dans La Minute.
-
 ### Comparatif rapide
 
-| Fournisseur | Transcription audio | Compte-rendu | Où ça tourne |
-| ----------- | ------------------- | ------------ | ------------ |
-| Mistral (recommandé) | Oui | Oui | Cloud (votre clé) |
-| OpenAI | Oui | Oui | Cloud (votre clé) |
-| Ollama | Non | Oui | Votre ordinateur |
-| Anthropic | — | — | Bientôt |
+| Fournisseur          | Transcription audio | Compte-rendu | Où ça tourne      |
+| -------------------- | ------------------- | ------------ | ----------------- |
+| Mistral (recommandé) | Oui                 | Oui          | Cloud (votre clé) |
+| OpenAI               | Oui                 | Oui          | Cloud (votre clé) |
+| Ollama               | Non                 | Oui          | Votre ordinateur  |
 
 ## Confidentialité
 
