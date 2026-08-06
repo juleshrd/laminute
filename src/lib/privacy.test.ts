@@ -8,6 +8,11 @@ describe("buildExportFilename", () => {
     expect(name).toBe("laminute-Comite-produit-1-2026-08-05.json");
   });
 
+  it("accepte une extension explicite", () => {
+    const name = buildExportFilename("Comité", "2026-08-05T12:00:00.000Z", "md");
+    expect(name).toBe("laminute-Comite-2026-08-05.md");
+  });
+
   it("utilise un nom par défaut si le titre est vide", () => {
     const name = buildExportFilename("!!!", "2026-08-05T12:00:00.000Z");
     expect(name).toBe("laminute-reunion-2026-08-05.json");

@@ -1,12 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
+use crate::ai::structured_summary::parse_structured_summary;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::models::{Action, Meeting, Summary, Transcription};
+use crate::report_pdf::{build_meeting_report_pdf, MeetingReportPdfInput};
 use crate::repository::MeetingRepository;
 
 const EXPORT_VERSION: u32 = 1;
@@ -137,6 +140,82 @@ pub fn write_export_file(path: String, contents: String) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
     std::fs::write(target, contents).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn write_export_bytes(path: String, contents_base64: String) -> Result<(), String> {
+    let bytes = BASE64
+        .decode(contents_base64.as_bytes())
+        .map_err(|err| format!("contenu export invalide : {err}"))?;
+    let target = PathBuf::from(&path);
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    std::fs::write(target, bytes).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn export_meeting_pdf(state: State<'_, AppState>, id: String) -> Result<String, String> {
+    let (meeting, summary, duration_ms) = with_db(&state, |conn| {
+        let detail = MeetingRepository::get_detail(conn, &id)?;
+        let summary_record = detail.summaries.last().ok_or_else(|| {
+            AppError::Message("aucun compte-rendu structuré à exporter".into())
+        })?;
+        let structured = parse_structured_summary(&summary_record.content)
+            .map_err(|err| AppError::Message(err.to_string()))?;
+        let duration_ms = detail
+            .audio_files
+            .first()
+            .and_then(|audio| audio.duration_ms)
+            .or_else(|| duration_from_range(&detail.meeting));
+        Ok((detail.meeting, structured, duration_ms))
+    })
+    .map_err(|err| err.to_string())?;
+
+    let display_date = format_display_date(&meeting);
+    let duration_label = format_duration_ms(duration_ms);
+    let bytes = build_meeting_report_pdf(MeetingReportPdfInput {
+        title: &meeting.title,
+        status: meeting.status,
+        display_date: &display_date,
+        duration_label: &duration_label,
+        summary: &summary,
+    })?;
+    Ok(BASE64.encode(bytes))
+}
+
+fn duration_from_range(meeting: &Meeting) -> Option<i64> {
+    let start = meeting.started_at.as_deref()?;
+    let end = meeting.ended_at.as_deref()?;
+    let start = DateTime::parse_from_rfc3339(start).ok()?;
+    let end = DateTime::parse_from_rfc3339(end).ok()?;
+    let ms = end.timestamp_millis() - start.timestamp_millis();
+    if ms >= 0 {
+        Some(ms)
+    } else {
+        None
+    }
+}
+
+fn format_display_date(meeting: &Meeting) -> String {
+    let raw = meeting
+        .started_at
+        .as_deref()
+        .unwrap_or(meeting.created_at.as_str());
+    if let Ok(dt) = DateTime::parse_from_rfc3339(raw) {
+        return dt.format("%d/%m/%Y %H:%M").to_string();
+    }
+    raw.to_string()
+}
+
+fn format_duration_ms(duration_ms: Option<i64>) -> String {
+    let Some(ms) = duration_ms else {
+        return "—".into();
+    };
+    let total_seconds = ms / 1000;
+    let minutes = total_seconds / 60;
+    let seconds = total_seconds % 60;
+    format!("{minutes}:{seconds:02}")
 }
 
 fn build_export(conn: &rusqlite::Connection, id: &str) -> AppResult<MeetingExport> {
@@ -323,6 +402,50 @@ mod tests {
         assert!(json.contains("secret.mp3"));
         assert_eq!(export.export_version, EXPORT_VERSION);
         assert_eq!(export.audio_files[0].file_name, "secret.mp3");
+    }
+
+    #[test]
+    fn pdf_export_requires_valid_structured_summary() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Sans CR".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let err = MeetingRepository::get_detail(&conn, &meeting.id)
+            .unwrap()
+            .summaries
+            .last()
+            .is_none();
+        assert!(err);
+    }
+
+    #[test]
+    fn pdf_bytes_from_seeded_summary() {
+        use crate::ai::structured_summary::StructuredSummary;
+        use crate::report_pdf::{build_meeting_report_pdf, MeetingReportPdfInput};
+        use crate::models::MeetingStatus;
+
+        let summary = StructuredSummary {
+            synthese: "Resume".into(),
+            decisions: vec![],
+            actions: vec![],
+            risques: vec![],
+            questions_ouvertes: vec![],
+        };
+        let bytes = build_meeting_report_pdf(MeetingReportPdfInput {
+            title: "Test",
+            status: MeetingStatus::Completed,
+            display_date: "01/01/2026",
+            duration_label: "1:00",
+            summary: &summary,
+        })
+        .unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
     }
 
     #[test]
