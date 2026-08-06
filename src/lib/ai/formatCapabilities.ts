@@ -5,6 +5,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   summary: "Résumé",
   local: "Local",
   streaming: "Streaming",
+  diarization: "Diarisation",
 };
 
 export function formatCapabilities(provider: ProviderInfo): string {

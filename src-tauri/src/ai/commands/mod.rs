@@ -2,7 +2,8 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::ai::models::{AiSettings, KeyValidationResult, ProviderInfo};
+use crate::ai::model_catalog;
+use crate::ai::models::{AiSettings, KeyValidationResult, ProviderInfo, SetModelPreferencesInput};
 use crate::ai::secrets;
 use crate::ai::settings::SettingsStore;
 use crate::AiAppState;
@@ -32,10 +33,24 @@ fn build_ai_settings(
         .transpose()?
         .unwrap_or(false);
 
+    let provider_id = selected_provider_id.as_deref().unwrap_or("");
+    let transcription_models = model_catalog::transcription_models(provider_id);
+    let summary_models = model_catalog::summary_models(provider_id);
+
     Ok(AiSettings {
-        selected_provider_id,
+        selected_provider_id: selected_provider_id.clone(),
         has_api_key,
         ollama_base_url: Some(settings.ollama_base_url().to_string()),
+        diarization_enabled: settings.diarization_enabled()
+            && model_catalog::supports_diarization(provider_id),
+        transcription_model: selected_provider_id
+            .as_deref()
+            .and_then(|id| settings.transcription_model_for(id)),
+        summary_model: selected_provider_id
+            .as_deref()
+            .and_then(|id| settings.summary_model_for(id)),
+        transcription_models,
+        summary_models,
     })
 }
 
@@ -92,6 +107,70 @@ pub fn set_ollama_base_url(
     state.registry.ollama().set_base_url(base_url);
 
     let selected_provider_id = settings.selected_provider_id().map(str::to_string);
+    build_ai_settings(&settings, selected_provider_id)
+}
+
+#[tauri::command]
+pub fn set_model_preferences(
+    state: State<'_, AiAppState>,
+    input: SetModelPreferencesInput,
+) -> Result<AiSettings, String> {
+    state
+        .registry
+        .require(&input.provider_id)
+        .map_err(|e| e.to_string())?;
+
+    if let Some(model) = &input.transcription_model {
+        let allowed = model_catalog::transcription_models(&input.provider_id);
+        if !allowed.is_empty() && !allowed.iter().any(|m| m.id == *model) {
+            return Err(format!(
+                "Modèle de transcription « {model} » non supporté pour {}.",
+                input.provider_id
+            ));
+        }
+    }
+
+    if let Some(model) = &input.summary_model {
+        let allowed = model_catalog::summary_models(&input.provider_id);
+        if !allowed.is_empty() && !allowed.iter().any(|m| m.id == *model) {
+            return Err(format!(
+                "Modèle de compte-rendu « {model} » non supporté pour {}.",
+                input.provider_id
+            ));
+        }
+    }
+
+    let mut settings = state
+        .settings
+        .lock()
+        .map_err(|_| "verrou des réglages indisponible".to_string())?;
+
+    if input.transcription_model.is_some() || input.summary_model.is_some() {
+        settings
+            .set_provider_models(
+                &input.provider_id,
+                input.transcription_model,
+                input.summary_model,
+            )
+            .map_err(|e| e.to_string())?;
+    }
+
+    if let Some(enabled) = input.diarization_enabled {
+        if enabled && !model_catalog::supports_diarization(&input.provider_id) {
+            return Err(format!(
+                "La diarisation n'est pas disponible pour {}.",
+                input.provider_id
+            ));
+        }
+        settings
+            .set_diarization_enabled(enabled)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let selected_provider_id = settings
+        .selected_provider_id()
+        .map(str::to_string)
+        .or(Some(input.provider_id));
     build_ai_settings(&settings, selected_provider_id)
 }
 

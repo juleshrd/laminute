@@ -13,10 +13,11 @@ describe("formatCapabilities", () => {
         summary: true,
         local: false,
         streaming: true,
+        diarization: true,
       },
     };
 
-    expect(formatCapabilities(provider)).toBe("Transcription · Résumé · Streaming");
+    expect(formatCapabilities(provider)).toBe("Transcription · Résumé · Streaming · Diarisation");
   });
 
   it("affiche transcription et résumé pour OpenAI", () => {
@@ -28,10 +29,11 @@ describe("formatCapabilities", () => {
         summary: true,
         local: false,
         streaming: false,
+        diarization: true,
       },
     };
 
-    expect(formatCapabilities(provider)).toBe("Transcription · Résumé");
+    expect(formatCapabilities(provider)).toBe("Transcription · Résumé · Diarisation");
   });
 
   it("affiche résumé et local pour Ollama", () => {
@@ -43,6 +45,7 @@ describe("formatCapabilities", () => {
         summary: true,
         local: true,
         streaming: false,
+        diarization: false,
       },
     };
 

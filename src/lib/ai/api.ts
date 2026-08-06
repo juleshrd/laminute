@@ -6,6 +6,7 @@ import type {
   GenerateStructuredSummaryOutput,
   KeyValidationResult,
   ProviderInfo,
+  SetModelPreferencesInput,
 } from "./types";
 
 export function listAiProviders(): Promise<ProviderInfo[]> {
@@ -22,6 +23,10 @@ export function setSelectedProvider(providerId: string): Promise<AiSettings> {
 
 export function setOllamaBaseUrl(baseUrl: string): Promise<AiSettings> {
   return invoke<AiSettings>("set_ollama_base_url", { baseUrl });
+}
+
+export function setModelPreferences(input: SetModelPreferencesInput): Promise<AiSettings> {
+  return invoke<AiSettings>("set_model_preferences", { input });
 }
 
 export function saveApiKey(providerId: string, apiKey: string): Promise<void> {

@@ -97,13 +97,19 @@ pub async fn transcribe_audio_file(
     transcription_state: State<'_, TranscriptionState>,
     input: TranscribeAudioInput,
 ) -> Result<Transcription, String> {
-    let provider_id = ai_state
-        .settings
-        .lock()
-        .map_err(|_| "verrou des réglages indisponible".to_string())?
-        .selected_provider_id()
-        .map(str::to_string)
-        .unwrap_or_else(|| DEFAULT_PROVIDER_ID.to_string());
+    let (provider_id, transcription_model, diarize) = {
+        let settings = ai_state
+            .settings
+            .lock()
+            .map_err(|_| "verrou des réglages indisponible".to_string())?;
+        let provider_id = settings
+            .selected_provider_id()
+            .map(str::to_string)
+            .unwrap_or_else(|| DEFAULT_PROVIDER_ID.to_string());
+        let transcription_model = settings.transcription_model_for(&provider_id);
+        let diarize = settings.diarization_enabled();
+        (provider_id, transcription_model, diarize)
+    };
 
     let provider = ai_state
         .registry
@@ -127,6 +133,7 @@ pub async fn transcribe_audio_file(
         })?;
 
     let provider_display_name = provider.display_name().to_string();
+    let diarize = diarize && provider.capabilities().diarization;
 
     emit_progress(
         &app,
@@ -249,9 +256,10 @@ pub async fn transcribe_audio_file(
             &api_key,
             &audio_bytes,
             TranscriptionOptions {
-                model: None,
+                model: transcription_model,
                 language: input.language.clone(),
                 file_name,
+                diarize,
             },
         )
         .await
