@@ -63,10 +63,6 @@ Utile si vous préférez ne rien envoyer dans le cloud.
 
 **Limite** : Ollama ne transcrit pas l’audio. Collez le texte de la réunion dans l’app pour générer le compte-rendu.
 
-### Anthropic
-
-Pas encore disponible dans La Minute.
-
 ### Comparatif rapide
 
 | Fournisseur | Transcription audio | Compte-rendu | Où ça tourne |
@@ -74,7 +70,6 @@ Pas encore disponible dans La Minute.
 | Mistral (recommandé) | Oui | Oui | Cloud (votre clé) |
 | OpenAI | Oui | Oui | Cloud (votre clé) |
 | Ollama | Non | Oui | Votre ordinateur |
-| Anthropic | — | — | Bientôt |
 
 ## Confidentialité
 
