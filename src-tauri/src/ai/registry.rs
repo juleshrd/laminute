@@ -3,45 +3,73 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::ai::error::AiError;
+use crate::ai::http;
 use crate::ai::models::{
     ProviderInfo, SummaryOptions, SummaryResult, TranscriptionOptions, TranscriptionResult,
 };
 use crate::ai::provider::AiProvider;
-use crate::ai::providers::mistral::MistralProvider;
-use crate::ai::providers::ollama::OllamaProvider;
-use crate::ai::providers::openai::OpenAiProvider;
+use crate::ai::providers::mistral::{MistralProvider, MISTRAL_API_BASE};
+use crate::ai::providers::ollama::{OllamaProvider, DEFAULT_OLLAMA_BASE};
+use crate::ai::providers::openai::{OpenAiProvider, OPENAI_API_BASE};
 use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
 /// Registre central des fournisseurs IA. Ajouter un fournisseur ici suffit — aucun changement UI requis.
 pub struct ProviderRegistry {
     providers: HashMap<String, Arc<dyn AiProvider>>,
-    mistral: Arc<MistralProvider>,
-    openai: Arc<OpenAiProvider>,
+    transcription: HashMap<String, Arc<dyn TranscriptionProvider>>,
+    summary: HashMap<String, Arc<dyn SummaryProvider>>,
     ollama: Arc<OllamaProvider>,
 }
 
 impl ProviderRegistry {
     pub fn new() -> Self {
-        let mistral = Arc::new(MistralProvider::new());
-        let openai = Arc::new(OpenAiProvider::new());
-        let ollama = Arc::new(OllamaProvider::new());
+        let client = http::build_client();
+        let mistral = Arc::new(MistralProvider::with_api_base(
+            MISTRAL_API_BASE.to_string(),
+            client.clone(),
+        ));
+        let openai = Arc::new(OpenAiProvider::with_api_base(
+            OPENAI_API_BASE.to_string(),
+            client.clone(),
+        ));
+        let ollama = Arc::new(OllamaProvider::with_base_url(
+            DEFAULT_OLLAMA_BASE.to_string(),
+            client,
+        ));
+
         let mut registry = Self {
             providers: HashMap::new(),
-            mistral: mistral.clone(),
-            openai: openai.clone(),
+            transcription: HashMap::new(),
+            summary: HashMap::new(),
             ollama: ollama.clone(),
         };
 
-        registry.register(mistral);
-        registry.register(openai);
-        registry.register(ollama);
+        registry.register_ai(mistral.clone());
+        registry.register_transcription(mistral.clone());
+        registry.register_summary(mistral);
+
+        registry.register_ai(openai.clone());
+        registry.register_transcription(openai.clone());
+        registry.register_summary(openai);
+
+        registry.register_ai(ollama.clone());
+        registry.register_summary(ollama);
 
         registry
     }
 
-    pub fn register(&mut self, provider: Arc<dyn AiProvider>) {
+    pub fn register_ai(&mut self, provider: Arc<dyn AiProvider>) {
         self.providers.insert(provider.id().to_string(), provider);
+    }
+
+    pub fn register_transcription(&mut self, provider: Arc<dyn TranscriptionProvider>) {
+        self.transcription
+            .insert(provider.id().to_string(), provider);
+    }
+
+    pub fn register_summary(&mut self, provider: Arc<dyn SummaryProvider>) {
+        self.summary.insert(provider.id().to_string(), provider);
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn AiProvider>> {
@@ -70,20 +98,12 @@ impl ProviderRegistry {
         text: &str,
         options: SummaryOptions,
     ) -> Result<SummaryResult, AiError> {
-        match provider_id {
-            "mistral" => {
-                SummaryProvider::summarize(self.mistral.as_ref(), api_key, text, options).await
-            }
-            "openai" => {
-                SummaryProvider::summarize(self.openai.as_ref(), api_key, text, options).await
-            }
-            "ollama" => {
-                SummaryProvider::summarize(self.ollama.as_ref(), api_key, text, options).await
-            }
-            _ => Err(AiError::Other(format!(
+        let provider = self.summary.get(provider_id).ok_or_else(|| {
+            AiError::Other(format!(
                 "le fournisseur « {provider_id} » ne prend pas en charge le résumé structuré"
-            ))),
-        }
+            ))
+        })?;
+        SummaryProvider::summarize(provider.as_ref(), api_key, text, options).await
     }
 
     pub async fn transcribe_audio(
@@ -93,29 +113,12 @@ impl ProviderRegistry {
         audio_path: &Path,
         options: TranscriptionOptions,
     ) -> Result<TranscriptionResult, AiError> {
-        match provider_id {
-            "mistral" => {
-                TranscriptionProvider::transcribe(
-                    self.mistral.as_ref(),
-                    api_key,
-                    audio_path,
-                    options,
-                )
-                .await
-            }
-            "openai" => {
-                TranscriptionProvider::transcribe(
-                    self.openai.as_ref(),
-                    api_key,
-                    audio_path,
-                    options,
-                )
-                .await
-            }
-            _ => Err(AiError::Other(format!(
+        let provider = self.transcription.get(provider_id).ok_or_else(|| {
+            AiError::Other(format!(
                 "le fournisseur « {provider_id} » ne prend pas en charge la transcription audio"
-            ))),
-        }
+            ))
+        })?;
+        TranscriptionProvider::transcribe(provider.as_ref(), api_key, audio_path, options).await
     }
 }
 
@@ -128,6 +131,59 @@ impl Default for ProviderRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::capabilities::ProviderCapabilities;
+    use crate::ai::models::{KeyValidationResult, ModelInfo};
+    use async_trait::async_trait;
+
+    struct StubSummaryProvider;
+
+    #[async_trait]
+    impl AiProvider for StubSummaryProvider {
+        fn id(&self) -> &str {
+            "stub"
+        }
+
+        fn display_name(&self) -> &str {
+            "Stub"
+        }
+
+        fn capabilities(&self) -> ProviderCapabilities {
+            ProviderCapabilities {
+                transcription: false,
+                summary: true,
+                local: true,
+                streaming: false,
+                diarization: false,
+            }
+        }
+
+        async fn validate_key(&self, _api_key: &str) -> Result<KeyValidationResult, AiError> {
+            Ok(KeyValidationResult {
+                valid: true,
+                message: "ok".into(),
+                models: None,
+            })
+        }
+
+        async fn list_models(&self, _api_key: &str) -> Result<Vec<ModelInfo>, AiError> {
+            Ok(vec![])
+        }
+    }
+
+    #[async_trait]
+    impl SummaryProvider for StubSummaryProvider {
+        async fn summarize(
+            &self,
+            _api_key: &str,
+            text: &str,
+            _options: SummaryOptions,
+        ) -> Result<SummaryResult, AiError> {
+            Ok(SummaryResult {
+                text: format!("stub:{text}"),
+                model: "stub-model".into(),
+            })
+        }
+    }
 
     #[test]
     fn registry_lists_all_providers() {
@@ -185,5 +241,29 @@ mod tests {
             )
             .await;
         assert!(matches!(result, Err(AiError::Other(_))));
+    }
+
+    #[tokio::test]
+    async fn register_summary_stub_dispatches_without_match() {
+        let mut registry = ProviderRegistry::new();
+        let stub = Arc::new(StubSummaryProvider);
+        registry.register_ai(stub.clone());
+        registry.register_summary(stub);
+
+        let result = registry
+            .summarize_text(
+                "stub",
+                "",
+                "hello",
+                SummaryOptions {
+                    model: None,
+                    max_tokens: None,
+                },
+            )
+            .await
+            .expect("stub summary");
+
+        assert_eq!(result.text, "stub:hello");
+        assert_eq!(result.model, "stub-model");
     }
 }
