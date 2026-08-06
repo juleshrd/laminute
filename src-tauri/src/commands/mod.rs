@@ -9,6 +9,7 @@ pub use meetings::{
     update_meeting_title,
 };
 pub use privacy::{
-    delete_all_local_data, export_meeting, get_local_storage_info, write_export_file,
+    delete_all_local_data, export_meeting, export_meeting_pdf, get_local_storage_info,
+    write_export_bytes, write_export_file,
 };
 pub use summary::generate_structured_summary;

@@ -25,7 +25,19 @@ export function writeExportFile(path: string, contents: string): Promise<void> {
   return invoke<void>("write_export_file", { path, contents });
 }
 
-export function buildExportFilename(title: string, exportedAt: string): string {
+export function writeExportBytes(path: string, contentsBase64: string): Promise<void> {
+  return invoke<void>("write_export_bytes", { path, contentsBase64 });
+}
+
+export function exportMeetingPdf(id: string): Promise<string> {
+  return invoke<string>("export_meeting_pdf", { id });
+}
+
+export function buildExportFilename(
+  title: string,
+  exportedAt: string,
+  extension: string = "json",
+): string {
   const safe =
     title
       .normalize("NFD")
@@ -35,7 +47,8 @@ export function buildExportFilename(title: string, exportedAt: string): string {
       .replace(/\s+/g, "-")
       .slice(0, 50) || "reunion";
   const date = exportedAt.slice(0, 10);
-  return `laminute-${safe}-${date}.json`;
+  const ext = extension.replace(/^\./, "") || "json";
+  return `laminute-${safe}-${date}.${ext}`;
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

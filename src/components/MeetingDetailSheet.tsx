@@ -4,7 +4,14 @@ import { save } from "@tauri-apps/plugin-dialog";
 
 import type { StructuredSummary } from "../lib/ai/types";
 import { deleteMeeting } from "../lib/meetings";
-import { buildExportFilename, exportMeeting, writeExportFile } from "../lib/privacy";
+import {
+  buildExportFilename,
+  exportMeeting,
+  exportMeetingPdf,
+  writeExportBytes,
+  writeExportFile,
+} from "../lib/privacy";
+import { buildReportMarkdown, reportExportMeta } from "../lib/reportExport";
 import {
   formatDurationMs,
   meetingDisplayDate,
@@ -21,6 +28,8 @@ interface MeetingDetailSheetProps {
   onDeleted?: () => void;
 }
 
+type ExportKind = "markdown" | "pdf" | "json";
+
 export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailSheetProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,24 +42,61 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
     ? parseStoredSummary(summaryRecord.content)
     : null;
   const durationMs = meetingDurationMs(detail);
+  const canExportReport = structured !== null;
 
-  async function handleExport() {
+  async function handleExport(kind: ExportKind) {
     setBusy(true);
     setError(null);
     setStatusMessage(null);
     try {
       const exportedAt = new Date().toISOString();
-      const contents = await exportMeeting(detail.id);
-      const defaultPath = buildExportFilename(detail.title, exportedAt);
+
+      if (kind === "json") {
+        const contents = await exportMeeting(detail.id);
+        const defaultPath = buildExportFilename(detail.title, exportedAt, "json");
+        const path = await save({
+          defaultPath,
+          filters: [{ name: "JSON", extensions: ["json"] }],
+        });
+        if (path === null) {
+          return;
+        }
+        await writeExportFile(path, contents);
+        setStatusMessage("Export JSON enregistré.");
+        return;
+      }
+
+      if (!structured) {
+        setError("Aucun compte-rendu structuré à exporter.");
+        return;
+      }
+
+      if (kind === "markdown") {
+        const contents = buildReportMarkdown(reportExportMeta(detail), structured);
+        const defaultPath = buildExportFilename(detail.title, exportedAt, "md");
+        const path = await save({
+          defaultPath,
+          filters: [{ name: "Markdown", extensions: ["md"] }],
+        });
+        if (path === null) {
+          return;
+        }
+        await writeExportFile(path, contents);
+        setStatusMessage("Export Markdown enregistré.");
+        return;
+      }
+
+      const pdfBase64 = await exportMeetingPdf(detail.id);
+      const defaultPath = buildExportFilename(detail.title, exportedAt, "pdf");
       const path = await save({
         defaultPath,
-        filters: [{ name: "JSON", extensions: ["json"] }],
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
       if (path === null) {
         return;
       }
-      await writeExportFile(path, contents);
-      setStatusMessage("Export enregistré.");
+      await writeExportBytes(path, pdfBase64);
+      setStatusMessage("Export PDF enregistré.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export impossible.");
     } finally {
@@ -89,8 +135,32 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
         </button>
         <h2>{detail.title}</h2>
         <div className="row controls meeting-detail__actions">
-          <button type="button" disabled={busy} onClick={() => void handleExport()}>
-            Exporter (JSON)
+          <button
+            type="button"
+            disabled={busy || !canExportReport}
+            onClick={() => void handleExport("markdown")}
+            title={
+              canExportReport
+                ? "Exporter le compte-rendu en Markdown"
+                : "Aucun compte-rendu structuré à exporter"
+            }
+          >
+            Exporter Markdown
+          </button>
+          <button
+            type="button"
+            disabled={busy || !canExportReport}
+            onClick={() => void handleExport("pdf")}
+            title={
+              canExportReport
+                ? "Exporter le compte-rendu en PDF brandé"
+                : "Aucun compte-rendu structuré à exporter"
+            }
+          >
+            Exporter PDF
+          </button>
+          <button type="button" disabled={busy} onClick={() => void handleExport("json")}>
+            Exporter JSON
           </button>
           <button
             type="button"

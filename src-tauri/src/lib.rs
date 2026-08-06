@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod error;
 mod models;
+mod report_pdf;
 mod repository;
 
 pub const APP_IDENTIFIER: &str = "app.laminute.desktop";
@@ -14,9 +15,9 @@ use tauri::Manager;
 
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
 use commands::{
-    create_meeting, delete_all_local_data, delete_meeting, export_meeting,
+    create_meeting, delete_all_local_data, delete_meeting, export_meeting, export_meeting_pdf,
     generate_structured_summary, get_local_storage_info, get_meeting, import_mp3_meeting,
-    list_meetings, search_meetings, update_meeting_title, write_export_file,
+    list_meetings, search_meetings, update_meeting_title, write_export_bytes, write_export_file,
 };
 use db::open_and_migrate;
 
@@ -149,9 +150,11 @@ pub fn run() {
             import_mp3_meeting,
             generate_structured_summary,
             export_meeting,
+            export_meeting_pdf,
             get_local_storage_info,
             delete_all_local_data,
             write_export_file,
+            write_export_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
