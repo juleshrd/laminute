@@ -76,7 +76,9 @@ pub struct ExportSummary {
 
 #[tauri::command]
 pub fn export_meeting(state: State<'_, AppState>, id: String) -> Result<String, String> {
-    let export = with_db(&state, |conn| build_export(conn, &id)).map_err(|err| err.to_string())?;
+    let export = state
+        .with_db(|conn| build_export(conn, &id))
+        .map_err(|err| err.to_string())?;
     serde_json::to_string_pretty(&export).map_err(|err| err.to_string())
 }
 
@@ -90,11 +92,12 @@ pub fn get_local_storage_info(
     let recordings_dir = app_data_dir.join("recordings");
     let db_path = app_data_dir.join("laminute.db");
 
-    let meetings_count = with_db(&state, |conn| {
-        conn.query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0))
-            .map_err(AppError::from)
-    })
-    .map_err(|err| err.to_string())?;
+    let meetings_count = state
+        .with_db(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0))
+                .map_err(AppError::from)
+        })
+        .map_err(|err| err.to_string())?;
 
     Ok(LocalStorageInfo {
         meetings_count,
@@ -112,20 +115,21 @@ pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Resu
     let imports_dir = app_data_dir.join("imports");
     let recordings_dir = app_data_dir.join("recordings");
 
-    with_db(&state, |conn| {
-        let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
-        let paths = stmt
-            .query_map([], |row| row.get::<_, String>(0))?
-            .collect::<Result<Vec<_>, _>>()?;
+    state
+        .with_db(|conn| {
+            let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
+            let paths = stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
 
-        for path in paths {
-            remove_file_if_present(Path::new(&path));
-        }
+            for path in paths {
+                remove_file_if_present(Path::new(&path));
+            }
 
-        conn.execute("DELETE FROM meetings", [])?;
-        Ok(())
-    })
-    .map_err(|err| err.to_string())?;
+            conn.execute("DELETE FROM meetings", [])?;
+            Ok(())
+        })
+        .map_err(|err| err.to_string())?;
 
     clear_dir_files(&imports_dir).map_err(|err| err.to_string())?;
     clear_dir_files(&recordings_dir).map_err(|err| err.to_string())?;
@@ -156,22 +160,23 @@ pub fn write_export_bytes(path: String, contents_base64: String) -> Result<(), S
 
 #[tauri::command]
 pub fn export_meeting_pdf(state: State<'_, AppState>, id: String) -> Result<String, String> {
-    let (meeting, summary, duration_ms) = with_db(&state, |conn| {
-        let detail = MeetingRepository::get_detail(conn, &id)?;
-        let summary_record = detail
-            .summaries
-            .last()
-            .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
-        let structured = parse_structured_summary(&summary_record.content)
-            .map_err(|err| AppError::Message(err.to_string()))?;
-        let duration_ms = detail
-            .audio_files
-            .first()
-            .and_then(|audio| audio.duration_ms)
-            .or_else(|| duration_from_range(&detail.meeting));
-        Ok((detail.meeting, structured, duration_ms))
-    })
-    .map_err(|err| err.to_string())?;
+    let (meeting, summary, duration_ms) = state
+        .with_db(|conn| {
+            let detail = MeetingRepository::get_detail(conn, &id)?;
+            let summary_record = detail
+                .summaries
+                .last()
+                .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
+            let structured = parse_structured_summary(&summary_record.content)
+                .map_err(|err| AppError::Message(err.to_string()))?;
+            let duration_ms = detail
+                .audio_files
+                .first()
+                .and_then(|audio| audio.duration_ms)
+                .or_else(|| duration_from_range(&detail.meeting));
+            Ok((detail.meeting, structured, duration_ms))
+        })
+        .map_err(|err| err.to_string())?;
 
     let display_date = format_display_date(&meeting);
     let duration_label = format_duration_ms(duration_ms);
@@ -325,17 +330,6 @@ fn remove_file_if_present(path: &Path) {
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|err| err.to_string())
-}
-
-fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>
-where
-    F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
-{
-    let db = state
-        .db
-        .lock()
-        .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
-    f(&db)
 }
 
 #[cfg(test)]

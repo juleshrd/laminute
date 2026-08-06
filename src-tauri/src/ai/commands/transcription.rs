@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::models::TranscriptionOptions;
@@ -11,6 +11,7 @@ use crate::ai::secrets;
 use crate::db::AppState;
 use crate::models::{CreateMeetingInput, MeetingStatus, Transcription};
 use crate::repository::MeetingRepository;
+use crate::retention;
 use crate::AiAppState;
 
 const DEFAULT_PROVIDER_ID: &str = "mistral";
@@ -198,32 +199,28 @@ pub async fn transcribe_audio_file(
         .and_then(|ext| ext.to_str())
         .map(str::to_string);
 
-    let meeting_id = {
-        let db = db_state
-            .db
-            .lock()
-            .map_err(|_| "impossible d'accéder à la base de données".to_string())?;
-
-        if let Some(existing_id) = &input.meeting_id {
-            MeetingRepository::get_by_id(&db, existing_id).map_err(|e| e.to_string())?;
-            existing_id.clone()
-        } else {
-            let title = input.meeting_title.clone().unwrap_or_else(|| {
-                Local::now()
-                    .format("Enregistrement %d/%m/%Y %H:%M")
-                    .to_string()
-            });
-            let meeting = MeetingRepository::create(
-                &db,
-                CreateMeetingInput {
-                    title,
-                    description: None,
-                },
-            )
-            .map_err(|e| e.to_string())?;
-            meeting.id
-        }
-    };
+    let meeting_id = db_state
+        .with_db(|conn| {
+            if let Some(existing_id) = &input.meeting_id {
+                MeetingRepository::get_by_id(conn, existing_id)?;
+                Ok(existing_id.clone())
+            } else {
+                let title = input.meeting_title.clone().unwrap_or_else(|| {
+                    Local::now()
+                        .format("Enregistrement %d/%m/%Y %H:%M")
+                        .to_string()
+                });
+                let meeting = MeetingRepository::create(
+                    conn,
+                    CreateMeetingInput {
+                        title,
+                        description: None,
+                    },
+                )?;
+                Ok(meeting.id)
+            }
+        })
+        .map_err(|e| e.to_string())?;
 
     emit_progress(
         &app,
@@ -235,24 +232,18 @@ pub async fn transcribe_audio_file(
         },
     );
 
-    let audio_file = {
-        let db = db_state
-            .db
-            .lock()
-            .map_err(|_| "impossible d'accéder à la base de données".to_string())?;
-
-        MeetingRepository::update_status(&db, &meeting_id, MeetingStatus::Processing)
-            .map_err(|e| e.to_string())?;
-
-        MeetingRepository::attach_audio_file(
-            &db,
-            &meeting_id,
-            &input.file_path,
-            input.duration_ms,
-            format.as_deref(),
-        )
-        .map_err(|e| e.to_string())?
-    };
+    let audio_file = db_state
+        .with_db(|conn| {
+            MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Processing)?;
+            MeetingRepository::attach_audio_file(
+                conn,
+                &meeting_id,
+                &input.file_path,
+                input.duration_ms,
+                format.as_deref(),
+            )
+        })
+        .map_err(|e| e.to_string())?;
 
     emit_progress(
         &app,
@@ -280,9 +271,9 @@ pub async fn transcribe_audio_file(
         .await
         .map_err(|err| {
             let message = err.to_string();
-            if let Ok(db) = db_state.db.lock() {
-                let _ = MeetingRepository::update_status(&db, &meeting_id, MeetingStatus::Draft);
-            }
+            let _ = db_state.with_db(|conn| {
+                MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Draft)
+            });
             emit_progress(
                 &app,
                 &transcription_state,
@@ -305,30 +296,23 @@ pub async fn transcribe_audio_file(
         },
     );
 
-    let transcription = {
-        let db = db_state
-            .db
-            .lock()
-            .map_err(|_| "impossible d'accéder à la base de données".to_string())?;
-
-        let saved = MeetingRepository::create_transcription(
-            &db,
-            &meeting_id,
-            Some(&audio_file.id),
-            &provider_id,
-            &provider_display_name,
-            &result.text,
-            result.language.as_deref(),
-        )
+    let transcription = db_state
+        .with_db(|conn| {
+            let saved = MeetingRepository::create_transcription(
+                conn,
+                &meeting_id,
+                Some(&audio_file.id),
+                &provider_id,
+                &provider_display_name,
+                &result.text,
+                result.language.as_deref(),
+            )?;
+            MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Completed)?;
+            Ok(saved)
+        })
         .map_err(|e| e.to_string())?;
 
-        MeetingRepository::update_status(&db, &meeting_id, MeetingStatus::Completed)
-            .map_err(|e| e.to_string())?;
-
-        saved
-    };
-
-    maybe_purge_audio_files(&app, &db_state, &meeting_id)?;
+    retention::maybe_purge_audio_files(&app, &db_state, &meeting_id).map_err(|e| e.to_string())?;
 
     emit_progress(
         &app,
@@ -341,26 +325,6 @@ pub async fn transcribe_audio_file(
     );
 
     Ok(transcription)
-}
-
-fn maybe_purge_audio_files(
-    app: &AppHandle,
-    db_state: &State<'_, AppState>,
-    meeting_id: &str,
-) -> Result<(), String> {
-    let audio_state = app
-        .try_state::<crate::audio::AudioState>()
-        .ok_or_else(|| "état audio indisponible".to_string())?;
-    let keep = audio_state.keep_audio_files().map_err(|e| e.to_string())?;
-    if keep {
-        return Ok(());
-    }
-
-    let db = db_state
-        .db
-        .lock()
-        .map_err(|_| "impossible d'accéder à la base de données".to_string())?;
-    MeetingRepository::delete_audio_files_for_meeting(&db, meeting_id).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
