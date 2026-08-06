@@ -157,7 +157,7 @@ pub fn write_export_bytes(path: String, contents_base64: String) -> Result<(), S
 #[tauri::command]
 pub fn export_meeting_pdf(state: State<'_, AppState>, id: String) -> Result<String, String> {
     let (meeting, summary, duration_ms) = with_db(&state, |conn| {
-        let detail = MeetingRepository::get_detail(conn, &id)?;
+        let detail = MeetingRepository::get_detail_full(conn, &id)?;
         let summary_record = detail
             .summaries
             .last()
@@ -220,7 +220,7 @@ fn format_duration_ms(duration_ms: Option<i64>) -> String {
 }
 
 fn build_export(conn: &rusqlite::Connection, id: &str) -> AppResult<MeetingExport> {
-    let detail = MeetingRepository::get_detail(conn, id)?;
+    let detail = MeetingRepository::get_detail_full(conn, id)?;
 
     Ok(MeetingExport {
         export_version: EXPORT_VERSION,
@@ -417,7 +417,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = MeetingRepository::get_detail(&conn, &meeting.id)
+        let err = MeetingRepository::get_detail_full(&conn, &meeting.id)
             .unwrap()
             .summaries
             .last()

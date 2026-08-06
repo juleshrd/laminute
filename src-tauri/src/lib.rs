@@ -16,8 +16,9 @@ use tauri::Manager;
 use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
 use commands::{
     create_meeting, delete_all_local_data, delete_meeting, export_meeting, export_meeting_pdf,
-    generate_structured_summary, get_local_storage_info, get_meeting, import_mp3_meeting,
-    list_meetings, search_meetings, update_meeting_title, write_export_bytes, write_export_file,
+    generate_structured_summary, get_local_storage_info, get_meeting, get_summary,
+    get_transcription, import_mp3_meeting, list_meetings, search_meetings, update_meeting_title,
+    write_export_bytes, write_export_file,
 };
 use db::open_and_migrate;
 
@@ -125,6 +126,8 @@ pub fn run() {
             greet,
             create_meeting,
             get_meeting,
+            get_transcription,
+            get_summary,
             list_meetings,
             search_meetings,
             delete_meeting,

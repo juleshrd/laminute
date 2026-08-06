@@ -2,6 +2,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TranscriptionMeta {
+    pub id: String,
+    pub meeting_id: String,
+    pub audio_file_id: Option<String>,
+    pub provider_id: Option<String>,
+    pub language: Option<String>,
+    pub content_length: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Transcription {
     pub id: String,
     pub meeting_id: String,

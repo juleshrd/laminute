@@ -4,7 +4,7 @@ use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters,
-    MeetingSummary,
+    MeetingSummary, Summary, Transcription,
 };
 use crate::repository::MeetingRepository;
 
@@ -19,6 +19,17 @@ pub fn create_meeting(
 #[tauri::command]
 pub fn get_meeting(state: State<'_, AppState>, id: String) -> Result<MeetingDetail, String> {
     with_db(&state, |conn| MeetingRepository::get_detail(conn, &id)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_transcription(state: State<'_, AppState>, id: String) -> Result<Transcription, String> {
+    with_db(&state, |conn| MeetingRepository::get_transcription(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_summary(state: State<'_, AppState>, id: String) -> Result<Summary, String> {
+    with_db(&state, |conn| MeetingRepository::get_summary(conn, &id)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

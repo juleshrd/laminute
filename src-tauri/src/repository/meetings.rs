@@ -8,8 +8,9 @@ use crate::audio::import::{import_mp3, title_from_path, ImportedAudio};
 use crate::audio::AudioError;
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem,
-    MeetingSearchFilters, MeetingStatus, MeetingSummary, Summary, Transcription,
+    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingDetailFull,
+    MeetingListItem, MeetingSearchFilters, MeetingStatus, MeetingSummary, Summary, SummaryMeta,
+    Transcription, TranscriptionMeta,
 };
 
 pub struct MeetingRepository;
@@ -56,10 +57,44 @@ impl MeetingRepository {
         Ok(MeetingDetail {
             meeting,
             audio_files: Self::list_audio_files(conn, id)?,
+            transcriptions: Self::list_transcriptions_meta(conn, id)?,
+            summaries: Self::list_summaries_meta(conn, id)?,
+            actions: Self::list_actions(conn, id)?,
+        })
+    }
+
+    pub fn get_detail_full(conn: &Connection, id: &str) -> AppResult<MeetingDetailFull> {
+        let meeting = Self::get_by_id(conn, id)?;
+
+        Ok(MeetingDetailFull {
+            meeting,
+            audio_files: Self::list_audio_files(conn, id)?,
             transcriptions: Self::list_transcriptions(conn, id)?,
             summaries: Self::list_summaries(conn, id)?,
             actions: Self::list_actions(conn, id)?,
         })
+    }
+
+    pub fn get_transcription(conn: &Connection, id: &str) -> AppResult<Transcription> {
+        conn.query_row(
+            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at
+             FROM transcriptions WHERE id = ?1",
+            [id],
+            map_transcription_row,
+        )
+        .optional()?
+        .ok_or_else(|| AppError::Message(format!("transcription introuvable : {id}")))
+    }
+
+    pub fn get_summary(conn: &Connection, id: &str) -> AppResult<Summary> {
+        conn.query_row(
+            "SELECT id, meeting_id, provider_id, content, created_at, updated_at
+             FROM summaries WHERE id = ?1",
+            [id],
+            map_summary_row,
+        )
+        .optional()?
+        .ok_or_else(|| AppError::Message(format!("résumé introuvable : {id}")))
     }
 
     pub fn list(conn: &Connection) -> AppResult<Vec<MeetingSummary>> {
@@ -414,24 +449,58 @@ impl MeetingRepository {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    fn list_transcriptions_meta(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Vec<TranscriptionMeta>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, audio_file_id, provider_id, language, LENGTH(content), created_at, updated_at
+             FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map([meeting_id], |row| {
+            Ok(TranscriptionMeta {
+                id: row.get(0)?,
+                meeting_id: row.get(1)?,
+                audio_file_id: row.get(2)?,
+                provider_id: row.get(3)?,
+                language: row.get(4)?,
+                content_length: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    fn list_summaries_meta(conn: &Connection, meeting_id: &str) -> AppResult<Vec<SummaryMeta>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, provider_id, LENGTH(content), created_at, updated_at
+             FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt.query_map([meeting_id], |row| {
+            Ok(SummaryMeta {
+                id: row.get(0)?,
+                meeting_id: row.get(1)?,
+                provider_id: row.get(2)?,
+                content_length: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })?;
+
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
     fn list_transcriptions(conn: &Connection, meeting_id: &str) -> AppResult<Vec<Transcription>> {
         let mut stmt = conn.prepare(
             "SELECT id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at
              FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
-        let rows = stmt.query_map([meeting_id], |row| {
-            Ok(Transcription {
-                id: row.get(0)?,
-                meeting_id: row.get(1)?,
-                audio_file_id: row.get(2)?,
-                provider_id: row.get(3)?,
-                content: row.get(4)?,
-                language: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map([meeting_id], map_transcription_row)?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
@@ -442,16 +511,7 @@ impl MeetingRepository {
              FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
-        let rows = stmt.query_map([meeting_id], |row| {
-            Ok(Summary {
-                id: row.get(0)?,
-                meeting_id: row.get(1)?,
-                provider_id: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-            })
-        })?;
+        let rows = stmt.query_map([meeting_id], map_summary_row)?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
@@ -479,6 +539,30 @@ impl MeetingRepository {
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+}
+
+fn map_transcription_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcription> {
+    Ok(Transcription {
+        id: row.get(0)?,
+        meeting_id: row.get(1)?,
+        audio_file_id: row.get(2)?,
+        provider_id: row.get(3)?,
+        content: row.get(4)?,
+        language: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+fn map_summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
+    Ok(Summary {
+        id: row.get(0)?,
+        meeting_id: row.get(1)?,
+        provider_id: row.get(2)?,
+        content: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
 }
 
 fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
@@ -1130,6 +1214,62 @@ mod tests {
             .unwrap()
             .to_lowercase()
             .contains("dufour"));
+    }
+
+    #[test]
+    fn light_detail_serialization_omits_heavy_content() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Volumineuse".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        let blob = "x".repeat(200_000);
+
+        for index in 0..3 {
+            conn.execute(
+                "INSERT INTO transcriptions (id, meeting_id, content, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?4)",
+                params![
+                    format!("tx-{index}"),
+                    meeting.id,
+                    blob,
+                    now,
+                ],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO summaries (id, meeting_id, content, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?4)",
+                params![
+                    format!("sum-{index}"),
+                    meeting.id,
+                    blob,
+                    now,
+                ],
+            )
+            .unwrap();
+        }
+
+        let light = MeetingRepository::get_detail(&conn, &meeting.id).unwrap();
+        let full = MeetingRepository::get_detail_full(&conn, &meeting.id).unwrap();
+
+        let light_bytes = serde_json::to_vec(&light).unwrap();
+        let full_bytes = serde_json::to_vec(&full).unwrap();
+
+        assert!(
+            light_bytes.len() < full_bytes.len() / 10,
+            "light detail ({}) should be much smaller than full ({})",
+            light_bytes.len(),
+            full_bytes.len()
+        );
+        let light_json = String::from_utf8_lossy(&light_bytes);
+        assert!(!light_json.contains(&blob[..100]));
     }
 
     #[test]

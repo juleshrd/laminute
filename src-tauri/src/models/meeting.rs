@@ -84,6 +84,17 @@ pub struct MeetingDetail {
     #[serde(flatten)]
     pub meeting: Meeting,
     pub audio_files: Vec<super::AudioFile>,
+    pub transcriptions: Vec<super::TranscriptionMeta>,
+    pub summaries: Vec<super::SummaryMeta>,
+    pub actions: Vec<super::Action>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingDetailFull {
+    #[serde(flatten)]
+    pub meeting: Meeting,
+    pub audio_files: Vec<super::AudioFile>,
     pub transcriptions: Vec<super::Transcription>,
     pub summaries: Vec<super::Summary>,
     pub actions: Vec<super::Action>,

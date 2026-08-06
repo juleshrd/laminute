@@ -6,6 +6,28 @@ export { parseStoredSummary } from "./ai/parseStructuredSummary";
 import type { AudioFile } from "./audio";
 import type { Transcription } from "./transcription";
 
+export type { Transcription };
+
+export interface TranscriptionMeta {
+  id: string;
+  meetingId: string;
+  audioFileId?: string;
+  providerId?: string;
+  language?: string;
+  contentLength?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SummaryMeta {
+  id: string;
+  meetingId: string;
+  providerId?: string;
+  contentLength?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type MeetingStatus = "draft" | "recording" | "processing" | "completed";
 
 export interface MeetingSummary {
@@ -32,8 +54,8 @@ export interface MeetingDetail {
   createdAt: string;
   updatedAt: string;
   audioFiles: AudioFile[];
-  transcriptions: Transcription[];
-  summaries: SummaryRecord[];
+  transcriptions: TranscriptionMeta[];
+  summaries: SummaryMeta[];
   actions: Action[];
 }
 
@@ -62,6 +84,14 @@ export function listMeetings(): Promise<MeetingSummary[]> {
 
 export function getMeeting(id: string): Promise<MeetingDetail> {
   return invoke<MeetingDetail>("get_meeting", { id });
+}
+
+export function getTranscription(id: string): Promise<Transcription> {
+  return invoke<Transcription>("get_transcription", { id });
+}
+
+export function getSummary(id: string): Promise<SummaryRecord> {
+  return invoke<SummaryRecord>("get_summary", { id });
 }
 
 export function searchMeetings(filters: MeetingSearchFilters): Promise<MeetingListItem[]> {

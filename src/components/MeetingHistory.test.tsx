@@ -169,10 +169,19 @@ describe("MeetingHistory", () => {
           description: null,
           audioFiles: [],
           transcriptions: [
-            { id: "t-1", meetingId: "m-1", content: "Bonjour", createdAt: "", updatedAt: "" },
+            { id: "t-1", meetingId: "m-1", createdAt: "", updatedAt: "" },
           ],
           summaries: [],
           actions: [],
+        });
+      }
+      if (command === "get_transcription") {
+        return Promise.resolve({
+          id: "t-1",
+          meetingId: "m-1",
+          content: "Bonjour",
+          createdAt: "",
+          updatedAt: "",
         });
       }
       return Promise.resolve([]);
