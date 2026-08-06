@@ -1,18 +1,54 @@
 use std::path::{Path, PathBuf};
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::ai::structured_summary::parse_structured_summary;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
+use crate::export_write::{issue_grant, write_granted};
 use crate::models::{Action, Meeting, Summary, Transcription};
+use crate::report_markdown::{build_meeting_report_markdown, MeetingReportMarkdownInput};
 use crate::report_pdf::{build_meeting_report_pdf, MeetingReportPdfInput};
 use crate::repository::MeetingRepository;
 
 const EXPORT_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExportFormat {
+    Json,
+    Markdown,
+    Pdf,
+}
+
+impl ExportFormat {
+    fn parse(raw: &str) -> Result<Self, String> {
+        match raw {
+            "json" => Ok(Self::Json),
+            "markdown" | "md" => Ok(Self::Markdown),
+            "pdf" => Ok(Self::Pdf),
+            other => Err(format!("format d'export inconnu : {other}")),
+        }
+    }
+
+    fn extension(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::Markdown => "md",
+            Self::Pdf => "pdf",
+        }
+    }
+
+    fn filter_name(self) -> &'static str {
+        match self {
+            Self::Json => "JSON",
+            Self::Markdown => "Markdown",
+            Self::Pdf => "PDF",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,10 +112,43 @@ pub struct ExportSummary {
 
 #[tauri::command]
 pub fn export_meeting(state: State<'_, AppState>, id: String) -> Result<String, String> {
-    let export = state
-        .with_db(|conn| build_export(conn, &id))
-        .map_err(|err| err.to_string())?;
+    let export = with_db(&state, |conn| build_export(conn, &id)).map_err(|err| err.to_string())?;
     serde_json::to_string_pretty(&export).map_err(|err| err.to_string())
+}
+
+/// Dialogue de sauvegarde + écriture native (JSON / Markdown / PDF).
+/// Retourne `false` si l'utilisateur annule le dialogue.
+#[tauri::command]
+pub async fn save_meeting_export(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    format: String,
+    default_file_name: String,
+) -> Result<bool, String> {
+    let format = ExportFormat::parse(&format)?;
+    let default_file_name = sanitize_default_file_name(&default_file_name, format)?;
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter(format.filter_name(), &[format.extension()])
+        .set_file_name(&default_file_name)
+        .blocking_save_file();
+
+    let Some(file_path) = file_path else {
+        return Ok(false);
+    };
+
+    let path = file_path
+        .into_path()
+        .map_err(|err| format!("chemin d'export invalide : {err}"))?;
+
+    // Générer avant d'émettre le grant pour ne pas laisser de grant orphelin.
+    let bytes = build_export_bytes(&state, &id, format)?;
+    let grant = issue_grant(path);
+    write_granted(&grant, &bytes).map_err(|err| err.to_string())?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -92,12 +161,11 @@ pub fn get_local_storage_info(
     let recordings_dir = app_data_dir.join("recordings");
     let db_path = app_data_dir.join("laminute.db");
 
-    let meetings_count = state
-        .with_db(|conn| {
-            conn.query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0))
-                .map_err(AppError::from)
-        })
-        .map_err(|err| err.to_string())?;
+    let meetings_count = with_db(&state, |conn| {
+        conn.query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0))
+            .map_err(AppError::from)
+    })
+    .map_err(|err| err.to_string())?;
 
     Ok(LocalStorageInfo {
         meetings_count,
@@ -115,21 +183,20 @@ pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Resu
     let imports_dir = app_data_dir.join("imports");
     let recordings_dir = app_data_dir.join("recordings");
 
-    state
-        .with_db(|conn| {
-            let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
-            let paths = stmt
-                .query_map([], |row| row.get::<_, String>(0))?
-                .collect::<Result<Vec<_>, _>>()?;
+    with_db(&state, |conn| {
+        let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
+        let paths = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
 
-            for path in paths {
-                remove_file_if_present(Path::new(&path));
-            }
+        for path in paths {
+            remove_file_if_present(Path::new(&path));
+        }
 
-            conn.execute("DELETE FROM meetings", [])?;
-            Ok(())
-        })
-        .map_err(|err| err.to_string())?;
+        conn.execute("DELETE FROM meetings", [])?;
+        Ok(())
+    })
+    .map_err(|err| err.to_string())?;
 
     clear_dir_files(&imports_dir).map_err(|err| err.to_string())?;
     clear_dir_files(&recordings_dir).map_err(|err| err.to_string())?;
@@ -137,57 +204,100 @@ pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Resu
     Ok(())
 }
 
-#[tauri::command]
-pub fn write_export_file(path: String, contents: String) -> Result<(), String> {
-    let target = PathBuf::from(&path);
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+fn sanitize_default_file_name(raw: &str, format: ExportFormat) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty()
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || trimmed.contains("..")
+    {
+        return Err("nom de fichier d'export invalide".into());
     }
-    std::fs::write(target, contents).map_err(|err| err.to_string())
+
+    let name = Path::new(trimmed)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "nom de fichier d'export invalide".to_string())?;
+
+    if name != trimmed {
+        return Err("nom de fichier d'export invalide".into());
+    }
+
+    let expected_ext = format.extension();
+    if Path::new(name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case(expected_ext))
+    {
+        return Ok(name.to_string());
+    }
+
+    Ok(format!("{name}.{expected_ext}"))
 }
 
-#[tauri::command]
-pub fn write_export_bytes(path: String, contents_base64: String) -> Result<(), String> {
-    let bytes = BASE64
-        .decode(contents_base64.as_bytes())
-        .map_err(|err| format!("contenu export invalide : {err}"))?;
-    let target = PathBuf::from(&path);
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+fn build_export_bytes(
+    state: &State<'_, AppState>,
+    id: &str,
+    format: ExportFormat,
+) -> Result<Vec<u8>, String> {
+    match format {
+        ExportFormat::Json => {
+            let export =
+                with_db(state, |conn| build_export(conn, id)).map_err(|err| err.to_string())?;
+            let json = serde_json::to_string_pretty(&export).map_err(|err| err.to_string())?;
+            Ok(json.into_bytes())
+        }
+        ExportFormat::Markdown => {
+            let (meeting, summary, duration_ms) = load_structured_export(state, id)?;
+            let md = build_meeting_report_markdown(MeetingReportMarkdownInput {
+                title: &meeting.title,
+                status: meeting.status,
+                display_date: &format_display_date(&meeting),
+                duration_label: &format_duration_ms(duration_ms),
+                summary: &summary,
+            });
+            Ok(md.into_bytes())
+        }
+        ExportFormat::Pdf => {
+            let (meeting, summary, duration_ms) = load_structured_export(state, id)?;
+            build_meeting_report_pdf(MeetingReportPdfInput {
+                title: &meeting.title,
+                status: meeting.status,
+                display_date: &format_display_date(&meeting),
+                duration_label: &format_duration_ms(duration_ms),
+                summary: &summary,
+            })
+        }
     }
-    std::fs::write(target, bytes).map_err(|err| err.to_string())
 }
 
-#[tauri::command]
-pub fn export_meeting_pdf(state: State<'_, AppState>, id: String) -> Result<String, String> {
-    let (meeting, summary, duration_ms) = state
-        .with_db(|conn| {
-            let detail = MeetingRepository::get_detail(conn, &id)?;
-            let summary_record = detail
-                .summaries
-                .last()
-                .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
-            let structured = parse_structured_summary(&summary_record.content)
-                .map_err(|err| AppError::Message(err.to_string()))?;
-            let duration_ms = detail
-                .audio_files
-                .first()
-                .and_then(|audio| audio.duration_ms)
-                .or_else(|| duration_from_range(&detail.meeting));
-            Ok((detail.meeting, structured, duration_ms))
-        })
-        .map_err(|err| err.to_string())?;
-
-    let display_date = format_display_date(&meeting);
-    let duration_label = format_duration_ms(duration_ms);
-    let bytes = build_meeting_report_pdf(MeetingReportPdfInput {
-        title: &meeting.title,
-        status: meeting.status,
-        display_date: &display_date,
-        duration_label: &duration_label,
-        summary: &summary,
-    })?;
-    Ok(BASE64.encode(bytes))
+fn load_structured_export(
+    state: &State<'_, AppState>,
+    id: &str,
+) -> Result<
+    (
+        Meeting,
+        crate::ai::structured_summary::StructuredSummary,
+        Option<i64>,
+    ),
+    String,
+> {
+    with_db(state, |conn| {
+        let detail = MeetingRepository::get_detail(conn, id)?;
+        let summary_record = detail
+            .summaries
+            .last()
+            .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
+        let structured = parse_structured_summary(&summary_record.content)
+            .map_err(|err| AppError::Message(err.to_string()))?;
+        let duration_ms = detail
+            .audio_files
+            .first()
+            .and_then(|audio| audio.duration_ms)
+            .or_else(|| duration_from_range(&detail.meeting));
+        Ok((detail.meeting, structured, duration_ms))
+    })
+    .map_err(|err| err.to_string())
 }
 
 fn duration_from_range(meeting: &Meeting) -> Option<i64> {
@@ -332,6 +442,17 @@ fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|err| err.to_string())
 }
 
+fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>
+where
+    F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
+{
+    let db = state
+        .db
+        .lock()
+        .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
+    f(&db)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,6 +497,43 @@ mod tests {
             "INSERT INTO summaries (id, meeting_id, provider_id, content, created_at, updated_at)
              VALUES ('sum-1', ?1, 'mistral', '{\"synthese\":\"test\"}', ?2, ?2)",
             params![meeting.id, now],
+        )
+        .unwrap();
+
+        meeting.id
+    }
+
+    fn seed_meeting_with_valid_summary(conn: &rusqlite::Connection) -> String {
+        let now = Utc::now().to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO ai_providers (id, name, provider_type, is_enabled, credential_key_id, created_at, updated_at)
+             VALUES ('mistral', 'Mistral AI', 'mistral', 1, NULL, ?1, ?1)",
+            [&now],
+        )
+        .unwrap();
+
+        let meeting = MeetingRepository::create(
+            conn,
+            CreateMeetingInput {
+                title: "Comité produit".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let summary_json = r#"{
+            "synthese": "Point d'avancement",
+            "decisions": ["Go"],
+            "actions": [{"titre": "Brief", "description": null, "responsable": "Alice", "echeance": null}],
+            "risques": [],
+            "questionsOuvertes": []
+        }"#;
+
+        conn.execute(
+            "INSERT INTO summaries (id, meeting_id, provider_id, content, created_at, updated_at)
+             VALUES ('sum-1', ?1, 'mistral', ?2, ?3, ?3)",
+            params![meeting.id, summary_json, now],
         )
         .unwrap();
 
@@ -441,6 +599,53 @@ mod tests {
         })
         .unwrap();
         assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn build_export_bytes_json_markdown_pdf_from_seed() {
+        let conn = open_in_memory().unwrap();
+        let meeting_id = seed_meeting_with_valid_summary(&conn);
+
+        let export = build_export(&conn, &meeting_id).unwrap();
+        let json = serde_json::to_string_pretty(&export).unwrap();
+        assert!(json.contains("Comité produit"));
+        assert!(json.contains("Point d'avancement"));
+
+        let detail = MeetingRepository::get_detail(&conn, &meeting_id).unwrap();
+        let summary = parse_structured_summary(&detail.summaries.last().unwrap().content).unwrap();
+        let md = build_meeting_report_markdown(MeetingReportMarkdownInput {
+            title: &detail.meeting.title,
+            status: detail.meeting.status,
+            display_date: &format_display_date(&detail.meeting),
+            duration_label: &format_duration_ms(None),
+            summary: &summary,
+        });
+        assert!(md.contains("# Comité produit"));
+        assert!(md.contains("Point d'avancement"));
+
+        let pdf = build_meeting_report_pdf(MeetingReportPdfInput {
+            title: &detail.meeting.title,
+            status: detail.meeting.status,
+            display_date: &format_display_date(&detail.meeting),
+            duration_label: &format_duration_ms(None),
+            summary: &summary,
+        })
+        .unwrap();
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn sanitize_default_file_name_rejects_path_traversal() {
+        let err = sanitize_default_file_name("../secret.json", ExportFormat::Json).unwrap_err();
+        assert!(err.contains("invalide"));
+
+        let ok = sanitize_default_file_name("laminute-reunion-2026-08-06.json", ExportFormat::Json)
+            .unwrap();
+        assert_eq!(ok, "laminute-reunion-2026-08-06.json");
+
+        let with_ext =
+            sanitize_default_file_name("laminute-reunion-2026-08-06", ExportFormat::Pdf).unwrap();
+        assert_eq!(with_ext, "laminute-reunion-2026-08-06.pdf");
     }
 
     #[test]

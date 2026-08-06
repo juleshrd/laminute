@@ -1,16 +1,8 @@
 import { useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
 
 import { deleteMeeting } from "../lib/meetings";
-import {
-  buildExportFilename,
-  exportMeeting,
-  exportMeetingPdf,
-  writeExportBytes,
-  writeExportFile,
-} from "../lib/privacy";
-import { buildReportMarkdown, reportExportMeta } from "../lib/reportExport";
+import { buildExportFilename, saveMeetingExport } from "../lib/privacy";
 import {
   formatDurationMs,
   meetingDisplayDate,
@@ -47,54 +39,25 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
     setError(null);
     setStatusMessage(null);
     try {
-      const exportedAt = new Date().toISOString();
-
-      if (kind === "json") {
-        const contents = await exportMeeting(detail.id);
-        const defaultPath = buildExportFilename(detail.title, exportedAt, "json");
-        const path = await save({
-          defaultPath,
-          filters: [{ name: "JSON", extensions: ["json"] }],
-        });
-        if (path === null) {
-          return;
-        }
-        await writeExportFile(path, contents);
-        setStatusMessage("Export JSON enregistré.");
-        return;
-      }
-
-      if (!structured) {
+      if (kind !== "json" && !structured) {
         setError("Aucun compte-rendu structuré à exporter.");
         return;
       }
 
-      if (kind === "markdown") {
-        const contents = buildReportMarkdown(reportExportMeta(detail), structured);
-        const defaultPath = buildExportFilename(detail.title, exportedAt, "md");
-        const path = await save({
-          defaultPath,
-          filters: [{ name: "Markdown", extensions: ["md"] }],
-        });
-        if (path === null) {
-          return;
-        }
-        await writeExportFile(path, contents);
-        setStatusMessage("Export Markdown enregistré.");
+      const exportedAt = new Date().toISOString();
+      const extension = kind === "markdown" ? "md" : kind;
+      const defaultFileName = buildExportFilename(detail.title, exportedAt, extension);
+      const saved = await saveMeetingExport(detail.id, kind, defaultFileName);
+      if (!saved) {
         return;
       }
 
-      const pdfBase64 = await exportMeetingPdf(detail.id);
-      const defaultPath = buildExportFilename(detail.title, exportedAt, "pdf");
-      const path = await save({
-        defaultPath,
-        filters: [{ name: "PDF", extensions: ["pdf"] }],
-      });
-      if (path === null) {
-        return;
-      }
-      await writeExportBytes(path, pdfBase64);
-      setStatusMessage("Export PDF enregistré.");
+      const labels: Record<ExportKind, string> = {
+        json: "Export JSON enregistré.",
+        markdown: "Export Markdown enregistré.",
+        pdf: "Export PDF enregistré.",
+      };
+      setStatusMessage(labels[kind]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export impossible.");
     } finally {
