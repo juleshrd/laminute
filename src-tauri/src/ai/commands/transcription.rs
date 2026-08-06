@@ -5,6 +5,7 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::models::TranscriptionOptions;
 use crate::ai::secrets;
 use crate::db::AppState;
@@ -160,7 +161,7 @@ pub async fn transcribe_audio_file(
         return Err(message);
     }
 
-    let audio_bytes = std::fs::read(path).map_err(|err| {
+    let metadata = std::fs::metadata(path).map_err(|err| {
         let message = format!("Impossible de lire le fichier audio : {err}");
         emit_progress(
             &app,
@@ -173,6 +174,20 @@ pub async fn transcribe_audio_file(
         );
         message
     })?;
+
+    if let Err(err) = validate_transcription_audio_size(metadata.len()) {
+        let message = err.to_string();
+        emit_progress(
+            &app,
+            &transcription_state,
+            TranscriptionProgress {
+                phase: TranscriptionPhase::Failed,
+                message: message.clone(),
+                meeting_id: input.meeting_id.clone(),
+            },
+        );
+        return Err(message);
+    }
 
     let file_name = path
         .file_name()
@@ -254,7 +269,7 @@ pub async fn transcribe_audio_file(
         .transcribe_audio(
             &provider_id,
             &api_key,
-            &audio_bytes,
+            path,
             TranscriptionOptions {
                 model: transcription_model,
                 language: input.language.clone(),

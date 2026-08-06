@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::ai::error::AiError;
@@ -89,17 +90,27 @@ impl ProviderRegistry {
         &self,
         provider_id: &str,
         api_key: &str,
-        audio: &[u8],
+        audio_path: &Path,
         options: TranscriptionOptions,
     ) -> Result<TranscriptionResult, AiError> {
         match provider_id {
             "mistral" => {
-                TranscriptionProvider::transcribe(self.mistral.as_ref(), api_key, audio, options)
-                    .await
+                TranscriptionProvider::transcribe(
+                    self.mistral.as_ref(),
+                    api_key,
+                    audio_path,
+                    options,
+                )
+                .await
             }
             "openai" => {
-                TranscriptionProvider::transcribe(self.openai.as_ref(), api_key, audio, options)
-                    .await
+                TranscriptionProvider::transcribe(
+                    self.openai.as_ref(),
+                    api_key,
+                    audio_path,
+                    options,
+                )
+                .await
             }
             _ => Err(AiError::Other(format!(
                 "le fournisseur « {provider_id} » ne prend pas en charge la transcription audio"
@@ -155,12 +166,16 @@ mod tests {
 
     #[tokio::test]
     async fn transcribe_audio_rejects_ollama() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let audio_path = dir.path().join("audio.wav");
+        std::fs::write(&audio_path, b"audio").expect("write");
+
         let registry = ProviderRegistry::new();
         let result = registry
             .transcribe_audio(
                 "ollama",
                 "",
-                b"audio",
+                &audio_path,
                 TranscriptionOptions {
                     model: None,
                     language: None,

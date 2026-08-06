@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
+use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::model_catalog::{self, OPENAI_DIARIZE_MODEL};
 use crate::ai::models::{
     KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult, TranscriptionOptions,
@@ -15,7 +17,6 @@ use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
-const MAX_AUDIO_BYTES: usize = 100 * 1024 * 1024;
 
 pub struct OpenAiProvider {
     client: reqwest::Client,
@@ -266,7 +267,7 @@ impl TranscriptionProvider for OpenAiProvider {
     async fn transcribe(
         &self,
         api_key: &str,
-        audio: &[u8],
+        audio_path: &Path,
         options: TranscriptionOptions,
     ) -> Result<TranscriptionResult, AiError> {
         if api_key.trim().is_empty() {
@@ -275,16 +276,10 @@ impl TranscriptionProvider for OpenAiProvider {
             ));
         }
 
-        if audio.is_empty() {
-            return Err(AiError::Other("Le fichier audio est vide.".to_string()));
-        }
-
-        if audio.len() > MAX_AUDIO_BYTES {
-            return Err(AiError::Other(format!(
-                "Fichier audio trop volumineux (max {} Mo).",
-                MAX_AUDIO_BYTES / 1024 / 1024
-            )));
-        }
+        let metadata = std::fs::metadata(audio_path).map_err(|err| {
+            AiError::Other(format!("Impossible de lire le fichier audio : {err}"))
+        })?;
+        validate_transcription_audio_size(metadata.len())?;
 
         let (model, diarize) = if options.diarize {
             (OPENAI_DIARIZE_MODEL, true)
@@ -299,7 +294,11 @@ impl TranscriptionProvider for OpenAiProvider {
         };
         let (file_name, mime) = Self::resolve_upload_name(&options);
 
-        let file_part = reqwest::multipart::Part::bytes(audio.to_vec())
+        let file_part = reqwest::multipart::Part::file(audio_path)
+            .await
+            .map_err(|err| {
+                AiError::Other(format!("Impossible de lire le fichier audio : {err}"))
+            })?
             .file_name(file_name)
             .mime_str(mime)
             .map_err(|err| AiError::Other(err.to_string()))?;
@@ -437,8 +436,20 @@ impl SummaryProvider for OpenAiProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn write_temp_audio(name: &str, bytes: &[u8]) -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(name);
+        if bytes.is_empty() {
+            std::fs::File::create(&path).expect("create empty file");
+        } else {
+            std::fs::write(&path, bytes).expect("write audio");
+        }
+        (dir, path)
+    }
 
     fn opts(
         model: Option<&str>,
@@ -464,9 +475,10 @@ mod tests {
 
     #[tokio::test]
     async fn transcribe_rejects_empty_audio() {
+        let (_dir, audio_path) = write_temp_audio("empty.wav", &[]);
         let provider = OpenAiProvider::new();
         let error = provider
-            .transcribe("sk-test", &[], opts(None, None, None, false))
+            .transcribe("sk-test", &audio_path, opts(None, None, None, false))
             .await
             .unwrap_err();
         assert!(matches!(error, AiError::Other(_)));
@@ -484,10 +496,11 @@ mod tests {
             .await;
 
         let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let (_dir, audio_path) = write_temp_audio("sample.wav", b"fake-audio-bytes");
         let result = provider
             .transcribe(
                 "sk-test",
-                b"fake-audio-bytes",
+                &audio_path,
                 opts(None, Some("fr"), Some("sample.wav"), false),
             )
             .await
@@ -513,10 +526,11 @@ mod tests {
             .await;
 
         let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let (_dir, audio_path) = write_temp_audio("sample.wav", b"fake-audio-bytes");
         let result = provider
             .transcribe(
                 "sk-test",
-                b"fake-audio-bytes",
+                &audio_path,
                 opts(Some("gpt-4o-transcribe"), None, Some("sample.wav"), true),
             )
             .await

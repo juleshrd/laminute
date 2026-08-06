@@ -58,7 +58,9 @@ export function MeetingIdleStep({
             {importing ? "Import en cours…" : "Choisir un fichier MP3"}
           </button>
         </div>
-        <p className="drop-zone-constraints">MP3 uniquement · 500 Mo max · entre 1 s et 4 h</p>
+        <p className="drop-zone-constraints">
+          MP3 · import 500 Mo max · transcription cloud 100 Mo max · 1 s–4 h
+        </p>
       </section>
     </section>
   );
