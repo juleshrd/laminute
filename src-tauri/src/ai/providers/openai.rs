@@ -296,9 +296,7 @@ impl TranscriptionProvider for OpenAiProvider {
 
         let file_part = reqwest::multipart::Part::file(audio_path)
             .await
-            .map_err(|err| {
-                AiError::Other(format!("Impossible de lire le fichier audio : {err}"))
-            })?
+            .map_err(|err| AiError::Other(format!("Impossible de lire le fichier audio : {err}")))?
             .file_name(file_name)
             .mime_str(mime)
             .map_err(|err| AiError::Other(err.to_string()))?;
