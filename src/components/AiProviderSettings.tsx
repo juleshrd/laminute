@@ -227,8 +227,8 @@ export function AiProviderSettings() {
           </select>
           {diarizationEnabled && selectedProviderId === "openai" ? (
             <p className="ai-settings__note" role="note">
-              Avec la diarisation OpenAI, le modèle dédié{" "}
-              <code>gpt-4o-transcribe-diarize</code> est utilisé automatiquement.
+              Avec la diarisation OpenAI, le modèle dédié <code>gpt-4o-transcribe-diarize</code> est
+              utilisé automatiquement.
             </p>
           ) : null}
         </div>
@@ -273,8 +273,8 @@ export function AiProviderSettings() {
             Identifier les locuteurs (diarisation)
           </label>
           <p className="ai-settings__note">
-            Ajoute des labels de locuteurs dans la transcription. Utile pour les réunions à plusieurs
-            voix.
+            Ajoute des labels de locuteurs dans la transcription. Utile pour les réunions à
+            plusieurs voix.
           </p>
         </div>
       ) : null}

@@ -31,7 +31,13 @@ vi.mock("../lib/ai/api", () => ({
     {
       id: "mistral",
       displayName: "Mistral AI",
-      capabilities: { transcription: true, summary: true, local: false, streaming: false, diarization: true },
+      capabilities: {
+        transcription: true,
+        summary: true,
+        local: false,
+        streaming: false,
+        diarization: true,
+      },
     },
   ]),
   generateStructuredSummary: vi.fn(),

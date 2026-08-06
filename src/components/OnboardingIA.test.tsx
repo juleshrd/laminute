@@ -25,17 +25,35 @@ const PROVIDERS = [
   {
     id: "mistral",
     displayName: "Mistral AI",
-    capabilities: { transcription: true, summary: true, local: false, streaming: true, diarization: true },
+    capabilities: {
+      transcription: true,
+      summary: true,
+      local: false,
+      streaming: true,
+      diarization: true,
+    },
   },
   {
     id: "openai",
     displayName: "OpenAI",
-    capabilities: { transcription: true, summary: true, local: false, streaming: false, diarization: true },
+    capabilities: {
+      transcription: true,
+      summary: true,
+      local: false,
+      streaming: false,
+      diarization: true,
+    },
   },
   {
     id: "ollama",
     displayName: "Ollama",
-    capabilities: { transcription: false, summary: true, local: true, streaming: false, diarization: false },
+    capabilities: {
+      transcription: false,
+      summary: true,
+      local: true,
+      streaming: false,
+      diarization: false,
+    },
   },
 ];
 

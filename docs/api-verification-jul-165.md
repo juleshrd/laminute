@@ -4,11 +4,11 @@ Document d’écarts et correctifs pour la couche fournisseurs (Mistral, OpenAI,
 
 ## Pipeline attendu
 
-| Étape | Mistral | OpenAI | Ollama |
-|---|---|---|---|
-| Transcription audio | Voxtral (`voxtral-mini-latest`) | GPT audio (`gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`) | Non supporté |
-| Diarisation | `diarize=true` + segments locuteurs | Modèle dédié `gpt-4o-transcribe-diarize` + `diarized_json` | — |
-| Compte-rendu LLM | `mistral-small-latest` ou `mistral-medium-latest` | `gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`, `gpt-4.1` | Modèle local installé |
+| Étape               | Mistral                                           | OpenAI                                                                 | Ollama                |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | --------------------- |
+| Transcription audio | Voxtral (`voxtral-mini-latest`)                   | GPT audio (`gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`) | Non supporté          |
+| Diarisation         | `diarize=true` + segments locuteurs               | Modèle dédié `gpt-4o-transcribe-diarize` + `diarized_json`             | —                     |
+| Compte-rendu LLM    | `mistral-small-latest` ou `mistral-medium-latest` | `gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`, `gpt-4.1`                     | Modèle local installé |
 
 Les préférences (modèles + diarisation) sont persistées dans `ai-settings.json` (pas dans le trousseau).
 
