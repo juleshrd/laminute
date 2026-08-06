@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   getMeeting,
-  listMeetings,
   meetingDisplayDate,
   meetingStatusLabel,
+  searchMeetings,
   type MeetingDetail,
-  type MeetingSummary,
+  type MeetingListItem,
 } from "../lib/meetings";
 import { MeetingDetailSheet } from "./MeetingDetailSheet";
 
-function shortDateParts(meeting: MeetingSummary): { day: string; month: string } {
+const SEARCH_DEBOUNCE_MS = 280;
+
+function shortDateParts(meeting: MeetingListItem): { day: string; month: string } {
   const raw = meeting.startedAt ?? meeting.createdAt;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
@@ -23,18 +25,29 @@ function shortDateParts(meeting: MeetingSummary): { day: string; month: string }
 }
 
 export function MeetingHistory() {
-  const [results, setResults] = useState<MeetingSummary[]>([]);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [results, setResults] = useState<MeetingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<MeetingDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const loadResults = useCallback(async () => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const loadResults = useCallback(async (searchQuery: string) => {
     setLoading(true);
     setError(null);
     try {
-      const items = await listMeetings();
+      const items = await searchMeetings(
+        searchQuery ? { query: searchQuery } : {},
+      );
       setResults(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chargement impossible.");
@@ -45,8 +58,8 @@ export function MeetingHistory() {
   }, []);
 
   useEffect(() => {
-    void loadResults();
-  }, [loadResults]);
+    void loadResults(debouncedQuery);
+  }, [debouncedQuery, loadResults]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -69,10 +82,14 @@ export function MeetingHistory() {
       <MeetingDetailSheet
         detail={detail}
         onBack={() => setSelectedId(null)}
-        onDeleted={() => void loadResults()}
+        onDeleted={() => void loadResults(debouncedQuery)}
       />
     );
   }
+
+  const trimmedQuery = debouncedQuery;
+  const showEmptyHistory = !loading && results.length === 0 && !trimmedQuery;
+  const showNoMatches = !loading && results.length === 0 && Boolean(trimmedQuery);
 
   return (
     <div className="meeting-history">
@@ -83,6 +100,18 @@ export function MeetingHistory() {
         </div>
       </div>
 
+      <label className="meeting-history__search">
+        <span className="visually-hidden">Rechercher une réunion</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Rechercher une réunion…"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+
       {detailLoading && <p className="progress-message">Chargement du détail…</p>}
       {loading && <p className="progress-message">Chargement…</p>}
       {error && (
@@ -91,11 +120,22 @@ export function MeetingHistory() {
         </p>
       )}
 
-      {!loading && results.length === 0 && (
+      {showEmptyHistory && (
         <div className="lm-panel lm-empty">
           <div className="lm-empty-inner">
             <h3>Aucune réunion</h3>
             <p className="lm-subtle">Importez ou enregistrez un audio depuis Réunion courante.</p>
+          </div>
+        </div>
+      )}
+
+      {showNoMatches && (
+        <div className="lm-panel lm-empty">
+          <div className="lm-empty-inner">
+            <h3>Aucun résultat</h3>
+            <p className="lm-subtle">
+              Aucune réunion ne correspond à « {trimmedQuery} ».
+            </p>
           </div>
         </div>
       )}
@@ -118,6 +158,9 @@ export function MeetingHistory() {
               <div>
                 <h3>{meeting.title}</h3>
                 <p className="lm-meta">{meetingDisplayDate(meeting)}</p>
+                {meeting.snippet ? (
+                  <p className="meeting-history__snippet">{meeting.snippet}</p>
+                ) : null}
               </div>
               <span className="lm-status">{meetingStatusLabel(meeting.status)}</span>
             </button>

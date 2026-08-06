@@ -833,9 +833,41 @@ select {
   gap: 1rem;
 }
 
+.meeting-history__search {
+  display: block;
+}
+
+.meeting-history__search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.meeting-history__snippet {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--lm-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .meeting-history__empty {
   margin: 0;
   color: var(--lm-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .meeting-detail__header {
