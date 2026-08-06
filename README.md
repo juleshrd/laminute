@@ -84,10 +84,10 @@ npm install
 npm run dev
 ```
 
-Validation complète avant une PR :
+Validation complète avant une PR (équivalent CI) :
 
 ```bash
-npm run check
+npm run check:ci
 ```
 
 ### Performance — recherche historique

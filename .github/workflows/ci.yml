@@ -5,53 +5,222 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  check:
+  format_lint:
+    name: format_lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           components: rustfmt, clippy
 
-      - name: Install Tauri Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libasound2-dev \
-            patchelf
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
 
-      - run: npm ci
+      - uses: ./.github/actions/install-tauri-deps
+
+      - name: npm ci
+        run: |
+          chmod +x .github/scripts/retry.sh
+          .github/scripts/retry.sh 3 npm ci
 
       - run: npm run format:check
-
       - run: npm run lint
 
-      - run: npm run test
+  test_frontend:
+    name: test_frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        run: |
+          chmod +x .github/scripts/retry.sh
+          .github/scripts/retry.sh 3 npm ci
+
+      - run: npm run test:web
+
+  test_rust:
+    name: test_rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: ./.github/actions/install-tauri-deps
+
+      - run: npm run test:rust
+
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: ./.github/actions/install-tauri-deps
+
+      - name: npm ci
+        run: |
+          chmod +x .github/scripts/retry.sh
+          .github/scripts/retry.sh 3 npm ci
 
       - run: npm run build
 
-      - uses: EmbarkStudios/cargo-deny-action@v2
+  audits:
+    name: audits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        run: |
+          chmod +x .github/scripts/retry.sh
+          .github/scripts/retry.sh 3 npm ci
+
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
           manifest-path: src-tauri/Cargo.toml
           arguments: --config deny.toml
 
       - name: npm audit (high severity)
-        run: npm audit --audit-level=high
+        run: npm run audit:npm
+
+  summary:
+    name: summary
+    if: always()
+    needs:
+      - format_lint
+      - test_frontend
+      - test_rust
+      - build
+      - audits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Résumé produit vs infrastructure
+        env:
+          FORMAT_LINT: ${{ needs.format_lint.result }}
+          TEST_FRONTEND: ${{ needs.test_frontend.result }}
+          TEST_RUST: ${{ needs.test_rust.result }}
+          BUILD: ${{ needs.build.result }}
+          AUDITS: ${{ needs.audits.result }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Résumé CI"
+            echo ""
+            echo "| Job | Résultat | Classification |"
+            echo "| --- | -------- | -------------- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed_product=0
+          failed_infra=0
+
+          classify() {
+            local job="$1" result="$2" kind
+            case "$result" in
+              success)
+                kind="ok"
+                ;;
+              cancelled|skipped)
+                kind="infrastructure"
+                failed_infra=1
+                ;;
+              failure)
+                kind="produit"
+                failed_product=1
+                ;;
+              *)
+                kind="infrastructure"
+                failed_infra=1
+                ;;
+            esac
+            echo "| \`${job}\` | \`${result}\` | **${kind}** |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          classify format_lint "$FORMAT_LINT"
+          classify test_frontend "$TEST_FRONTEND"
+          classify test_rust "$TEST_RUST"
+          classify build "$BUILD"
+          classify audits "$AUDITS"
+
+          {
+            echo ""
+            if [ "$failed_product" -eq 0 ] && [ "$failed_infra" -eq 0 ]; then
+              echo "✅ Tous les contrôles produit sont verts."
+            elif [ "$failed_product" -eq 1 ]; then
+              echo "❌ Échec **produit** : corriger le job rouge (format/lint, tests, build ou audits)."
+            else
+              echo "⚠️ Échec / annulation classé **infrastructure** (runner, concurrence PR, réseau)."
+              echo "Relancer le job concerné ; ne pas traiter comme un défaut du code tant qu’aucun contrôle produit n’a échoué."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failed_product" -eq 1 ]; then
+            exit 1
+          fi
+          if [ "$failed_infra" -eq 1 ]; then
+            exit 1
+          fi
