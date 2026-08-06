@@ -158,9 +158,10 @@ pub fn write_export_bytes(path: String, contents_base64: String) -> Result<(), S
 pub fn export_meeting_pdf(state: State<'_, AppState>, id: String) -> Result<String, String> {
     let (meeting, summary, duration_ms) = with_db(&state, |conn| {
         let detail = MeetingRepository::get_detail(conn, &id)?;
-        let summary_record = detail.summaries.last().ok_or_else(|| {
-            AppError::Message("aucun compte-rendu structuré à exporter".into())
-        })?;
+        let summary_record = detail
+            .summaries
+            .last()
+            .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
         let structured = parse_structured_summary(&summary_record.content)
             .map_err(|err| AppError::Message(err.to_string()))?;
         let duration_ms = detail
@@ -427,8 +428,8 @@ mod tests {
     #[test]
     fn pdf_bytes_from_seeded_summary() {
         use crate::ai::structured_summary::StructuredSummary;
-        use crate::report_pdf::{build_meeting_report_pdf, MeetingReportPdfInput};
         use crate::models::MeetingStatus;
+        use crate::report_pdf::{build_meeting_report_pdf, MeetingReportPdfInput};
 
         let summary = StructuredSummary {
             synthese: "Resume".into(),

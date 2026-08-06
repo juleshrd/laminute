@@ -56,10 +56,7 @@ function formatActions(actions: StructuredSummary["actions"]): string {
 }
 
 /** Construit un Markdown exploitable à partir du compte-rendu affiché. */
-export function buildReportMarkdown(
-  meta: ReportExportMeta,
-  summary: StructuredSummary,
-): string {
+export function buildReportMarkdown(meta: ReportExportMeta, summary: StructuredSummary): string {
   const sections: string[] = [
     `# ${meta.title}`,
     "",

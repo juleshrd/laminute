@@ -67,7 +67,13 @@ impl<'a> PdfWriter<'a> {
             self.ensure_space(line_height + 2.0);
             let layer = self.layer();
             layer.set_fill_color(Color::Rgb(Rgb::new(rgb.0, rgb.1, rgb.2, None)));
-            layer.use_text(line, font_size, Mm(MARGIN_X), Mm(self.y - line_height), font);
+            layer.use_text(
+                line,
+                font_size,
+                Mm(MARGIN_X),
+                Mm(self.y - line_height),
+                font,
+            );
             self.y -= line_height;
         }
     }
@@ -91,8 +97,12 @@ impl<'a> PdfWriter<'a> {
 }
 
 pub fn build_meeting_report_pdf(input: MeetingReportPdfInput<'_>) -> Result<Vec<u8>, String> {
-    let (doc, page_index, layer_index) =
-        PdfDocument::new("La Minute — compte-rendu", Mm(PAGE_W), Mm(PAGE_H), "Layer 1");
+    let (doc, page_index, layer_index) = PdfDocument::new(
+        "La Minute — compte-rendu",
+        Mm(PAGE_W),
+        Mm(PAGE_H),
+        "Layer 1",
+    );
 
     let font = doc
         .add_builtin_font(BuiltinFont::Helvetica)
@@ -161,11 +171,7 @@ pub fn build_meeting_report_pdf(input: MeetingReportPdfInput<'_>) -> Result<Vec<
     } else {
         input.summary.decisions.clone()
     };
-    writer.write_section(
-        "Decisions",
-        &decisions,
-        !input.summary.decisions.is_empty(),
-    );
+    writer.write_section("Decisions", &decisions, !input.summary.decisions.is_empty());
 
     let action_lines: Vec<String> = if input.summary.actions.is_empty() {
         vec!["Aucune action identifiee.".into()]
@@ -196,11 +202,7 @@ pub fn build_meeting_report_pdf(input: MeetingReportPdfInput<'_>) -> Result<Vec<
             })
             .collect()
     };
-    writer.write_section(
-        "Actions",
-        &action_lines,
-        !input.summary.actions.is_empty(),
-    );
+    writer.write_section("Actions", &action_lines, !input.summary.actions.is_empty());
 
     if !input.summary.risques.is_empty() {
         writer.write_section("Risques", &input.summary.risques, true);
