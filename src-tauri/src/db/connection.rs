@@ -3,12 +3,25 @@ use std::sync::Mutex;
 
 use rusqlite::Connection;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 use super::migrations::run_migrations;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
+}
+
+impl AppState {
+    pub fn with_db<T, F>(&self, f: F) -> AppResult<T>
+    where
+        F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
+    {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
+        f(&db)
+    }
 }
 
 #[cfg(test)]

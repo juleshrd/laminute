@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod report_pdf;
 mod repository;
+mod retention;
 
 pub const APP_IDENTIFIER: &str = "app.laminute.desktop";
 

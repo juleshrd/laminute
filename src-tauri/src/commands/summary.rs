@@ -1,15 +1,15 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 use crate::ai::models::SummaryOptions;
 use crate::ai::secrets;
 use crate::ai::structured_summary::{self, StructuredSummary};
-use crate::audio::AudioState;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::models::{Action, CreateMeetingInput, Summary};
 use crate::repository::{MeetingRepository, SummaryRepository};
+use crate::retention;
 use crate::AiAppState;
 
 #[derive(Debug, Deserialize)]
@@ -98,7 +98,7 @@ async fn generate_structured_summary_inner(
     let structured = structured_summary::parse_structured_summary(&summary_result.text)
         .map_err(|e| AppError::Message(e.to_string()))?;
 
-    let (summary, actions) = with_db(db_state, |conn| {
+    let (summary, actions) = db_state.with_db(|conn| {
         SummaryRepository::save_structured_summary(
             conn,
             &meeting_id,
@@ -107,32 +107,13 @@ async fn generate_structured_summary_inner(
         )
     })?;
 
-    maybe_purge_audio_files(app, db_state, &meeting_id)?;
+    retention::maybe_purge_audio_files(app, db_state, &meeting_id)?;
 
     Ok(GenerateStructuredSummaryOutput {
         meeting_id,
         summary,
         structured,
         actions,
-    })
-}
-
-fn maybe_purge_audio_files(
-    app: &AppHandle,
-    db_state: &State<'_, AppState>,
-    meeting_id: &str,
-) -> AppResult<()> {
-    let Some(audio_state) = app.try_state::<AudioState>() else {
-        return Ok(());
-    };
-    let keep = audio_state
-        .keep_audio_files()
-        .map_err(|e| AppError::Message(e.to_string()))?;
-    if keep {
-        return Ok(());
-    }
-    with_db(db_state, |conn| {
-        MeetingRepository::delete_audio_files_for_meeting(conn, meeting_id)
     })
 }
 
@@ -145,28 +126,23 @@ fn resolve_input(
             if text.trim().is_empty() {
                 return Err(AppError::Message("le texte fourni est vide".into()));
             }
-            with_db(db_state, |conn| {
-                MeetingRepository::get_by_id(conn, &meeting_id)
-            })?;
+            db_state.with_db(|conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
             Ok((meeting_id, text))
         }
         (Some(meeting_id), None) => {
-            with_db(db_state, |conn| {
-                MeetingRepository::get_by_id(conn, &meeting_id)
-            })?;
-            let text = with_db(db_state, |conn| {
-                SummaryRepository::latest_transcription_text(conn, &meeting_id)
-            })?
-            .ok_or_else(|| {
-                AppError::Message("aucune transcription trouvée pour cette réunion".into())
-            })?;
+            db_state.with_db(|conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
+            let text = db_state
+                .with_db(|conn| SummaryRepository::latest_transcription_text(conn, &meeting_id))?
+                .ok_or_else(|| {
+                    AppError::Message("aucune transcription trouvée pour cette réunion".into())
+                })?;
             Ok((meeting_id, text))
         }
         (None, Some(text)) => {
             if text.trim().is_empty() {
                 return Err(AppError::Message("le texte fourni est vide".into()));
             }
-            let meeting = with_db(db_state, |conn| {
+            let meeting = db_state.with_db(|conn| {
                 MeetingRepository::create(
                     conn,
                     CreateMeetingInput {
@@ -181,15 +157,4 @@ fn resolve_input(
             "fournissez un meeting_id ou un texte de transcription".into(),
         )),
     }
-}
-
-fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>
-where
-    F: FnOnce(&rusqlite::Connection) -> AppResult<T>,
-{
-    let db = state
-        .db
-        .lock()
-        .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
-    f(&db)
 }
