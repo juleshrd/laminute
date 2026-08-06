@@ -7,6 +7,7 @@ import { getAiSettings, listAiProviders } from "../lib/ai/api";
 import { generateStructuredSummary } from "../lib/ai/api";
 import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../lib/ai/types";
 import "../components/StructuredSummaryPanel.css";
+import { ClockMark } from "./ClockMark";
 import { DataProcessingNotice } from "./DataProcessingNotice";
 import { RecordingConsentModal } from "./RecordingConsentModal";
 import {
@@ -205,22 +206,6 @@ export function MeetingWorkspace() {
     };
   }, [flowPhase, importMp3, importing]);
 
-  async function handleSelectDevice() {
-    if (!selectedDeviceId) {
-      return;
-    }
-
-    setError(null);
-    try {
-      const selected = await invoke<AudioInputDevice>("set_selected_audio_input_device", {
-        deviceId: selectedDeviceId,
-      });
-      setSelectedDeviceId(selected.id);
-    } catch (err) {
-      setError(formatError(err));
-    }
-  }
-
   async function handleStartRecording() {
     setError(null);
     try {
@@ -251,9 +236,19 @@ export function MeetingWorkspace() {
       setRecordingStatus(status);
       setFilePath(status.filePath);
       setDurationSecs(status.durationSecs);
-      if (!title.trim()) {
-        setTitle(defaultRecordingTitle());
+      const nextTitle = title.trim() || defaultRecordingTitle();
+      setTitle(nextTitle);
+
+      const providerCanTranscribe = selectedProvider?.capabilities.transcription ?? true;
+      if (status.filePath && hasApiKey && providerCanTranscribe) {
+        await runProcessing({
+          filePath: status.filePath,
+          durationSecs: status.durationSecs,
+          meetingTitle: nextTitle,
+        });
+        return;
       }
+
       setFlowPhase("ready");
     } catch (err) {
       setError(formatError(err));
@@ -298,12 +293,20 @@ export function MeetingWorkspace() {
     }
   }
 
-  async function runProcessing() {
-    if (!filePath) {
+  async function runProcessing(overrides?: {
+    filePath?: string | null;
+    durationSecs?: number | null;
+    meetingTitle?: string;
+  }) {
+    const activeFilePath = overrides?.filePath ?? filePath;
+    const activeDurationSecs = overrides?.durationSecs ?? durationSecs;
+    const activeTitle = overrides?.meetingTitle ?? title;
+
+    if (!activeFilePath) {
       return;
     }
 
-    const canTranscribe = selectedProvider?.capabilities.transcription ?? true;
+    const providerCanTranscribe = selectedProvider?.capabilities.transcription ?? true;
 
     setFlowPhase("processing");
     setError(null);
@@ -311,14 +314,15 @@ export function MeetingWorkspace() {
     try {
       let nextTranscription = transcription;
 
-      if (!nextTranscription && canTranscribe) {
+      if (!nextTranscription && providerCanTranscribe) {
         setProcessingStep("transcribing");
         nextTranscription = await transcribeAudioFile({
-          filePath,
+          filePath: activeFilePath,
           meetingId: meetingId ?? undefined,
-          meetingTitle: meetingId ? undefined : title.trim() || undefined,
+          meetingTitle: meetingId ? undefined : activeTitle.trim() || undefined,
           language: "fr",
-          durationMs: durationSecs != null ? Math.round(durationSecs * 1000) : undefined,
+          durationMs:
+            activeDurationSecs != null ? Math.round(activeDurationSecs * 1000) : undefined,
         });
         setTranscription(nextTranscription);
         setMeetingId(nextTranscription.meetingId);
@@ -329,8 +333,8 @@ export function MeetingWorkspace() {
         throw new Error("Aucun texte disponible pour générer le compte-rendu.");
       }
 
-      if (title.trim() && (nextTranscription?.meetingId ?? meetingId)) {
-        await updateMeetingTitle(nextTranscription?.meetingId ?? meetingId!, title.trim());
+      if (activeTitle.trim() && (nextTranscription?.meetingId ?? meetingId)) {
+        await updateMeetingTitle(nextTranscription?.meetingId ?? meetingId!, activeTitle.trim());
       }
 
       setProcessingStep("summarizing");
@@ -380,7 +384,6 @@ export function MeetingWorkspace() {
   }
 
   const isRecording = flowPhase === "recording";
-  const showHomeControls = flowPhase === "idle" || flowPhase === "recording";
   const showReadyControls = flowPhase === "ready" || flowPhase === "error" || flowPhase === "done";
   const progressMessage =
     processingStep === "summarizing"
@@ -393,105 +396,83 @@ export function MeetingWorkspace() {
   const isBusy =
     flowPhase === "processing" ||
     (transcriptionProgress != null && isTranscriptionBusy(transcriptionProgress.phase));
+  const canStartRecording = Boolean(selectedDeviceId) && devices.length > 0;
 
   return (
-    <div className="meeting-workspace">
-      <div className={`status-banner status-banner--${flowPhase}`} role="status" aria-live="polite">
-        {meetingFlowStatusLabel(flowPhase)}
-        {isRecording && recordingStatus?.durationSecs != null && (
-          <span className="status-banner__timer">
-            {formatDuration(recordingStatus.durationSecs)}
-          </span>
-        )}
-      </div>
+    <div className={`meeting-workspace${isRecording ? " meeting-workspace--recording" : ""}`}>
+      {!isRecording && (
+        <div
+          className={`status-banner status-banner--${flowPhase}`}
+          role="status"
+          aria-live="polite"
+        >
+          {meetingFlowStatusLabel(flowPhase)}
+        </div>
+      )}
 
       {loading ? (
         <p>Chargement…</p>
       ) : (
         <>
-          {showHomeControls && (
-            <>
-              <section className="panel">
-                <h2>Périphérique d&apos;entrée</h2>
-                {devices.length === 0 ? (
-                  <p className="warning">Aucun périphérique d&apos;entrée détecté.</p>
-                ) : (
-                  <div className="row controls">
-                    <select
-                      value={selectedDeviceId}
-                      onChange={(event) => setSelectedDeviceId(event.currentTarget.value)}
-                      disabled={isRecording}
-                    >
-                      {devices.map((device) => (
-                        <option key={device.id} value={device.id}>
-                          {device.name}
-                          {device.isDefault ? " (défaut)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void handleSelectDevice()}
-                      disabled={isRecording}
-                    >
-                      Mémoriser
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void refreshDevices()}
-                      disabled={isRecording}
-                    >
-                      Actualiser
-                    </button>
-                  </div>
-                )}
-              </section>
+          {flowPhase === "idle" && (
+            <section className="meeting-hero" aria-labelledby="meeting-hero-title">
+              <h2 id="meeting-hero-title">Prêt à enregistrer ?</h2>
 
-              <section className="panel">
-                <h2>Enregistrement</h2>
+              <button
+                type="button"
+                className="meeting-logo-cta"
+                aria-label="Démarrer l'enregistrement"
+                onClick={requestStartRecording}
+                disabled={!canStartRecording}
+              >
+                <ClockMark className="meeting-logo-cta__mark" />
+              </button>
+
+              {devices.length === 0 ? (
+                <p className="warning meeting-hero__hint">
+                  Aucun périphérique d&apos;entrée détecté.
+                </p>
+              ) : (
+                <p className="meeting-hero__hint lm-subtle">
+                  Cliquez sur le logo pour démarrer la réunion.
+                </p>
+              )}
+
+              <section
+                className={`meeting-hero__import drop-zone${dragOver ? " drop-zone-active" : ""}`}
+                onDragEnter={() => setDragOver(true)}
+                onDragLeave={() => setDragOver(false)}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragOver(true);
+                }}
+              >
+                <p className="drop-zone-hint">Ou importez un fichier MP3</p>
                 <div className="row controls">
-                  <button
-                    type="button"
-                    onClick={requestStartRecording}
-                    disabled={isRecording || !selectedDeviceId || flowPhase !== "idle"}
-                  >
-                    Démarrer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleStopRecording()}
-                    disabled={!isRecording}
-                  >
-                    Arrêter
+                  <button type="button" onClick={() => void handlePickMp3()} disabled={importing}>
+                    {importing ? "Import en cours…" : "Choisir un fichier MP3"}
                   </button>
                 </div>
+                <p className="drop-zone-constraints">
+                  MP3 uniquement · 500 Mo max · entre 1 s et 4 h
+                </p>
               </section>
+            </section>
+          )}
 
-              {flowPhase === "idle" && (
-                <section
-                  className={`panel drop-zone${dragOver ? " drop-zone-active" : ""}`}
-                  onDragEnter={() => setDragOver(true)}
-                  onDragLeave={() => setDragOver(false)}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                >
-                  <h2>Import MP3</h2>
-                  <p className="drop-zone-hint">
-                    Glissez-déposez un fichier MP3 ici ou sélectionnez-le depuis votre ordinateur.
-                  </p>
-                  <div className="row controls">
-                    <button type="button" onClick={() => void handlePickMp3()} disabled={importing}>
-                      {importing ? "Import en cours…" : "Choisir un fichier MP3"}
-                    </button>
-                  </div>
-                  <p className="drop-zone-constraints">
-                    MP3 uniquement · 500 Mo max · entre 1 s et 4 h
-                  </p>
-                </section>
-              )}
-            </>
+          {flowPhase === "recording" && (
+            <section className="meeting-recording-stage" aria-live="polite">
+              <p className="meeting-timer" aria-label="Durée de l'enregistrement">
+                {formatDuration(recordingStatus?.durationSecs ?? 0)}
+              </p>
+              <button
+                type="button"
+                className="lm-btn meeting-recording-stage__stop"
+                onClick={() => void handleStopRecording()}
+              >
+                Terminer la réunion
+              </button>
+            </section>
           )}
 
           {showReadyControls && filePath && (
@@ -528,7 +509,7 @@ export function MeetingWorkspace() {
               {!hasApiKey && (flowPhase === "ready" || flowPhase === "error") && (
                 <p className="warning">
                   Configurez {isSummarizeOnly ? "la connexion" : "une clé API"} pour {providerName}{" "}
-                  dans les réglages IA ci-dessous avant de traiter la réunion.
+                  dans les réglages IA avant de traiter la réunion.
                 </p>
               )}
 

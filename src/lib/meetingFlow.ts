@@ -4,7 +4,7 @@ import type { TranscriptionPhase } from "./transcription";
 export type MeetingFlowPhase = "idle" | "recording" | "ready" | "processing" | "done" | "error";
 
 const FLOW_STATUS_LABELS: Record<MeetingFlowPhase, string> = {
-  idle: "Prêt à enregistrer ou importer un fichier audio",
+  idle: "Prêt à enregistrer ?",
   recording: "Enregistrement en cours",
   ready: "Audio prêt — vous pouvez traiter la réunion",
   processing: "Traitement en cours…",
