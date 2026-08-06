@@ -109,15 +109,15 @@ impl MeetingRepository {
                 m.updated_at,
                 CASE
                     WHEN ?1 IS NOT NULL THEN COALESCE(
-                        CASE WHEN m.title LIKE ?2 ESCAPE '\' THEN substr(m.title, 1, 120) END,
+                        CASE WHEN m.title LIKE ?2 ESCAPE '\' THEN m.title END,
                         (
-                            SELECT substr(t.content, 1, 120)
+                            SELECT t.content
                             FROM transcriptions t
                             WHERE t.meeting_id = m.id AND t.content LIKE ?2 ESCAPE '\'
                             LIMIT 1
                         ),
                         (
-                            SELECT substr(s.content, 1, 120)
+                            SELECT s.content
                             FROM summaries s
                             WHERE s.meeting_id = m.id AND s.content LIKE ?2 ESCAPE '\'
                             LIMIT 1
@@ -167,6 +167,11 @@ impl MeetingRepository {
             ],
             |row| {
                 let status_value: String = row.get(2)?;
+                let raw_snippet: Option<String> = row.get(7)?;
+                let snippet = match (raw_snippet, query) {
+                    (Some(text), Some(needle)) => Some(centered_snippet(&text, needle, 120)),
+                    (other, _) => other,
+                };
                 Ok(MeetingListItem {
                     id: row.get(0)?,
                     title: row.get(1)?,
@@ -175,7 +180,7 @@ impl MeetingRepository {
                     started_at: row.get(4)?,
                     ended_at: row.get(5)?,
                     updated_at: row.get(6)?,
-                    snippet: row.get(7)?,
+                    snippet,
                 })
             },
         )?;
@@ -499,6 +504,64 @@ fn escape_like(value: &str) -> String {
         .replace('\\', "\\\\")
         .replace('%', "\\%")
         .replace('_', "\\_")
+}
+
+/// Builds a short excerpt centered on the first case-insensitive match of `needle`.
+fn centered_snippet(haystack: &str, needle: &str, max_chars: usize) -> String {
+    if max_chars == 0 || haystack.is_empty() {
+        return String::new();
+    }
+
+    let needle = needle.trim();
+    if needle.is_empty() {
+        return truncate_chars(haystack, max_chars);
+    }
+
+    let lower_haystack = haystack.to_lowercase();
+    let lower_needle = needle.to_lowercase();
+    let byte_pos = lower_haystack.find(&lower_needle);
+
+    let char_index = match byte_pos {
+        Some(pos) => haystack[..pos].chars().count(),
+        None => 0,
+    };
+
+    let total_chars = haystack.chars().count();
+    if total_chars <= max_chars {
+        return haystack.to_string();
+    }
+
+    let needle_chars = needle.chars().count();
+    let context = max_chars.saturating_sub(needle_chars) / 2;
+    let mut start = char_index.saturating_sub(context);
+    let end = (start + max_chars).min(total_chars);
+    if end - start < max_chars {
+        start = end.saturating_sub(max_chars);
+    }
+
+    let excerpt: String = haystack
+        .chars()
+        .skip(start)
+        .take(end - start)
+        .collect();
+
+    let mut result = String::new();
+    if start > 0 {
+        result.push('…');
+    }
+    result.push_str(&excerpt);
+    if end < total_chars {
+        result.push('…');
+    }
+    result
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    let mut truncated: String = value.chars().take(max_chars).collect();
+    if value.chars().count() > max_chars {
+        truncated.push('…');
+    }
+    truncated
 }
 
 #[cfg(test)]
@@ -977,5 +1040,110 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Réunion du jour");
+    }
+
+    #[test]
+    fn search_by_transcription_content() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Point commercial".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Autre sujet".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        let long_prefix = "x".repeat(80);
+        let content = format!(
+            "{long_prefix} Discussion avec le client Dufour sur le renouvellement."
+        );
+        conn.execute(
+            "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at)
+             VALUES ('tx-dufour', ?1, NULL, NULL, ?2, 'fr', ?3, ?3)",
+            params![meeting.id, content, now],
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                query: Some("Dufour".into()),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Point commercial");
+        let snippet = results[0].snippet.as_deref().unwrap();
+        assert!(snippet.contains("Dufour"));
+        assert!(snippet.starts_with('…'));
+    }
+
+    #[test]
+    fn search_by_summary_content() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Comité".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+        MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Sans résumé pertinent".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO summaries (id, meeting_id, provider_id, content, created_at, updated_at)
+             VALUES ('sum-1', ?1, NULL, 'Actions : relancer Dufour avant vendredi', ?2, ?2)",
+            params![meeting.id, now],
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                query: Some("dufour".into()),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Comité");
+        assert!(results[0]
+            .snippet
+            .as_deref()
+            .unwrap()
+            .to_lowercase()
+            .contains("dufour"));
+    }
+
+    #[test]
+    fn centered_snippet_focuses_on_match() {
+        let haystack = format!("{}Dufour{}", "a".repeat(100), "b".repeat(100));
+        let snippet = centered_snippet(&haystack, "Dufour", 40);
+        assert!(snippet.contains("Dufour"));
+        assert!(snippet.starts_with('…'));
+        assert!(snippet.ends_with('…'));
+        assert!(snippet.chars().count() <= 42); // excerpt + ellipses
     }
 }
