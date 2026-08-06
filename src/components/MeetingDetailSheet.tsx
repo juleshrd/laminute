@@ -2,7 +2,6 @@ import { useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 
-import type { StructuredSummary } from "../lib/ai/types";
 import { deleteMeeting } from "../lib/meetings";
 import {
   buildExportFilename,
@@ -20,7 +19,8 @@ import {
   parseStoredSummary,
   type MeetingDetail,
 } from "../lib/meetings";
-import "../components/StructuredSummaryPanel.css";
+import { StructuredSummaryView } from "./StructuredSummaryView";
+import "./StructuredSummaryPanel.css";
 
 interface MeetingDetailSheetProps {
   detail: MeetingDetail;
@@ -38,9 +38,7 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
   const audioFile = detail.audioFiles[0];
   const transcription = detail.transcriptions[detail.transcriptions.length - 1];
   const summaryRecord = detail.summaries[detail.summaries.length - 1];
-  const structured: StructuredSummary | null = summaryRecord
-    ? parseStoredSummary(summaryRecord.content)
-    : null;
+  const structured = summaryRecord ? parseStoredSummary(summaryRecord.content) : null;
   const durationMs = meetingDurationMs(detail);
   const canExportReport = structured !== null;
 
@@ -231,49 +229,11 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
       {structured && (
         <article className="meeting-detail__block structured-summary-inline">
           <h3>Compte-rendu structuré</h3>
-          {summaryRecord?.providerId && (
-            <p className="meta">Fournisseur : {summaryRecord.providerId}</p>
-          )}
-
-          <div className="structured-summary__block">
-            <h4>Synthèse</h4>
-            <p>{structured.synthese}</p>
-          </div>
-
-          <div className="structured-summary__block">
-            <h4>Décisions</h4>
-            {structured.decisions.length > 0 ? (
-              <ul>
-                {structured.decisions.map((decision) => (
-                  <li key={decision}>{decision}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="structured-summary__empty">Aucune décision identifiée.</p>
-            )}
-          </div>
-
-          <div className="structured-summary__block">
-            <h4>Actions</h4>
-            {structured.actions.length > 0 ? (
-              <ul>
-                {structured.actions.map((action) => (
-                  <li key={`${action.titre}-${action.responsable ?? ""}`}>
-                    <strong>{action.titre}</strong>
-                    {action.description && <span> — {action.description}</span>}
-                    {action.responsable && (
-                      <span className="structured-summary__tag">{action.responsable}</span>
-                    )}
-                    {action.echeance && (
-                      <span className="structured-summary__tag">{action.echeance}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="structured-summary__empty">Aucune action identifiée.</p>
-            )}
-          </div>
+          <StructuredSummaryView
+            summary={structured}
+            providerId={summaryRecord?.providerId}
+            headingLevel={4}
+          />
         </article>
       )}
 

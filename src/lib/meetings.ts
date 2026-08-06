@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import type { Action, StructuredSummary, SummaryRecord } from "./ai/types";
+import type { Action, SummaryRecord } from "./ai/types";
+
+export { parseStoredSummary } from "./ai/parseStructuredSummary";
 import type { AudioFile } from "./audio";
 import type { Transcription } from "./transcription";
 
@@ -70,41 +72,8 @@ export function deleteMeeting(id: string): Promise<void> {
   return invoke<void>("delete_meeting", { id });
 }
 
-function extractJsonPayload(raw: string): string {
-  const trimmed = raw.trim();
-
-  if (trimmed.includes("```")) {
-    const start = trimmed.indexOf("```");
-    const afterFence = trimmed.slice(start + 3);
-    const content = afterFence.startsWith("json")
-      ? afterFence.slice(4).trimStart()
-      : afterFence.trimStart();
-    const end = content.indexOf("```");
-    if (end >= 0) {
-      return content.slice(0, end).trim();
-    }
-  }
-
-  return trimmed;
-}
-
-export function parseStoredSummary(content: string): StructuredSummary | null {
-  try {
-    const json = extractJsonPayload(content);
-    const parsed = JSON.parse(json) as StructuredSummary;
-    if (typeof parsed.synthese !== "string") {
-      return null;
-    }
-    return {
-      synthese: parsed.synthese,
-      decisions: parsed.decisions ?? [],
-      actions: parsed.actions ?? [],
-      risques: parsed.risques ?? [],
-      questionsOuvertes: parsed.questionsOuvertes ?? [],
-    };
-  } catch {
-    return null;
-  }
+export function updateMeetingTitle(id: string, title: string): Promise<MeetingSummary> {
+  return invoke<MeetingSummary>("update_meeting_title", { id, title });
 }
 
 export function meetingDisplayDate(
