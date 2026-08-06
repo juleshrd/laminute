@@ -74,6 +74,19 @@ fn get_recording_status(
     state.recording_status()
 }
 
+#[tauri::command]
+fn get_keep_audio_files(state: tauri::State<'_, AudioState>) -> Result<bool, AudioError> {
+    state.keep_audio_files()
+}
+
+#[tauri::command]
+fn set_keep_audio_files(
+    state: tauri::State<'_, AudioState>,
+    keep: bool,
+) -> Result<bool, AudioError> {
+    state.set_keep_audio_files(keep)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -130,6 +143,8 @@ pub fn run() {
             start_microphone_recording,
             stop_microphone_recording,
             get_recording_status,
+            get_keep_audio_files,
+            set_keep_audio_files,
             import_mp3_meeting,
             generate_structured_summary,
             export_meeting,

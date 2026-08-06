@@ -19,11 +19,31 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 vi.mock("../lib/ai/api", () => ({
   getAiSettings: vi.fn().mockResolvedValue({ hasApiKey: true, selectedProviderId: "mistral" }),
-  listAiProviders: vi
-    .fn()
-    .mockResolvedValue([{ id: "mistral", displayName: "Mistral AI", capabilities: {} }]),
+  listAiProviders: vi.fn().mockResolvedValue([
+    {
+      id: "mistral",
+      displayName: "Mistral AI",
+      capabilities: { transcription: true, summary: true, local: false, streaming: false },
+    },
+  ]),
   generateStructuredSummary: vi.fn(),
 }));
+
+vi.mock("../lib/transcription", async () => {
+  const actual =
+    await vi.importActual<typeof import("../lib/transcription")>("../lib/transcription");
+  return {
+    ...actual,
+    getTranscriptionProgress: vi.fn().mockResolvedValue(null),
+    listenTranscriptionProgress: vi.fn().mockResolvedValue(() => undefined),
+    transcribeAudioFile: vi.fn().mockResolvedValue({
+      id: "tx-1",
+      meetingId: "meeting-rec",
+      content: "Transcription test",
+      language: "fr",
+    }),
+  };
+});
 
 function setupDefaultInvoke() {
   invokeMock.mockImplementation((command: string) => {
@@ -57,26 +77,70 @@ describe("MeetingWorkspace", () => {
     cleanup();
   });
 
-  it("affiche l'écran d'accueil avec enregistrement et import MP3", async () => {
+  it("affiche l'écran d'accueil avec logo CTA et import MP3", async () => {
     render(<MeetingWorkspace />);
 
     expect(
-      await screen.findByText(/Prêt à enregistrer ou importer un fichier audio/i),
+      await screen.findByRole("heading", { name: "Prêt à enregistrer ?" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Démarrer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
   });
 
   it("demande le consentement avant de démarrer l'enregistrement", async () => {
     render(<MeetingWorkspace />);
-    await screen.findByRole("button", { name: "Démarrer" });
+    await screen.findByRole("button", { name: "Démarrer l'enregistrement" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Démarrer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Démarrer l'enregistrement" }));
 
     expect(
       await screen.findByRole("dialog", { name: /Avertissement d'enregistrement/i }),
     ).toBeInTheDocument();
     expect(invokeMock).not.toHaveBeenCalledWith("start_microphone_recording", expect.anything());
+  });
+
+  it("affiche le chrono et Terminer la réunion pendant l'enregistrement", async () => {
+    let recording = false;
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "list_audio_input_devices") {
+        return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
+      }
+      if (command === "get_selected_audio_input_device") {
+        return Promise.resolve({ id: "mic-1", name: "Micro intégré", isDefault: true });
+      }
+      if (command === "start_microphone_recording") {
+        recording = true;
+        return Promise.resolve({
+          phase: "recording",
+          deviceId: "mic-1",
+          filePath: null,
+          durationSecs: 12,
+          error: null,
+        });
+      }
+      if (command === "get_recording_status") {
+        return Promise.resolve({
+          phase: recording ? "recording" : "idle",
+          deviceId: "mic-1",
+          filePath: null,
+          durationSecs: recording ? 12 : null,
+          error: null,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    render(<MeetingWorkspace />);
+    await screen.findByRole("button", { name: "Démarrer l'enregistrement" });
+    fireEvent.click(screen.getByRole("button", { name: "Démarrer l'enregistrement" }));
+
+    const confirm = await screen.findByRole("button", {
+      name: /J'ai informé les participants — Démarrer/i,
+    });
+    fireEvent.click(confirm);
+
+    expect(await screen.findByRole("button", { name: "Terminer la réunion" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Durée de l'enregistrement")).toHaveTextContent("0:12");
   });
 
   it("passe en phase ready après import MP3", async () => {

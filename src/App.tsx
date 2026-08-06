@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
 
-import { APP_NAME } from "./lib/app";
 import { applyAppUpdate, checkForAppUpdate, type UpdateProgress } from "./lib/updater";
-import { AiProviderSettings } from "./components/AiProviderSettings";
+import {
+  applyReduceMotionToDocument,
+  isOnboardingDone,
+  setOnboardingDone,
+} from "./lib/preferences";
+import { LmShell, type AppScreen } from "./components/LmShell";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingWorkspace } from "./components/MeetingWorkspace";
-import { PrivacySettings } from "./components/PrivacySettings";
+import { OnboardingIA } from "./components/OnboardingIA";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { UpdateAvailableModal } from "./components/UpdateAvailableModal";
 import "./App.css";
 
-type AppTab = "new" | "history";
-
 function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>("new");
+  const [activeScreen, setActiveScreen] = useState<AppScreen>("meeting");
+  const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingDone());
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    applyReduceMotionToDocument();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,40 +67,51 @@ function App() {
     })();
   };
 
+  function finishOnboarding() {
+    setOnboardingDone(true);
+    setShowOnboarding(false);
+    setActiveScreen("meeting");
+  }
+
+  if (showOnboarding) {
+    return (
+      <div className="lm-root">
+        <OnboardingIA onComplete={finishOnboarding} onSkip={finishOnboarding} />
+        {pendingUpdate ? (
+          <UpdateAvailableModal
+            currentVersion={pendingUpdate.currentVersion}
+            nextVersion={pendingUpdate.version}
+            notes={pendingUpdate.body}
+            busy={updateBusy}
+            progress={updateProgress}
+            error={updateError}
+            onConfirm={handleApplyUpdate}
+            onCancel={() => {
+              if (!updateBusy) {
+                setPendingUpdate(null);
+                setUpdateError(null);
+                setUpdateProgress(null);
+              }
+            }}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   return (
-    <main className="container">
-      <h1>{APP_NAME}</h1>
-
-      <nav className="app-tabs" aria-label="Navigation principale">
-        <button
-          type="button"
-          className={activeTab === "new" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"}
-          onClick={() => setActiveTab("new")}
-        >
-          Nouvelle réunion
-        </button>
-        <button
-          type="button"
-          className={
-            activeTab === "history" ? "app-tabs__tab app-tabs__tab--active" : "app-tabs__tab"
-          }
-          onClick={() => setActiveTab("history")}
-        >
-          Historique
-        </button>
-      </nav>
-
-      {activeTab === "new" ? <MeetingWorkspace /> : <MeetingHistory />}
-
-      <details className="ai-settings-collapsible">
-        <summary>Réglages IA</summary>
-        <AiProviderSettings />
-      </details>
-
-      <details className="ai-settings-collapsible">
-        <summary>Confidentialité</summary>
-        <PrivacySettings />
-      </details>
+    <div className="lm-root">
+      <LmShell active={activeScreen} onNavigate={setActiveScreen}>
+        {activeScreen === "meeting" ? <MeetingWorkspace /> : null}
+        {activeScreen === "history" ? <MeetingHistory /> : null}
+        {activeScreen === "settings" ? (
+          <SettingsScreen
+            onReplayOnboarding={() => {
+              setShowOnboarding(true);
+            }}
+          />
+        ) : null}
+      </LmShell>
 
       {pendingUpdate ? (
         <UpdateAvailableModal
@@ -112,7 +131,7 @@ function App() {
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 
