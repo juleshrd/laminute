@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
+use crate::ai::http;
 use crate::ai::models::{KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult};
 use crate::ai::provider::AiProvider;
 use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
@@ -21,12 +22,12 @@ pub struct OllamaProvider {
 
 impl OllamaProvider {
     pub fn new() -> Self {
-        Self::with_base_url(DEFAULT_OLLAMA_BASE.to_string())
+        Self::with_base_url(DEFAULT_OLLAMA_BASE.to_string(), http::build_client())
     }
 
-    pub fn with_base_url(base_url: String) -> Self {
+    pub fn with_base_url(base_url: String, client: reqwest::Client) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client,
             api_base: Arc::new(RwLock::new(base_url)),
         }
     }
@@ -241,7 +242,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OllamaProvider::with_base_url(mock_server.uri());
+        let provider = OllamaProvider::with_base_url(mock_server.uri(), http::build_client());
         let result = provider.validate_key("").await.expect("validation");
         assert!(result.valid);
         assert!(result.message.contains("Connexion Ollama OK"));
@@ -269,7 +270,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OllamaProvider::with_base_url(mock_server.uri());
+        let provider = OllamaProvider::with_base_url(mock_server.uri(), http::build_client());
         let result = provider
             .summarize(
                 "",

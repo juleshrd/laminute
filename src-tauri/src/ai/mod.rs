@@ -1,6 +1,8 @@
 pub mod capabilities;
 pub mod commands;
+pub mod diarize;
 pub mod error;
+pub mod http;
 pub mod limits;
 pub mod model_catalog;
 pub mod models;

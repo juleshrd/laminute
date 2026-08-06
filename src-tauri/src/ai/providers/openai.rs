@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use crate::ai::capabilities::ProviderCapabilities;
+use crate::ai::diarize::{self, DiarizedSegment};
 use crate::ai::error::AiError;
+use crate::ai::http;
 use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::model_catalog::{self, OPENAI_DIARIZE_MODEL};
 use crate::ai::models::{
@@ -16,7 +18,7 @@ use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
 use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
-const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
+pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
 pub struct OpenAiProvider {
     client: reqwest::Client,
@@ -25,14 +27,11 @@ pub struct OpenAiProvider {
 
 impl OpenAiProvider {
     pub fn new() -> Self {
-        Self::with_api_base(OPENAI_API_BASE.to_string())
+        Self::with_api_base(OPENAI_API_BASE.to_string(), http::build_client())
     }
 
-    pub fn with_api_base(api_base: String) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            api_base,
-        }
+    pub fn with_api_base(api_base: String, client: reqwest::Client) -> Self {
+        Self { client, api_base }
     }
 
     async fn fetch_models(&self, api_key: &str) -> Result<Vec<ModelInfo>, AiError> {
@@ -64,47 +63,6 @@ impl OpenAiProvider {
                 description: None,
             })
             .collect())
-    }
-
-    fn resolve_upload_name(options: &TranscriptionOptions) -> (String, &'static str) {
-        let file_name = options
-            .file_name
-            .as_deref()
-            .unwrap_or("audio.wav")
-            .to_string();
-        let mime = match file_name.rsplit('.').next() {
-            Some("mp3") => "audio/mpeg",
-            Some("m4a") => "audio/mp4",
-            Some("ogg") => "audio/ogg",
-            Some("flac") => "audio/flac",
-            _ => "audio/wav",
-        };
-        (file_name, mime)
-    }
-
-    fn map_http_error(status: StatusCode, body: &str) -> AiError {
-        let message = match status {
-            StatusCode::UNAUTHORIZED => "Clé API invalide ou expirée.".to_string(),
-            StatusCode::PAYLOAD_TOO_LARGE => {
-                "Fichier audio trop volumineux pour l'API OpenAI.".to_string()
-            }
-            StatusCode::TOO_MANY_REQUESTS => {
-                "Limite de requêtes OpenAI atteinte — réessayez plus tard.".to_string()
-            }
-            StatusCode::UNSUPPORTED_MEDIA_TYPE => {
-                "Format audio non supporté par OpenAI.".to_string()
-            }
-            _ if status.is_client_error() => {
-                extract_api_message(body).unwrap_or_else(|| format!("requête refusée ({status})"))
-            }
-            _ => extract_api_message(body)
-                .unwrap_or_else(|| format!("erreur serveur OpenAI ({status})")),
-        };
-
-        AiError::Provider {
-            provider: "openai".to_string(),
-            message,
-        }
     }
 }
 
@@ -140,53 +98,6 @@ struct OpenAiTranscriptionSegment {
     start: Option<f64>,
     #[serde(default)]
     end: Option<f64>,
-}
-
-fn format_diarized_text(segments: &[OpenAiTranscriptionSegment], fallback: &str) -> String {
-    if segments.is_empty() {
-        return fallback.to_string();
-    }
-
-    let mut lines = Vec::with_capacity(segments.len());
-    for segment in segments {
-        let text = segment.text.trim();
-        if text.is_empty() {
-            continue;
-        }
-        let speaker = segment
-            .speaker
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .unwrap_or("Locuteur");
-        match (segment.start, segment.end) {
-            (Some(start), Some(end)) => {
-                lines.push(format!("[{speaker} {start:.1}s–{end:.1}s] {text}"));
-            }
-            _ => lines.push(format!("[{speaker}] {text}")),
-        }
-    }
-
-    if lines.is_empty() {
-        fallback.to_string()
-    } else {
-        lines.join("\n")
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct OpenAiErrorResponse {
-    error: Option<OpenAiErrorDetail>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OpenAiErrorDetail {
-    message: Option<String>,
-}
-
-fn extract_api_message(body: &str) -> Option<String> {
-    serde_json::from_str::<OpenAiErrorResponse>(body)
-        .ok()
-        .and_then(|payload| payload.error.and_then(|e| e.message))
 }
 
 #[derive(Debug, Serialize)]
@@ -292,14 +203,9 @@ impl TranscriptionProvider for OpenAiProvider {
                 false,
             )
         };
-        let (file_name, mime) = Self::resolve_upload_name(&options);
+        let (file_name, mime) = http::resolve_upload_name(&options);
 
-        let file_part = reqwest::multipart::Part::file(audio_path)
-            .await
-            .map_err(|err| AiError::Other(format!("Impossible de lire le fichier audio : {err}")))?
-            .file_name(file_name)
-            .mime_str(mime)
-            .map_err(|err| AiError::Other(err.to_string()))?;
+        let file_part = http::audio_file_part(audio_path, file_name, mime).await?;
 
         let mut form = reqwest::multipart::Form::new()
             .text("model", model.to_string())
@@ -331,7 +237,7 @@ impl TranscriptionProvider for OpenAiProvider {
         let body = response.text().await?;
 
         if !status.is_success() {
-            return Err(Self::map_http_error(status, &body));
+            return Err(http::map_http_error(status, &body, "OpenAI", self.id()));
         }
 
         let payload: OpenAiTranscriptionResponse =
@@ -341,7 +247,17 @@ impl TranscriptionProvider for OpenAiProvider {
             })?;
 
         let text = if diarize {
-            format_diarized_text(&payload.segments, &payload.text)
+            let segments: Vec<DiarizedSegment> = payload
+                .segments
+                .iter()
+                .map(|s| DiarizedSegment {
+                    speaker: s.speaker.clone(),
+                    text: s.text.clone(),
+                    start: s.start,
+                    end: s.end,
+                })
+                .collect();
+            diarize::format_diarized_text(&segments, &payload.text)
         } else {
             payload.text
         };
@@ -493,7 +409,10 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let provider = OpenAiProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
         let (_dir, audio_path) = write_temp_audio("sample.wav", b"fake-audio-bytes");
         let result = provider
             .transcribe(
@@ -523,7 +442,10 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let provider = OpenAiProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
         let (_dir, audio_path) = write_temp_audio("sample.wav", b"fake-audio-bytes");
         let result = provider
             .transcribe(
@@ -555,7 +477,10 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let provider = OpenAiProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
         let result = provider
             .summarize(
                 "sk-test",
