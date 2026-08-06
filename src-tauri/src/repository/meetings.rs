@@ -94,7 +94,7 @@ impl MeetingRepository {
             .map(str::trim)
             .filter(|value| !value.is_empty());
 
-        let like_pattern = query.map(|value| format!("%{}%", escape_like(value)));
+        let fts_query = query.map(escape_fts);
 
         let status_str = filters.status.map(|status| status.as_str().to_string());
 
@@ -108,20 +108,18 @@ impl MeetingRepository {
                 m.ended_at,
                 m.updated_at,
                 CASE
-                    WHEN ?1 IS NOT NULL THEN COALESCE(
-                        CASE WHEN m.title LIKE ?2 ESCAPE '\' THEN m.title END,
-                        (
-                            SELECT t.content
-                            FROM transcriptions t
-                            WHERE t.meeting_id = m.id AND t.content LIKE ?2 ESCAPE '\'
-                            LIMIT 1
-                        ),
-                        (
-                            SELECT s.content
-                            FROM summaries s
-                            WHERE s.meeting_id = m.id AND s.content LIKE ?2 ESCAPE '\'
-                            LIMIT 1
-                        )
+                    WHEN ?1 IS NOT NULL THEN (
+                        SELECT body
+                        FROM meetings_fts
+                        WHERE meeting_id = m.id
+                          AND meetings_fts MATCH ?2
+                        ORDER BY CASE source
+                            WHEN 'title' THEN 0
+                            WHEN 'transcription' THEN 1
+                            WHEN 'summary' THEN 2
+                            ELSE 3
+                        END
+                        LIMIT 1
                     )
                 END AS snippet
             FROM meetings m
@@ -141,14 +139,10 @@ impl MeetingRepository {
               )
               AND (
                     ?1 IS NULL
-                    OR m.title LIKE ?2 ESCAPE '\'
-                    OR EXISTS (
-                        SELECT 1 FROM transcriptions t
-                        WHERE t.meeting_id = m.id AND t.content LIKE ?2 ESCAPE '\'
-                    )
-                    OR EXISTS (
-                        SELECT 1 FROM summaries s
-                        WHERE s.meeting_id = m.id AND s.content LIKE ?2 ESCAPE '\'
+                    OR m.id IN (
+                        SELECT meeting_id
+                        FROM meetings_fts
+                        WHERE meetings_fts MATCH ?2
                     )
               )
             ORDER BY m.created_at DESC
@@ -159,7 +153,7 @@ impl MeetingRepository {
         let rows = stmt.query_map(
             params![
                 query,
-                like_pattern,
+                fts_query,
                 status_str,
                 filters.date_from,
                 filters.date_to,
@@ -499,11 +493,10 @@ fn map_audio_error(error: AudioError) -> AppError {
     AppError::Message(error.to_string())
 }
 
-fn escape_like(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+/// Escapes a user query for FTS5 MATCH (trigram substring search).
+fn escape_fts(value: &str) -> String {
+    let escaped = value.replace('"', "\"\"");
+    format!("\"{escaped}\"")
 }
 
 /// Builds a short excerpt centered on the first case-insensitive match of `needle`.

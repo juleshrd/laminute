@@ -7,6 +7,10 @@ mod models;
 mod report_pdf;
 mod repository;
 
+pub use db::open_in_memory;
+pub use models::MeetingSearchFilters;
+pub use repository::MeetingRepository;
+
 pub const APP_IDENTIFIER: &str = "app.laminute.desktop";
 
 use std::sync::Mutex;

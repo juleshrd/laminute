@@ -11,7 +11,6 @@ pub struct AppState {
     pub db: Mutex<Connection>,
 }
 
-#[cfg(test)]
 pub fn open_in_memory() -> AppResult<Connection> {
     let mut conn = Connection::open_in_memory()?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;

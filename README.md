@@ -90,6 +90,14 @@ Validation complète avant une PR :
 npm run check
 ```
 
+### Performance — recherche historique
+
+La recherche texte sur l'historique utilise un index SQLite FTS5 (tokenizer trigram). Pour mesurer les latences sur un jeu de données synthétique (1 000 réunions) :
+
+```bash
+cd src-tauri && cargo run --example bench_search --release
+```
+
 Prérequis, structure du dépôt et contributions : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
