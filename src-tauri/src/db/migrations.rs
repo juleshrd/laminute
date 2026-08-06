@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn migrations_apply_cleanly_on_empty_database() {
         let conn = open_in_memory().expect("connexion mémoire");
-        assert_eq!(migration_count(&conn).unwrap(), 1);
+        assert_eq!(migration_count(&conn).unwrap(), 2);
     }
 
     #[test]
@@ -40,7 +40,7 @@ mod tests {
         run_migrations(&mut conn).expect("première passe");
         run_migrations(&mut conn).expect("deuxième passe");
 
-        assert_eq!(migration_count(&conn).unwrap(), 1);
+        assert_eq!(migration_count(&conn).unwrap(), 2);
     }
 
     #[test]
@@ -49,7 +49,11 @@ mod tests {
 
         let tables: Vec<String> = conn
             .prepare(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+                "SELECT name FROM sqlite_master
+                 WHERE type = 'table'
+                   AND name NOT LIKE 'sqlite_%'
+                   AND name NOT LIKE 'meetings_fts%'
+                 ORDER BY name",
             )
             .unwrap()
             .query_map([], |row| row.get(0))
@@ -70,6 +74,17 @@ mod tests {
                 "transcriptions",
             ]
         );
+
+        let fts_present: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master
+                 WHERE name = 'meetings_fts' AND type IN ('table', 'virtual')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert!(fts_present, "meetings_fts virtual table must exist");
     }
 
     #[test]

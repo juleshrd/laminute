@@ -40,6 +40,10 @@ base64 = "0.22"
 tempfile = "3"
 wiremock = "0.6"
 
+[[example]]
+name = "bench_search"
+path = "examples/bench_search.rs"
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mobile)'] }
 
