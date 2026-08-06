@@ -1,112 +1,102 @@
-# La Minute
+<p align="center">
+  <img src="docs/la-minute-banner.png" alt="La Minute" width="420" />
+</p>
+
+**La Minute** transforme vos réunions en comptes-rendus structurés : synthèse, décisions et actions.
+
+Enregistrez ou importez un audio, lancez le traitement, et consultez le résultat. Tout reste sur votre ordinateur.
 
 [![CI](https://github.com/juleshrd/laminute/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/juleshrd/laminute/actions/workflows/ci.yml)
 
-Application desktop **La Minute** — monorepo Tauri 2 (Rust) + React + TypeScript + Vite.
+## Télécharger et installer
 
-Identifiant : `app.laminute.desktop`
+Téléchargez la [dernière version](https://github.com/juleshrd/laminute/releases/latest) pour votre ordinateur :
 
-Contributions : voir [CONTRIBUTING.md](CONTRIBUTING.md).
+| Système | Fichier |
+| ------- | ------- |
+| Windows | Installateur `.exe` |
+| macOS   | Fichier `.dmg` |
+| Linux   | Fichier `.AppImage` |
 
-## Téléchargement (utilisateurs)
+Installez, puis ouvrez **La Minute**.
 
-Installez La Minute sans Node ni Rust via la [dernière Release GitHub](https://github.com/juleshrd/laminute/releases/latest) :
+- **macOS** : si macOS bloque l’ouverture, clic droit sur l’app → **Ouvrir**.
+- **Windows** : si SmartScreen s’affiche, choisissez **Exécuter quand même**.
 
-| OS      | Fichier                    |
-| ------- | -------------------------- |
-| Windows | installateur `.exe` (NSIS) |
-| macOS   | `.dmg`                     |
-| Linux   | `.AppImage`                |
+Quand une nouvelle version est disponible, l’app vous propose la mise à jour.
 
-Après installation, ouvrez **Réglages IA** et renseignez votre clé API Mistral (BYOK) pour la transcription et les comptes-rendus.
+## Configuration recommandée (Mistral)
 
-- **macOS** (si l’app n’est pas notariée) : clic droit sur l’app → **Ouvrir**.
-- **Windows** (si non signé Authenticode) : SmartScreen peut afficher un avertissement.
+C’est le parcours le plus simple pour démarrer.
 
-Au démarrage, si une nouvelle version est publiée sur GitHub, l’application propose une mise à jour en un clic.
+1. Créez un compte (ou connectez-vous) sur [console.mistral.ai](https://console.mistral.ai/).
+2. Créez une **clé API**, puis copiez-la.
+3. Dans La Minute, ouvrez **Réglages**.
+4. Choisissez **Mistral AI**, collez la clé, enregistrez, puis **Validez**.
 
-## Prérequis (développement)
+Votre clé est stockée dans le trousseau de votre ordinateur (pas dans les exports de réunions).
 
-### macOS
+## Premier usage
 
-- [Node.js](https://nodejs.org/) 20+ et npm
-- [Rust](https://www.rust-lang.org/tools/install) (rustup)
-- Xcode Command Line Tools : `xcode-select --install`
+1. Importez un fichier **MP3**, ou lancez un **enregistrement**.
+2. Donnez un titre à la réunion.
+3. Cliquez sur **Traiter** : transcription puis compte-rendu.
+4. Retrouvez le résultat dans l’historique.
 
-### Windows
+## Autres fournisseurs IA
 
-- Node.js 20+ et npm
-- Rust (rustup)
-- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (inclus sur Windows 11)
+### OpenAI
 
-### Linux (Debian/Ubuntu)
+1. Créez une clé sur [platform.openai.com](https://platform.openai.com/api-keys).
+2. Dans **Réglages**, choisissez **OpenAI**, collez la clé, enregistrez et validez.
 
-```bash
-sudo apt update
-sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-```
+OpenAI gère la transcription audio et le compte-rendu.
 
-Installez aussi Node.js 20+ et Rust via rustup.
+### Ollama (tout local)
 
-## Démarrage local
+Utile si vous préférez ne rien envoyer dans le cloud.
+
+1. Installez [Ollama](https://ollama.com/) et lancez-le.
+2. Téléchargez un modèle, par exemple : `ollama pull llama3.2`
+3. Dans **Réglages**, choisissez **Ollama**.
+4. Laissez l’adresse par défaut `http://127.0.0.1:11434` (sauf config particulière), puis validez.
+
+**Limite** : Ollama ne transcrit pas l’audio. Collez le texte de la réunion dans l’app pour générer le compte-rendu.
+
+### Anthropic
+
+Pas encore disponible dans La Minute.
+
+### Comparatif rapide
+
+| Fournisseur | Transcription audio | Compte-rendu | Où ça tourne |
+| ----------- | ------------------- | ------------ | ------------ |
+| Mistral (recommandé) | Oui | Oui | Cloud (votre clé) |
+| OpenAI | Oui | Oui | Cloud (votre clé) |
+| Ollama | Non | Oui | Votre ordinateur |
+| Anthropic | — | — | Bientôt |
+
+## Confidentialité
+
+Vos réunions restent sur votre machine. Aucune télémétrie n’est envoyée aux développeurs. Si vous utilisez Mistral ou OpenAI, seuls l’audio (transcription) et/ou le texte (compte-rendu) partent vers le fournisseur que vous avez choisi.
+
+Détails : [PRIVACY.md](PRIVACY.md).
+
+## Pour les développeurs
 
 ```bash
 npm install
 npm run dev
 ```
 
-`npm run dev` lance Tauri en mode développement (Vite sur le port 1420 + fenêtre native).
-
-Autres commandes utiles :
-
-| Commande               | Description                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `npm run build`        | Compile le frontend et le backend Rust                                          |
-| `npm run build:bundle` | Produit un installable Tauri (`.deb`, `.AppImage`, etc. selon l'OS)             |
-| `npm run lint`         | ESLint + TypeScript + Clippy                                                    |
-| `npm run format`       | Prettier + rustfmt                                                              |
-| `npm run format:check` | Vérifie le formatage sans modifier les fichiers                                 |
-| `npm run test`         | Tests Vitest (frontend) + `cargo test` (Rust)                                   |
-| `npm run check`        | **Format + lint + tests + build** (commande unique pour CI / validation locale) |
-
-## Structure du dépôt
-
-```
-.
-├── src/                  # Frontend React + TypeScript (Vite)
-│   ├── lib/              # Utilitaires et métadonnées partagées
-│   └── test/             # Configuration des tests Vitest
-├── src-tauri/            # Backend Rust et configuration Tauri
-│   ├── src/              # Code Rust (commandes, point d'entrée)
-│   ├── capabilities/     # Permissions Tauri 2
-│   └── tauri.conf.json   # Configuration application / bundle
-├── public/               # Assets statiques servis par Vite
-├── package.json          # Scripts npm et dépendances frontend
-├── vite.config.ts        # Configuration Vite + Vitest
-├── eslint.config.js      # ESLint (flat config)
-├── rustfmt.toml          # Formatage Rust
-├── LICENSE               # GPL-3.0
-└── README.md
-```
-
-## Validation complète
-
-Avant de pousser ou ouvrir une PR :
+Validation complète avant une PR :
 
 ```bash
 npm run check
 ```
 
-Cette commande enchaîne le contrôle de formatage, le lint frontend/Rust, les tests, puis la compilation complète.
-
-## Releases
-
-Les tags `v*` (ex. `v0.1.0`) déclenchent le workflow GitHub Actions [Release](.github/workflows/release.yml), qui produit des artefacts installables **non signés** pour Linux, macOS et Windows. En local, `npm run build:bundle` exécute la même commande Tauri (`tauri build`).
+Prérequis, structure du dépôt et contributions : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
 GPL-3.0 — voir [LICENSE](LICENSE).
-
-Politique de confidentialité : [PRIVACY.md](PRIVACY.md).

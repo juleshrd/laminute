@@ -1,11 +1,69 @@
 # Contribuer à La Minute
 
-Merci de votre intérêt pour **La Minute** ! Ce guide complète le [README](README.md) pour les contributions au dépôt.
+Merci de votre intérêt pour **La Minute** ! Ce guide complète le [README](README.md) (parcours utilisateur) pour le travail sur le dépôt.
 
-## Avant de commencer
+## Prérequis
 
-- Consultez le [README](README.md) pour les prérequis (Node.js 20+, Rust, dépendances Tauri selon l'OS) et le démarrage local (`npm install`, `npm run dev`).
-- Ouvrez une issue pour discuter d'une fonctionnalité importante avant d'implémenter, si possible.
+### Tous les systèmes
+
+- [Node.js](https://nodejs.org/) 20+ et npm
+- [Rust](https://www.rust-lang.org/tools/install) stable ≥ 1.85 (rustup)
+
+### macOS
+
+- Xcode Command Line Tools : `xcode-select --install`
+
+### Windows
+
+- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (inclus sur Windows 11)
+
+### Linux (Debian/Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+## Démarrage local
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` lance Tauri en mode développement (Vite sur le port 1420 + fenêtre native).
+
+| Commande | Description |
+| -------- | ----------- |
+| `npm run build` | Compile le frontend et le backend Rust |
+| `npm run build:bundle` | Produit un installable Tauri (selon l’OS) |
+| `npm run lint` | ESLint + TypeScript + Clippy |
+| `npm run format` | Prettier + rustfmt |
+| `npm run format:check` | Vérifie le formatage sans modifier les fichiers |
+| `npm run test` | Tests Vitest (frontend) + `cargo test` (Rust) |
+| `npm run check` | Format + lint + tests + build |
+
+## Structure du dépôt
+
+```
+.
+├── src/                  # Frontend React + TypeScript (Vite)
+│   ├── lib/              # Utilitaires et métadonnées partagées
+│   └── test/             # Configuration des tests Vitest
+├── src-tauri/            # Backend Rust et configuration Tauri
+│   ├── src/              # Code Rust (commandes, point d'entrée)
+│   ├── capabilities/     # Permissions Tauri 2
+│   └── tauri.conf.json   # Configuration application / bundle
+├── docs/                 # Assets et notes (ex. bannière README)
+├── public/               # Assets statiques servis par Vite
+├── package.json          # Scripts npm et dépendances frontend
+├── LICENSE               # GPL-3.0
+└── README.md             # Guide utilisateur
+```
+
+Identifiant application : `app.laminute.desktop`.
 
 ## Validation locale
 
@@ -47,6 +105,7 @@ Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) 
 - Restez focalisé : une PR par sujet logique.
 - Suivez les conventions existantes du dépôt ; évitez les refactorings hors sujet.
 - Le code applicatif et la documentation utilisateur sont en **français** lorsque c'est pertinent.
+- Ouvrez une issue pour discuter d'une fonctionnalité importante avant d'implémenter, si possible.
 
 ## Licence
 
