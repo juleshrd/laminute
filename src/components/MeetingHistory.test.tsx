@@ -14,10 +14,7 @@ describe("MeetingHistory", () => {
   beforeEach(() => {
     invokeMock.mockReset();
     invokeMock.mockImplementation((command: string) => {
-      if (command === "list_ai_providers") {
-        return Promise.resolve([{ id: "mistral", displayName: "Mistral AI", capabilities: {} }]);
-      }
-      if (command === "search_meetings") {
+      if (command === "list_meetings") {
         return Promise.resolve([
           {
             id: "m-1",
@@ -27,7 +24,6 @@ describe("MeetingHistory", () => {
             endedAt: null,
             createdAt: "2026-08-05T10:00:00Z",
             updatedAt: "2026-08-05T11:00:00Z",
-            snippet: "Réunion productive",
           },
         ]);
       }
@@ -35,23 +31,16 @@ describe("MeetingHistory", () => {
     });
   });
 
-  it("affiche les résultats de recherche", async () => {
+  it("affiche les réunions de la liste", async () => {
     render(<MeetingHistory />);
 
     expect(await screen.findByText("Comité produit")).toBeInTheDocument();
-    expect(screen.getByText("Réunion productive")).toBeInTheDocument();
-    expect(invokeMock).toHaveBeenCalledWith(
-      "search_meetings",
-      expect.objectContaining({ filters: expect.any(Object) }),
-    );
+    expect(invokeMock).toHaveBeenCalledWith("list_meetings");
   });
 
   it("ouvre le détail au clic sur une réunion", async () => {
     invokeMock.mockImplementation((command: string) => {
-      if (command === "list_ai_providers") {
-        return Promise.resolve([]);
-      }
-      if (command === "search_meetings") {
+      if (command === "list_meetings") {
         return Promise.resolve([
           {
             id: "m-1",

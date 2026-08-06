@@ -1,10 +1,11 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use crate::ai::models::SummaryOptions;
 use crate::ai::secrets;
 use crate::ai::structured_summary::{self, StructuredSummary};
+use crate::audio::AudioState;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::models::{Action, CreateMeetingInput, Summary};
@@ -31,16 +32,18 @@ pub struct GenerateStructuredSummaryOutput {
 
 #[tauri::command]
 pub async fn generate_structured_summary(
+    app: AppHandle,
     db_state: State<'_, AppState>,
     ai_state: State<'_, AiAppState>,
     input: GenerateStructuredSummaryInput,
 ) -> Result<GenerateStructuredSummaryOutput, String> {
-    generate_structured_summary_inner(&db_state, &ai_state, input)
+    generate_structured_summary_inner(&app, &db_state, &ai_state, input)
         .await
         .map_err(|e| e.to_string())
 }
 
 async fn generate_structured_summary_inner(
+    app: &AppHandle,
     db_state: &State<'_, AppState>,
     ai_state: &State<'_, AiAppState>,
     input: GenerateStructuredSummaryInput,
@@ -102,11 +105,32 @@ async fn generate_structured_summary_inner(
         )
     })?;
 
+    maybe_purge_audio_files(app, db_state, &meeting_id)?;
+
     Ok(GenerateStructuredSummaryOutput {
         meeting_id,
         summary,
         structured,
         actions,
+    })
+}
+
+fn maybe_purge_audio_files(
+    app: &AppHandle,
+    db_state: &State<'_, AppState>,
+    meeting_id: &str,
+) -> AppResult<()> {
+    let Some(audio_state) = app.try_state::<AudioState>() else {
+        return Ok(());
+    };
+    let keep = audio_state
+        .keep_audio_files()
+        .map_err(|e| AppError::Message(e.to_string()))?;
+    if keep {
+        return Ok(());
+    }
+    with_db(db_state, |conn| {
+        MeetingRepository::delete_audio_files_for_meeting(conn, meeting_id)
     })
 }
 

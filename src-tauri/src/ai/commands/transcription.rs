@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::ai::models::TranscriptionOptions;
 use crate::ai::secrets;
@@ -305,6 +305,8 @@ pub async fn transcribe_audio_file(
         saved
     };
 
+    maybe_purge_audio_files(&app, &db_state, &meeting_id)?;
+
     emit_progress(
         &app,
         &transcription_state,
@@ -316,6 +318,26 @@ pub async fn transcribe_audio_file(
     );
 
     Ok(transcription)
+}
+
+fn maybe_purge_audio_files(
+    app: &AppHandle,
+    db_state: &State<'_, AppState>,
+    meeting_id: &str,
+) -> Result<(), String> {
+    let audio_state = app
+        .try_state::<crate::audio::AudioState>()
+        .ok_or_else(|| "état audio indisponible".to_string())?;
+    let keep = audio_state.keep_audio_files().map_err(|e| e.to_string())?;
+    if keep {
+        return Ok(());
+    }
+
+    let db = db_state
+        .db
+        .lock()
+        .map_err(|_| "impossible d'accéder à la base de données".to_string())?;
+    MeetingRepository::delete_audio_files_for_meeting(&db, meeting_id).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

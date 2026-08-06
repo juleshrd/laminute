@@ -9,13 +9,29 @@ use super::devices::{list_input_devices, AudioInputDevice};
 use super::error::AudioError;
 use super::recording::{RecordingService, RecordingStatus};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct PersistedSettings {
     selected_device_id: Option<String>,
+    #[serde(default = "default_keep_audio_files")]
+    keep_audio_files: bool,
+}
+
+fn default_keep_audio_files() -> bool {
+    true
+}
+
+impl Default for PersistedSettings {
+    fn default() -> Self {
+        Self {
+            selected_device_id: None,
+            keep_audio_files: true,
+        }
+    }
 }
 
 pub struct AudioState {
     selected_device_id: Mutex<Option<String>>,
+    keep_audio_files: Mutex<bool>,
     recording: RecordingService,
     settings_path: PathBuf,
     recordings_dir: PathBuf,
@@ -33,16 +49,24 @@ impl AudioState {
 
         let persisted = load_settings(&settings_path);
         let mut selected_device_id = persisted.selected_device_id;
+        let keep_audio_files = persisted.keep_audio_files;
 
         if let Some(device_id) = &selected_device_id {
             if resolve_selected_device(device_id).is_err() {
-                let _ = fs::remove_file(&settings_path);
                 selected_device_id = None;
+                let _ = save_settings(
+                    &settings_path,
+                    &PersistedSettings {
+                        selected_device_id: None,
+                        keep_audio_files,
+                    },
+                );
             }
         }
 
         Ok(Self {
             selected_device_id: Mutex::new(selected_device_id),
+            keep_audio_files: Mutex::new(keep_audio_files),
             recording: RecordingService::spawn(),
             settings_path,
             recordings_dir,
@@ -79,18 +103,49 @@ impl AudioState {
             *selected = Some(device_id);
         }
 
+        self.persist_settings()?;
+
+        Ok(device)
+    }
+
+    pub fn keep_audio_files(&self) -> Result<bool, AudioError> {
+        self.keep_audio_files
+            .lock()
+            .map(|value| *value)
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))
+    }
+
+    pub fn set_keep_audio_files(&self, keep: bool) -> Result<bool, AudioError> {
+        {
+            let mut value = self
+                .keep_audio_files
+                .lock()
+                .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?;
+            *value = keep;
+        }
+        self.persist_settings()?;
+        Ok(keep)
+    }
+
+    fn persist_settings(&self) -> Result<(), AudioError> {
+        let selected_device_id = self
+            .selected_device_id
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
+            .clone();
+        let keep_audio_files = self
+            .keep_audio_files
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))
+            .map(|value| *value)?;
+
         save_settings(
             &self.settings_path,
             &PersistedSettings {
-                selected_device_id: self
-                    .selected_device_id
-                    .lock()
-                    .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
-                    .clone(),
+                selected_device_id,
+                keep_audio_files,
             },
-        )?;
-
-        Ok(device)
+        )
     }
 
     pub fn recording_status(&self) -> Result<RecordingStatus, AudioError> {
@@ -152,12 +207,20 @@ mod tests {
 
         let settings = PersistedSettings {
             selected_device_id: Some("input-0".into()),
+            keep_audio_files: false,
         };
         save_settings(&path, &settings).expect("save settings");
 
         let loaded = load_settings(&path);
         assert_eq!(loaded.selected_device_id, Some("input-0".into()));
+        assert!(!loaded.keep_audio_files);
 
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn keep_audio_files_defaults_to_true() {
+        let loaded: PersistedSettings = serde_json::from_str("{}").expect("empty defaults");
+        assert!(loaded.keep_audio_files);
     }
 }

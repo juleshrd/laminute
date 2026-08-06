@@ -239,7 +239,19 @@ impl MeetingRepository {
     }
 
     pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
-        let audio_files = Self::list_audio_files(conn, id)?;
+        Self::delete_audio_files_for_meeting(conn, id)?;
+
+        let deleted = conn.execute("DELETE FROM meetings WHERE id = ?1", [id])?;
+        if deleted == 0 {
+            return Err(AppError::MeetingNotFound { id: id.to_string() });
+        }
+        Ok(())
+    }
+
+    /// Supprime les fichiers audio disque et les lignes `audio_files` d'une réunion.
+    /// Les transcriptions liées passent en `audio_file_id = NULL` (ON DELETE SET NULL).
+    pub fn delete_audio_files_for_meeting(conn: &Connection, meeting_id: &str) -> AppResult<()> {
+        let audio_files = Self::list_audio_files(conn, meeting_id)?;
         for audio in &audio_files {
             let path = Path::new(&audio.file_path);
             if path.is_file() {
@@ -247,10 +259,10 @@ impl MeetingRepository {
             }
         }
 
-        let deleted = conn.execute("DELETE FROM meetings WHERE id = ?1", [id])?;
-        if deleted == 0 {
-            return Err(AppError::MeetingNotFound { id: id.to_string() });
-        }
+        conn.execute(
+            "DELETE FROM audio_files WHERE meeting_id = ?1",
+            [meeting_id],
+        )?;
         Ok(())
     }
 
@@ -743,6 +755,55 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(imports_dir);
+    }
+
+    #[test]
+    fn delete_audio_files_for_meeting_keeps_transcription() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Purge audio".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let dir = std::env::temp_dir().join(format!("laminute-purge-audio-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let audio_path = dir.join("meeting.mp3");
+        std::fs::write(&audio_path, b"audio").unwrap();
+
+        let audio = MeetingRepository::attach_audio_file(
+            &conn,
+            &meeting.id,
+            &audio_path.to_string_lossy(),
+            Some(1000),
+            Some("mp3"),
+        )
+        .unwrap();
+
+        MeetingRepository::create_transcription(
+            &conn,
+            &meeting.id,
+            Some(&audio.id),
+            "mistral",
+            "Mistral AI",
+            "Bonjour",
+            Some("fr"),
+        )
+        .unwrap();
+
+        assert!(audio_path.is_file());
+        MeetingRepository::delete_audio_files_for_meeting(&conn, &meeting.id).unwrap();
+        assert!(!audio_path.exists());
+
+        let detail = MeetingRepository::get_detail(&conn, &meeting.id).unwrap();
+        assert!(detail.audio_files.is_empty());
+        assert_eq!(detail.transcriptions.len(), 1);
+        assert!(detail.transcriptions[0].audio_file_id.is_none());
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     fn empty_filters() -> MeetingSearchFilters {
