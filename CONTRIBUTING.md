@@ -44,6 +44,9 @@ npm run dev
 | `npm run format:check` | Vérifie le formatage sans modifier les fichiers |
 | `npm run test`         | Tests Vitest (frontend) + `cargo test` (Rust)   |
 | `npm run check`        | Format + lint + tests + build                   |
+| `npm run audit:npm`    | Audit npm (sévérité high)                       |
+| `npm run audit:rust`   | `cargo deny check` (licences / advisories)      |
+| `npm run check:ci`     | Équivalent local complet de la CI GitHub        |
 
 ## Structure du dépôt
 
@@ -67,11 +70,13 @@ Identifiant application : `app.laminute.desktop`.
 
 ## Validation locale
 
-Avant d'ouvrir une pull request, exécutez :
+Avant d'ouvrir une pull request, exécutez l’équivalent complet de la CI :
 
 ```bash
-npm run check
+npm run check:ci
 ```
+
+(`cargo deny` doit être installé : `cargo install cargo-deny`.)
 
 Cette commande enchaîne :
 
@@ -79,6 +84,9 @@ Cette commande enchaîne :
 2. **Lint** — ESLint, TypeScript (`tsc --noEmit`), Clippy
 3. **Tests** — Vitest (frontend) et `cargo test` (Rust)
 4. **Build** — compilation frontend + backend
+5. **Audits** — `cargo deny check` et `npm audit --audit-level=high`
+
+Pour une validation produit sans audits : `npm run check`.
 
 Pour corriger le formatage automatiquement : `npm run format`.
 
@@ -96,7 +104,17 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --ignored
 
 ## CI
 
-Les pull requests et les pushes sur `main` déclenchent le workflow [CI](.github/workflows/ci.yml) : format, lint, tests, build, vérification des licences Rust (`cargo-deny`) et audit npm (niveau high).
+Les pull requests et les pushes sur `main` déclenchent le workflow [CI](.github/workflows/ci.yml), découpé en checks relançables :
+
+| Check GHA | Commande locale |
+| --------- | --------------- |
+| `format_lint` | `npm run format:check` puis `npm run lint` |
+| `test_frontend` | `npm run test:web` |
+| `test_rust` | `npm run test:rust` |
+| `build` | `npm run build` |
+| `audits` | `npm run audit:rust` puis `npm run audit:npm` |
+
+`npm run check:ci` exécute l’ensemble. Un job `summary` classe les échecs en **produit** (format, tests, build, audits) ou **infrastructure** (annulation runner / concurrence PR). Sur les PR, les anciens runs sont annulés ; un push sur `main` ne l’est jamais.
 
 Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) qui produit des artefacts installables non signés pour Linux, macOS et Windows.
 
