@@ -38,7 +38,9 @@ export function MeetingIdleStep({
       {!hasDevices ? (
         <p className="warning meeting-hero__hint">Aucun périphérique d&apos;entrée détecté.</p>
       ) : (
-        <p className="meeting-hero__hint lm-subtle">Cliquez sur le logo pour démarrer la réunion.</p>
+        <p className="meeting-hero__hint lm-subtle">
+          Cliquez sur le logo pour démarrer la réunion.
+        </p>
       )}
 
       <section
