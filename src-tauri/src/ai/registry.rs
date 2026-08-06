@@ -59,16 +59,16 @@ impl ProviderRegistry {
         registry
     }
 
-    pub fn register_ai(&mut self, provider: Arc<dyn AiProvider>) {
+    fn register_ai(&mut self, provider: Arc<dyn AiProvider>) {
         self.providers.insert(provider.id().to_string(), provider);
     }
 
-    pub fn register_transcription(&mut self, provider: Arc<dyn TranscriptionProvider>) {
+    fn register_transcription(&mut self, provider: Arc<dyn TranscriptionProvider>) {
         self.transcription
             .insert(provider.id().to_string(), provider);
     }
 
-    pub fn register_summary(&mut self, provider: Arc<dyn SummaryProvider>) {
+    fn register_summary(&mut self, provider: Arc<dyn SummaryProvider>) {
         self.summary.insert(provider.id().to_string(), provider);
     }
 
@@ -264,6 +264,87 @@ mod tests {
             .expect("stub summary");
 
         assert_eq!(result.text, "stub:hello");
+        assert_eq!(result.model, "stub-model");
+    }
+
+    struct StubTranscriptionProvider;
+
+    #[async_trait]
+    impl AiProvider for StubTranscriptionProvider {
+        fn id(&self) -> &str {
+            "stub-transcribe"
+        }
+
+        fn display_name(&self) -> &str {
+            "Stub Transcribe"
+        }
+
+        fn capabilities(&self) -> ProviderCapabilities {
+            ProviderCapabilities {
+                transcription: true,
+                summary: false,
+                local: false,
+                streaming: false,
+                diarization: false,
+            }
+        }
+
+        async fn validate_key(&self, _api_key: &str) -> Result<KeyValidationResult, AiError> {
+            Ok(KeyValidationResult {
+                valid: true,
+                message: "ok".into(),
+                models: None,
+            })
+        }
+
+        async fn list_models(&self, _api_key: &str) -> Result<Vec<ModelInfo>, AiError> {
+            Ok(vec![])
+        }
+    }
+
+    #[async_trait]
+    impl TranscriptionProvider for StubTranscriptionProvider {
+        async fn transcribe(
+            &self,
+            _api_key: &str,
+            _audio_path: &Path,
+            _options: TranscriptionOptions,
+        ) -> Result<TranscriptionResult, AiError> {
+            Ok(TranscriptionResult {
+                text: "stub transcription".into(),
+                model: "stub-model".into(),
+                language: None,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn register_transcription_stub_dispatches_without_match() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let audio_path = dir.path().join("audio.wav");
+        std::fs::write(&audio_path, b"audio").expect("write");
+
+        let mut registry = ProviderRegistry::new();
+        let stub = Arc::new(StubTranscriptionProvider);
+        registry.register_ai(stub.clone());
+        registry.register_transcription(stub);
+
+        let result = registry
+            .transcribe_audio(
+                "stub-transcribe",
+                "",
+                &audio_path,
+                TranscriptionOptions {
+                    model: None,
+                    language: None,
+                    file_name: None,
+                    diarize: false,
+                },
+            )
+            .await
+            .expect("stub transcription");
+
+        assert_eq!(result.text, "stub transcription");
         assert_eq!(result.model, "stub-model");
     }
 }
