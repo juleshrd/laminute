@@ -11,9 +11,7 @@ export function MeetingWorkspace() {
   const flow = useMeetingFlow();
 
   return (
-    <div
-      className={`meeting-workspace${flow.isRecording ? " meeting-workspace--recording" : ""}`}
-    >
+    <div className={`meeting-workspace${flow.isRecording ? " meeting-workspace--recording" : ""}`}>
       {!flow.isRecording && (
         <div
           className={`status-banner status-banner--${flow.flowPhase}`}
