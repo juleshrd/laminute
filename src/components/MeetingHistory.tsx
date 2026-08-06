@@ -45,9 +45,7 @@ export function MeetingHistory() {
     setLoading(true);
     setError(null);
     try {
-      const items = await searchMeetings(
-        searchQuery ? { query: searchQuery } : {},
-      );
+      const items = await searchMeetings(searchQuery ? { query: searchQuery } : {});
       setResults(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chargement impossible.");
@@ -133,9 +131,7 @@ export function MeetingHistory() {
         <div className="lm-panel lm-empty">
           <div className="lm-empty-inner">
             <h3>Aucun résultat</h3>
-            <p className="lm-subtle">
-              Aucune réunion ne correspond à « {trimmedQuery} ».
-            </p>
+            <p className="lm-subtle">Aucune réunion ne correspond à « {trimmedQuery} ».</p>
           </div>
         </div>
       )}

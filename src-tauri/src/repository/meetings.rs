@@ -539,11 +539,7 @@ fn centered_snippet(haystack: &str, needle: &str, max_chars: usize) -> String {
         start = end.saturating_sub(max_chars);
     }
 
-    let excerpt: String = haystack
-        .chars()
-        .skip(start)
-        .take(end - start)
-        .collect();
+    let excerpt: String = haystack.chars().skip(start).take(end - start).collect();
 
     let mut result = String::new();
     if start > 0 {
@@ -1064,9 +1060,8 @@ mod tests {
 
         let now = Utc::now().to_rfc3339();
         let long_prefix = "x".repeat(80);
-        let content = format!(
-            "{long_prefix} Discussion avec le client Dufour sur le renouvellement."
-        );
+        let content =
+            format!("{long_prefix} Discussion avec le client Dufour sur le renouvellement.");
         conn.execute(
             "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at)
              VALUES ('tx-dufour', ?1, NULL, NULL, ?2, 'fr', ?3, ?3)",
