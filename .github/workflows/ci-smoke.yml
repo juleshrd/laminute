@@ -1,0 +1,17 @@
+# Smoke minimal pour vérifier que GitHub Actions accepte les workflows de cette PR.
+name: CI Smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: OK
+        run: echo "ci-smoke ok"

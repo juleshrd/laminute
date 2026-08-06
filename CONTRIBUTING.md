@@ -106,13 +106,13 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --ignored
 
 Les pull requests et les pushes sur `main` déclenchent le workflow [CI](.github/workflows/ci.yml), découpé en checks relançables :
 
-| Check GHA | Commande locale |
-| --------- | --------------- |
-| `format_lint` | `npm run format:check` puis `npm run lint` |
-| `test_frontend` | `npm run test:web` |
-| `test_rust` | `npm run test:rust` |
-| `build` | `npm run build` |
-| `audits` | `npm run audit:rust` puis `npm run audit:npm` |
+| Check GHA       | Commande locale                               |
+| --------------- | --------------------------------------------- |
+| `format_lint`   | `npm run format:check` puis `npm run lint`    |
+| `test_frontend` | `npm run test:web`                            |
+| `test_rust`     | `npm run test:rust`                           |
+| `build`         | `npm run build`                               |
+| `audits`        | `npm run audit:rust` puis `npm run audit:npm` |
 
 `npm run check:ci` exécute l’ensemble. Un job `summary` classe les échecs en **produit** (format, tests, build, audits) ou **infrastructure** (annulation runner / concurrence PR). Sur les PR, les anciens runs sont annulés ; un push sur `main` ne l’est jamais.
 
