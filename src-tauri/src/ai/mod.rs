@@ -1,6 +1,7 @@
 pub mod capabilities;
 pub mod commands;
 pub mod error;
+pub mod model_catalog;
 pub mod models;
 pub mod provider;
 pub mod providers;

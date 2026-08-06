@@ -8,6 +8,7 @@ pub struct ProviderCapabilities {
     pub summary: bool,
     pub local: bool,
     pub streaming: bool,
+    pub diarization: bool,
 }
 
 impl ProviderCapabilities {
@@ -17,6 +18,7 @@ impl ProviderCapabilities {
             summary: false,
             local: false,
             streaming: false,
+            diarization: false,
         }
     }
 
@@ -26,6 +28,7 @@ impl ProviderCapabilities {
             summary: true,
             local: false,
             streaming: true,
+            diarization: true,
         }
     }
 
@@ -35,6 +38,7 @@ impl ProviderCapabilities {
             summary: true,
             local: false,
             streaming: false,
+            diarization: true,
         }
     }
 
@@ -44,6 +48,7 @@ impl ProviderCapabilities {
             summary: true,
             local: true,
             streaming: false,
+            diarization: false,
         }
     }
 }

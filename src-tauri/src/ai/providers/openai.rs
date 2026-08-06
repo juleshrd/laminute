@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
+use crate::ai::model_catalog::{self, OPENAI_DIARIZE_MODEL};
 use crate::ai::models::{
     KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult, TranscriptionOptions,
     TranscriptionResult,
@@ -14,8 +15,6 @@ use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
-const DEFAULT_TRANSCRIPTION_MODEL: &str = "whisper-1";
-const DEFAULT_SUMMARY_MODEL: &str = "gpt-4o-mini";
 const MAX_AUDIO_BYTES: usize = 100 * 1024 * 1024;
 
 pub struct OpenAiProvider {
@@ -127,6 +126,50 @@ struct OpenAiModel {
 #[derive(Debug, Deserialize)]
 struct OpenAiTranscriptionResponse {
     text: String,
+    #[serde(default)]
+    segments: Vec<OpenAiTranscriptionSegment>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiTranscriptionSegment {
+    text: String,
+    #[serde(default)]
+    speaker: Option<String>,
+    #[serde(default)]
+    start: Option<f64>,
+    #[serde(default)]
+    end: Option<f64>,
+}
+
+fn format_diarized_text(segments: &[OpenAiTranscriptionSegment], fallback: &str) -> String {
+    if segments.is_empty() {
+        return fallback.to_string();
+    }
+
+    let mut lines = Vec::with_capacity(segments.len());
+    for segment in segments {
+        let text = segment.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let speaker = segment
+            .speaker
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("Locuteur");
+        match (segment.start, segment.end) {
+            (Some(start), Some(end)) => {
+                lines.push(format!("[{speaker} {start:.1}s–{end:.1}s] {text}"));
+            }
+            _ => lines.push(format!("[{speaker}] {text}")),
+        }
+    }
+
+    if lines.is_empty() {
+        fallback.to_string()
+    } else {
+        lines.join("\n")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -243,10 +286,17 @@ impl TranscriptionProvider for OpenAiProvider {
             )));
         }
 
-        let model = options
-            .model
-            .as_deref()
-            .unwrap_or(DEFAULT_TRANSCRIPTION_MODEL);
+        let (model, diarize) = if options.diarize {
+            (OPENAI_DIARIZE_MODEL, true)
+        } else {
+            (
+                options.model.as_deref().unwrap_or_else(|| {
+                    model_catalog::default_transcription_model("openai")
+                        .unwrap_or("gpt-4o-mini-transcribe")
+                }),
+                false,
+            )
+        };
         let (file_name, mime) = Self::resolve_upload_name(&options);
 
         let file_part = reqwest::multipart::Part::bytes(audio.to_vec())
@@ -258,8 +308,18 @@ impl TranscriptionProvider for OpenAiProvider {
             .text("model", model.to_string())
             .part("file", file_part);
 
-        if let Some(language) = &options.language {
-            form = form.text("language", language.clone());
+        if diarize {
+            form = form
+                .text("response_format", "diarized_json")
+                .text("chunking_strategy", "auto");
+        } else {
+            // gpt-4o-*-transcribe n'accepte que response_format=json
+            if model != "whisper-1" {
+                form = form.text("response_format", "json");
+            }
+            if let Some(language) = &options.language {
+                form = form.text("language", language.clone());
+            }
         }
 
         let response = self
@@ -283,7 +343,13 @@ impl TranscriptionProvider for OpenAiProvider {
                 message: format!("réponse transcription illisible : {err}"),
             })?;
 
-        if payload.text.trim().is_empty() {
+        let text = if diarize {
+            format_diarized_text(&payload.segments, &payload.text)
+        } else {
+            payload.text
+        };
+
+        if text.trim().is_empty() {
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
                 message: "OpenAI a renvoyé une transcription vide.".to_string(),
@@ -291,7 +357,7 @@ impl TranscriptionProvider for OpenAiProvider {
         }
 
         Ok(TranscriptionResult {
-            text: payload.text,
+            text,
             model: model.to_string(),
             language: options.language,
         })
@@ -306,9 +372,11 @@ impl SummaryProvider for OpenAiProvider {
         text: &str,
         options: SummaryOptions,
     ) -> Result<SummaryResult, AiError> {
-        let model = options
-            .model
-            .unwrap_or_else(|| DEFAULT_SUMMARY_MODEL.to_string());
+        let model = options.model.unwrap_or_else(|| {
+            model_catalog::default_summary_model("openai")
+                .unwrap_or("gpt-4o-mini")
+                .to_string()
+        });
 
         let request = ChatCompletionRequest {
             model: model.clone(),
@@ -372,6 +440,20 @@ mod tests {
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
+    fn opts(
+        model: Option<&str>,
+        language: Option<&str>,
+        file_name: Option<&str>,
+        diarize: bool,
+    ) -> TranscriptionOptions {
+        TranscriptionOptions {
+            model: model.map(str::to_string),
+            language: language.map(str::to_string),
+            file_name: file_name.map(str::to_string),
+            diarize,
+        }
+    }
+
     #[tokio::test]
     async fn validate_key_rejects_empty_key() {
         let provider = OpenAiProvider::new();
@@ -384,15 +466,7 @@ mod tests {
     async fn transcribe_rejects_empty_audio() {
         let provider = OpenAiProvider::new();
         let error = provider
-            .transcribe(
-                "sk-test",
-                &[],
-                TranscriptionOptions {
-                    model: None,
-                    language: None,
-                    file_name: None,
-                },
-            )
+            .transcribe("sk-test", &[], opts(None, None, None, false))
             .await
             .unwrap_err();
         assert!(matches!(error, AiError::Other(_)));
@@ -414,17 +488,43 @@ mod tests {
             .transcribe(
                 "sk-test",
                 b"fake-audio-bytes",
-                TranscriptionOptions {
-                    model: None,
-                    language: Some("fr".into()),
-                    file_name: Some("sample.wav".into()),
-                },
+                opts(None, Some("fr"), Some("sample.wav"), false),
             )
             .await
             .expect("transcription");
 
         assert_eq!(result.text, "Bonjour à tous");
-        assert_eq!(result.model, "whisper-1");
+        assert_eq!(result.model, "gpt-4o-mini-transcribe");
+    }
+
+    #[tokio::test]
+    async fn transcribe_uses_diarize_model_and_formats_speakers() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/audio/transcriptions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "text": "Bonjour. Salut.",
+                "segments": [
+                    { "text": "Bonjour.", "speaker": "A", "start": 0.0, "end": 0.8 },
+                    { "text": "Salut.", "speaker": "B", "start": 1.0, "end": 1.6 }
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let provider = OpenAiProvider::with_api_base(format!("{}/v1", mock_server.uri()));
+        let result = provider
+            .transcribe(
+                "sk-test",
+                b"fake-audio-bytes",
+                opts(Some("gpt-4o-transcribe"), None, Some("sample.wav"), true),
+            )
+            .await
+            .expect("diarized transcription");
+
+        assert_eq!(result.model, OPENAI_DIARIZE_MODEL);
+        assert!(result.text.contains("[A"));
+        assert!(result.text.contains("[B"));
     }
 
     #[tokio::test]

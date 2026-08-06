@@ -165,6 +165,7 @@ mod tests {
                     model: None,
                     language: None,
                     file_name: None,
+                    diarize: false,
                 },
             )
             .await;

@@ -48,16 +48,18 @@ async fn generate_structured_summary_inner(
     ai_state: &State<'_, AiAppState>,
     input: GenerateStructuredSummaryInput,
 ) -> AppResult<GenerateStructuredSummaryOutput> {
-    let provider_id = {
+    let (provider_id, default_model) = {
         let settings = ai_state
             .settings
             .lock()
             .map_err(|_| AppError::Message("verrou des réglages indisponible".into()))?;
-        input
+        let provider_id = input
             .provider_id
             .clone()
             .or_else(|| settings.selected_provider_id().map(str::to_string))
-            .ok_or_else(|| AppError::Message("aucun fournisseur IA sélectionné".into()))?
+            .ok_or_else(|| AppError::Message("aucun fournisseur IA sélectionné".into()))?;
+        let default_model = settings.summary_model_for(&provider_id);
+        (provider_id, default_model)
     };
 
     let provider = ai_state
@@ -76,7 +78,7 @@ async fn generate_structured_summary_inner(
             })?
     };
 
-    let model = input.model.clone();
+    let model = input.model.clone().or(default_model);
     let (meeting_id, transcription_text) = resolve_input(db_state, input)?;
 
     let summary_result = ai_state

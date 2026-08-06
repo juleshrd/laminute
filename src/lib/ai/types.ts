@@ -3,6 +3,7 @@ export interface ProviderCapabilities {
   summary: boolean;
   local: boolean;
   streaming: boolean;
+  diarization: boolean;
 }
 
 export interface ProviderInfo {
@@ -27,6 +28,18 @@ export interface AiSettings {
   selectedProviderId?: string;
   hasApiKey: boolean;
   ollamaBaseUrl?: string;
+  diarizationEnabled: boolean;
+  transcriptionModel?: string;
+  summaryModel?: string;
+  transcriptionModels: ModelInfo[];
+  summaryModels: ModelInfo[];
+}
+
+export interface SetModelPreferencesInput {
+  providerId: string;
+  transcriptionModel?: string | null;
+  summaryModel?: string | null;
+  diarizationEnabled?: boolean | null;
 }
 
 export interface StructuredActionItem {

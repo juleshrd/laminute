@@ -18,12 +18,26 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 vi.mock("../lib/ai/api", () => ({
-  getAiSettings: vi.fn().mockResolvedValue({ hasApiKey: true, selectedProviderId: "mistral" }),
+  getAiSettings: vi.fn().mockResolvedValue({
+    hasApiKey: true,
+    selectedProviderId: "mistral",
+    diarizationEnabled: false,
+    transcriptionModel: "voxtral-mini-latest",
+    summaryModel: "mistral-small-latest",
+    transcriptionModels: [],
+    summaryModels: [],
+  }),
   listAiProviders: vi.fn().mockResolvedValue([
     {
       id: "mistral",
       displayName: "Mistral AI",
-      capabilities: { transcription: true, summary: true, local: false, streaming: false },
+      capabilities: {
+        transcription: true,
+        summary: true,
+        local: false,
+        streaming: false,
+        diarization: true,
+      },
     },
   ]),
   generateStructuredSummary: vi.fn(),
@@ -208,6 +222,11 @@ describe("MeetingWorkspace", () => {
     vi.mocked(getAiSettings).mockResolvedValue({
       hasApiKey: false,
       selectedProviderId: "mistral",
+      diarizationEnabled: false,
+      transcriptionModel: "voxtral-mini-latest",
+      summaryModel: "mistral-small-latest",
+      transcriptionModels: [],
+      summaryModels: [],
     });
 
     invokeMock.mockImplementation((command: string) => {

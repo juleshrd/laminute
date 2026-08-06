@@ -132,6 +132,7 @@ pub fn run() {
             ai::commands::get_ai_settings,
             ai::commands::set_selected_provider,
             ai::commands::set_ollama_base_url,
+            ai::commands::set_model_preferences,
             ai::commands::save_api_key,
             ai::commands::delete_api_key,
             ai::commands::validate_api_key,

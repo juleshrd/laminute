@@ -25,17 +25,35 @@ const PROVIDERS = [
   {
     id: "mistral",
     displayName: "Mistral AI",
-    capabilities: { transcription: true, summary: true, local: false, streaming: true },
+    capabilities: {
+      transcription: true,
+      summary: true,
+      local: false,
+      streaming: true,
+      diarization: true,
+    },
   },
   {
     id: "openai",
     displayName: "OpenAI",
-    capabilities: { transcription: true, summary: true, local: false, streaming: false },
+    capabilities: {
+      transcription: true,
+      summary: true,
+      local: false,
+      streaming: false,
+      diarization: true,
+    },
   },
   {
     id: "ollama",
     displayName: "Ollama",
-    capabilities: { transcription: false, summary: true, local: true, streaming: false },
+    capabilities: {
+      transcription: false,
+      summary: true,
+      local: true,
+      streaming: false,
+      diarization: false,
+    },
   },
 ];
 
@@ -46,11 +64,19 @@ describe("OnboardingIA", () => {
       selectedProviderId: "mistral",
       hasApiKey: false,
       ollamaBaseUrl: "http://127.0.0.1:11434",
+      diarizationEnabled: false,
+      transcriptionModel: "voxtral-mini-latest",
+      summaryModel: "mistral-small-latest",
+      transcriptionModels: [],
+      summaryModels: [],
     });
     setSelectedProvider.mockImplementation(async (id: string) => ({
       selectedProviderId: id,
       hasApiKey: false,
       ollamaBaseUrl: "http://127.0.0.1:11434",
+      diarizationEnabled: false,
+      transcriptionModels: [],
+      summaryModels: [],
     }));
   });
 
