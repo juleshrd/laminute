@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use async_trait::async_trait;
 
 use crate::ai::error::AiError;
@@ -11,7 +13,7 @@ pub trait TranscriptionProvider: AiProvider {
     async fn transcribe(
         &self,
         api_key: &str,
-        audio: &[u8],
+        audio_path: &Path,
         options: TranscriptionOptions,
     ) -> Result<TranscriptionResult, AiError>;
 }
