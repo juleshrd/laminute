@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod report_pdf;
 mod repository;
+mod retention;
 
 pub use db::open_in_memory;
 pub use models::MeetingSearchFilters;

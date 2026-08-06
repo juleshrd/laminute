@@ -21,21 +21,11 @@ pub fn import_mp3_meeting(
     let imports_dir = app_data_dir.join("imports");
     let source = PathBuf::from(source_path);
 
-    with_db(&state, |conn| {
-        MeetingRepository::create_from_mp3_import(conn, &source, &imports_dir)
-    })
-    .map_err(map_app_error)
-}
-
-fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> Result<T, AppError>
-where
-    F: FnOnce(&rusqlite::Connection) -> Result<T, AppError>,
-{
-    let db = state
-        .db
-        .lock()
-        .map_err(|_| AppError::Message("impossible d'accéder à la base de données".into()))?;
-    f(&db)
+    state
+        .with_db(|conn| {
+            MeetingRepository::create_from_mp3_import(conn, &source, &imports_dir)
+        })
+        .map_err(map_app_error)
 }
 
 fn map_app_error(error: AppError) -> AudioError {
