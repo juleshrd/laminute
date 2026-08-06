@@ -9,8 +9,15 @@ export interface LocalStorageInfo {
   recordingsBytes?: number | null;
 }
 
-export function exportMeeting(id: string): Promise<string> {
-  return invoke<string>("export_meeting", { id });
+export type MeetingExportFormat = "json" | "markdown" | "pdf";
+
+/** Dialogue natif + écriture côté Rust. Retourne false si l'utilisateur annule. */
+export function saveMeetingExport(
+  id: string,
+  format: MeetingExportFormat,
+  defaultFileName: string,
+): Promise<boolean> {
+  return invoke<boolean>("save_meeting_export", { id, format, defaultFileName });
 }
 
 export function getLocalStorageInfo(): Promise<LocalStorageInfo> {
@@ -19,18 +26,6 @@ export function getLocalStorageInfo(): Promise<LocalStorageInfo> {
 
 export function deleteAllLocalData(): Promise<void> {
   return invoke<void>("delete_all_local_data");
-}
-
-export function writeExportFile(path: string, contents: string): Promise<void> {
-  return invoke<void>("write_export_file", { path, contents });
-}
-
-export function writeExportBytes(path: string, contentsBase64: string): Promise<void> {
-  return invoke<void>("write_export_bytes", { path, contentsBase64 });
-}
-
-export function exportMeetingPdf(id: string): Promise<string> {
-  return invoke<string>("export_meeting_pdf", { id });
 }
 
 export function buildExportFilename(
