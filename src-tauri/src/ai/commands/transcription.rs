@@ -10,6 +10,7 @@ use crate::ai::models::TranscriptionOptions;
 use crate::ai::secrets;
 use crate::audio::paths::{ingest_if_needed, resolve_owned, ManagedAudioRoots};
 use crate::db::AppState;
+use crate::local_activity::LocalActivityGate;
 use crate::models::{CreateMeetingInput, MeetingStatus, Transcription};
 use crate::repository::MeetingRepository;
 use crate::retention;
@@ -62,6 +63,19 @@ impl TranscriptionState {
             }),
         }
     }
+
+    pub fn reset(&self) -> Result<(), String> {
+        let mut progress = self
+            .last_progress
+            .lock()
+            .map_err(|_| "verrou transcription indisponible".to_string())?;
+        *progress = TranscriptionProgress {
+            phase: TranscriptionPhase::Idle,
+            message: "En attente.".to_string(),
+            meeting_id: None,
+        };
+        Ok(())
+    }
 }
 
 impl Default for TranscriptionState {
@@ -98,8 +112,11 @@ pub async fn transcribe_audio_file(
     ai_state: State<'_, AiAppState>,
     db_state: State<'_, AppState>,
     transcription_state: State<'_, TranscriptionState>,
+    gate: State<'_, LocalActivityGate>,
     input: TranscribeAudioInput,
 ) -> Result<Transcription, String> {
+    let activity = gate.begin_operation().map_err(|e| e.to_string())?;
+
     let (provider_id, transcription_model, diarize) = {
         let settings = ai_state
             .settings
@@ -147,6 +164,9 @@ pub async fn transcribe_audio_file(
             meeting_id: input.meeting_id.clone(),
         },
     );
+
+    gate.ensure_generation(activity)
+        .map_err(|e| e.to_string())?;
 
     let roots = ManagedAudioRoots::from_app(&app).map_err(|err| {
         let message = err.to_string();
@@ -215,6 +235,9 @@ pub async fn transcribe_audio_file(
         .map(str::to_string);
     let owned_path_str = owned_path.to_string_lossy().to_string();
 
+    gate.ensure_generation(activity)
+        .map_err(|e| e.to_string())?;
+
     let meeting_id = db_state
         .with_db(|conn| {
             if let Some(existing_id) = &input.meeting_id {
@@ -247,6 +270,9 @@ pub async fn transcribe_audio_file(
             meeting_id: Some(meeting_id.clone()),
         },
     );
+
+    gate.ensure_generation(activity)
+        .map_err(|e| e.to_string())?;
 
     let audio_file = db_state
         .with_db(|conn| {
@@ -289,6 +315,9 @@ pub async fn transcribe_audio_file(
         },
     );
 
+    gate.ensure_generation(activity)
+        .map_err(|e| e.to_string())?;
+
     let result = ai_state
         .registry
         .transcribe_audio(
@@ -329,6 +358,19 @@ pub async fn transcribe_audio_file(
             meeting_id: Some(meeting_id.clone()),
         },
     );
+
+    gate.ensure_generation(activity).map_err(|e| {
+        emit_progress(
+            &app,
+            &transcription_state,
+            TranscriptionProgress {
+                phase: TranscriptionPhase::Failed,
+                message: e.to_string(),
+                meeting_id: Some(meeting_id.clone()),
+            },
+        );
+        e.to_string()
+    })?;
 
     let transcription = db_state
         .with_db(|conn| {

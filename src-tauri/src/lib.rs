@@ -4,7 +4,9 @@ mod commands;
 mod db;
 mod error;
 mod export_write;
+mod local_activity;
 mod models;
+mod purge;
 mod report_markdown;
 mod report_pdf;
 mod repository;
@@ -27,6 +29,7 @@ use commands::{
     list_meetings, save_meeting_export, search_meetings, update_meeting_title,
 };
 use db::open_and_migrate;
+use local_activity::LocalActivityGate;
 
 /// État IA (providers BYOK) — distinct de l'état SQLite et audio.
 pub struct AiAppState {
@@ -64,7 +67,10 @@ fn set_selected_audio_input_device(
 #[tauri::command]
 fn start_microphone_recording(
     state: tauri::State<'_, AudioState>,
+    gate: tauri::State<'_, LocalActivityGate>,
 ) -> Result<RecordingStatus, AudioError> {
+    gate.ensure_not_purging()
+        .map_err(|err| AudioError::Internal(err.to_string()))?;
     state.start_recording()
 }
 
@@ -122,6 +128,7 @@ pub fn run() {
             ai::commands::sync_ollama_base_url(&ai_state);
             app.manage(ai_state);
             app.manage(ai::TranscriptionState::new());
+            app.manage(LocalActivityGate::new());
 
             let audio_state = AudioState::initialize(app.handle())?;
             app.manage(audio_state);

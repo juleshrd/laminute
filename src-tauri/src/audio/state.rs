@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager};
 
 use super::devices::{list_input_devices, AudioInputDevice};
 use super::error::AudioError;
-use super::recording::{RecordingService, RecordingStatus};
+use super::recording::{RecordingPhase, RecordingService, RecordingStatus};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PersistedSettings {
@@ -167,6 +167,38 @@ impl AudioState {
 
     pub fn stop_recording(&self) -> Result<RecordingStatus, AudioError> {
         self.recording.stop()
+    }
+
+    /// Arrête l'enregistrement s'il est actif (no-op si idle).
+    pub fn stop_recording_if_active(&self) -> Result<(), AudioError> {
+        if self.recording.status()?.phase == RecordingPhase::Recording {
+            self.recording.stop()?;
+        }
+        Ok(())
+    }
+
+    /// Remet les réglages audio mémoire/disque aux valeurs par défaut.
+    pub fn reset_persisted_settings(&self) -> Result<(), AudioError> {
+        {
+            let mut selected = self
+                .selected_device_id
+                .lock()
+                .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?;
+            *selected = None;
+        }
+        {
+            let mut keep = self
+                .keep_audio_files
+                .lock()
+                .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?;
+            *keep = default_keep_audio_files();
+        }
+
+        match fs::remove_file(&self.settings_path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(AudioError::Io(err.to_string())),
+        }
     }
 }
 
