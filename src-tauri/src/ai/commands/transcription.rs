@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::models::TranscriptionOptions;
 use crate::ai::secrets;
+use crate::audio::paths::{ingest_if_needed, resolve_owned, ManagedAudioRoots};
 use crate::db::AppState;
 use crate::models::{CreateMeetingInput, MeetingStatus, Transcription};
 use crate::repository::MeetingRepository;
@@ -147,9 +148,8 @@ pub async fn transcribe_audio_file(
         },
     );
 
-    let path = Path::new(&input.file_path);
-    if !path.exists() {
-        let message = format!("Fichier audio introuvable : {}", input.file_path);
+    let roots = ManagedAudioRoots::from_app(&app).map_err(|err| {
+        let message = err.to_string();
         emit_progress(
             &app,
             &transcription_state,
@@ -159,10 +159,25 @@ pub async fn transcribe_audio_file(
                 meeting_id: input.meeting_id.clone(),
             },
         );
-        return Err(message);
-    }
+        message
+    })?;
 
-    let metadata = std::fs::metadata(path).map_err(|err| {
+    // Copie éventuelle hors verrou SQLite ; seul un chemin owned sera uploadé.
+    let owned_path = ingest_if_needed(Path::new(&input.file_path), &roots).map_err(|err| {
+        let message = err.to_string();
+        emit_progress(
+            &app,
+            &transcription_state,
+            TranscriptionProgress {
+                phase: TranscriptionPhase::Failed,
+                message: message.clone(),
+                meeting_id: input.meeting_id.clone(),
+            },
+        );
+        message
+    })?;
+
+    let metadata = std::fs::metadata(&owned_path).map_err(|err| {
         let message = format!("Impossible de lire le fichier audio : {err}");
         emit_progress(
             &app,
@@ -190,14 +205,15 @@ pub async fn transcribe_audio_file(
         return Err(message);
     }
 
-    let file_name = path
+    let file_name = owned_path
         .file_name()
         .and_then(|name| name.to_str())
         .map(str::to_string);
-    let format = path
+    let format = owned_path
         .extension()
         .and_then(|ext| ext.to_str())
         .map(str::to_string);
+    let owned_path_str = owned_path.to_string_lossy().to_string();
 
     let meeting_id = db_state
         .with_db(|conn| {
@@ -238,12 +254,30 @@ pub async fn transcribe_audio_file(
             MeetingRepository::attach_audio_file(
                 conn,
                 &meeting_id,
-                &input.file_path,
+                &owned_path_str,
                 input.duration_ms,
                 format.as_deref(),
             )
         })
         .map_err(|e| e.to_string())?;
+
+    // Re-vérification anti-TOCTOU juste avant l'upload cloud.
+    let upload_path = resolve_owned(&owned_path, &roots).map_err(|err| {
+        let message = err.to_string();
+        let _ = db_state.with_db(|conn| {
+            MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Draft)
+        });
+        emit_progress(
+            &app,
+            &transcription_state,
+            TranscriptionProgress {
+                phase: TranscriptionPhase::Failed,
+                message: message.clone(),
+                meeting_id: Some(meeting_id.clone()),
+            },
+        );
+        message
+    })?;
 
     emit_progress(
         &app,
@@ -260,7 +294,7 @@ pub async fn transcribe_audio_file(
         .transcribe_audio(
             &provider_id,
             &api_key,
-            path,
+            &upload_path,
             TranscriptionOptions {
                 model: transcription_model,
                 language: input.language.clone(),
