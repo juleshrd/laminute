@@ -34,13 +34,7 @@ interface StructuredSummaryViewProps {
   headingLevel?: 2 | 3 | 4;
 }
 
-function SectionHeading({
-  level,
-  children,
-}: {
-  level: 2 | 3 | 4;
-  children: ReactNode;
-}) {
+function SectionHeading({ level, children }: { level: 2 | 3 | 4; children: ReactNode }) {
   if (level === 2) {
     return <h2>{children}</h2>;
   }

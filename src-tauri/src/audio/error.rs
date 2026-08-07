@@ -40,6 +40,12 @@ pub enum AudioError {
 
     #[error("fichier audio invalide : {0}")]
     InvalidAudio(String),
+
+    #[error("chemin audio hors des répertoires gérés par l'application")]
+    PathNotOwned,
+
+    #[error("les liens symboliques ne sont pas autorisés pour les fichiers audio")]
+    SymlinkRejected,
 }
 
 impl AudioError {
@@ -57,6 +63,8 @@ impl AudioError {
             Self::DurationTooShort { .. } => "duration_too_short",
             Self::DurationTooLong { .. } => "duration_too_long",
             Self::InvalidAudio(_) => "invalid_audio",
+            Self::PathNotOwned => "path_not_owned",
+            Self::SymlinkRejected => "symlink_rejected",
         }
     }
 

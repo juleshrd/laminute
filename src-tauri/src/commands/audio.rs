@@ -22,9 +22,7 @@ pub fn import_mp3_meeting(
     let source = PathBuf::from(source_path);
 
     state
-        .with_db(|conn| {
-            MeetingRepository::create_from_mp3_import(conn, &source, &imports_dir)
-        })
+        .with_db(|conn| MeetingRepository::create_from_mp3_import(conn, &source, &imports_dir))
         .map_err(map_app_error)
 }
 

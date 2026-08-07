@@ -6,6 +6,7 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::ai::structured_summary::parse_structured_summary;
+use crate::audio::paths::ManagedAudioRoots;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::export_write::{issue_grant, write_granted};
@@ -180,8 +181,8 @@ pub fn get_local_storage_info(
 #[tauri::command]
 pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let app_data_dir = app_data_dir(&app)?;
-    let imports_dir = app_data_dir.join("imports");
-    let recordings_dir = app_data_dir.join("recordings");
+    let roots = ManagedAudioRoots::from_app_data_dir(app_data_dir.clone());
+    roots.ensure_dirs().map_err(|err| err.to_string())?;
 
     with_db(&state, |conn| {
         let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
@@ -190,7 +191,9 @@ pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Resu
             .collect::<Result<Vec<_>, _>>()?;
 
         for path in paths {
-            remove_file_if_present(Path::new(&path));
+            // Ne jamais supprimer hors racines gérées (DB éventuellement empoisonnée).
+            crate::audio::paths::try_remove_owned(Path::new(&path), &roots)
+                .map_err(|err| AppError::Message(err.to_string()))?;
         }
 
         conn.execute("DELETE FROM meetings", [])?;
@@ -198,8 +201,8 @@ pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Resu
     })
     .map_err(|err| err.to_string())?;
 
-    clear_dir_files(&imports_dir).map_err(|err| err.to_string())?;
-    clear_dir_files(&recordings_dir).map_err(|err| err.to_string())?;
+    clear_dir_files(&roots.imports_dir).map_err(|err| err.to_string())?;
+    clear_dir_files(&roots.recordings_dir).map_err(|err| err.to_string())?;
 
     Ok(())
 }

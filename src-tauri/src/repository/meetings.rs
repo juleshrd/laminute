@@ -238,8 +238,8 @@ impl MeetingRepository {
     }
 
     pub fn delete(conn: &Connection, id: &str) -> AppResult<()> {
-        Self::delete_audio_files_for_meeting(conn, id)?;
-
+        // La suppression disque est gérée hors repository (voir retention::purge_meeting_audio).
+        // CASCADE efface aussi audio_files si des lignes restent.
         let deleted = conn.execute("DELETE FROM meetings WHERE id = ?1", [id])?;
         if deleted == 0 {
             return Err(AppError::MeetingNotFound { id: id.to_string() });
@@ -247,17 +247,9 @@ impl MeetingRepository {
         Ok(())
     }
 
-    /// Supprime les fichiers audio disque et les lignes `audio_files` d'une réunion.
+    /// Supprime les lignes `audio_files` d'une réunion (pas d'I/O disque).
     /// Les transcriptions liées passent en `audio_file_id = NULL` (ON DELETE SET NULL).
-    pub fn delete_audio_files_for_meeting(conn: &Connection, meeting_id: &str) -> AppResult<()> {
-        let audio_files = Self::list_audio_files(conn, meeting_id)?;
-        for audio in &audio_files {
-            let path = Path::new(&audio.file_path);
-            if path.is_file() {
-                let _ = std::fs::remove_file(path);
-            }
-        }
-
+    pub fn delete_audio_file_rows(conn: &Connection, meeting_id: &str) -> AppResult<()> {
         conn.execute(
             "DELETE FROM audio_files WHERE meeting_id = ?1",
             [meeting_id],
@@ -388,7 +380,7 @@ impl MeetingRepository {
         Self::get_by_id(conn, meeting_id)
     }
 
-    fn list_audio_files(conn: &Connection, meeting_id: &str) -> AppResult<Vec<AudioFile>> {
+    pub fn list_audio_files(conn: &Connection, meeting_id: &str) -> AppResult<Vec<AudioFile>> {
         let mut stmt = conn.prepare(
             "SELECT id, meeting_id, file_path, duration_ms, format, created_at
              FROM audio_files WHERE meeting_id = ?1 ORDER BY created_at ASC",
@@ -746,6 +738,9 @@ mod tests {
 
     #[test]
     fn delete_meeting_removes_audio_file_from_disk() {
+        use crate::audio::paths::ManagedAudioRoots;
+        use crate::retention::purge_meeting_audio;
+
         let conn = open_in_memory().unwrap();
         let meeting = MeetingRepository::create(
             &conn,
@@ -756,10 +751,10 @@ mod tests {
         )
         .unwrap();
 
-        let dir =
-            std::env::temp_dir().join(format!("laminute-delete-audio-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
-        let audio_path = dir.join("meeting.mp3");
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = ManagedAudioRoots::from_app_data_dir(tmp.path().to_path_buf());
+        roots.ensure_dirs().unwrap();
+        let audio_path = roots.imports_dir.join("meeting.mp3");
         std::fs::write(&audio_path, b"audio").unwrap();
 
         let now = Utc::now().to_rfc3339();
@@ -771,10 +766,111 @@ mod tests {
         .unwrap();
 
         assert!(audio_path.is_file());
+        purge_meeting_audio(&roots, &conn, &meeting.id).unwrap();
         MeetingRepository::delete(&conn, &meeting.id).unwrap();
         assert!(!audio_path.exists());
+    }
 
-        let _ = std::fs::remove_dir_all(dir);
+    #[test]
+    fn delete_meeting_refuses_external_audio_path() {
+        use crate::audio::paths::ManagedAudioRoots;
+        use crate::retention::purge_meeting_audio;
+
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Chemin externe".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = ManagedAudioRoots::from_app_data_dir(tmp.path().join("app").to_path_buf());
+        roots.ensure_dirs().unwrap();
+
+        let external = tmp.path().join("external.mp3");
+        std::fs::write(&external, b"audio").unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO audio_files (id, meeting_id, file_path, duration_ms, format, created_at)
+             VALUES ('audio-ext', ?1, ?2, 1000, 'mp3', ?3)",
+            params![meeting.id, external.to_string_lossy().to_string(), now],
+        )
+        .unwrap();
+
+        let err = purge_meeting_audio(&roots, &conn, &meeting.id).unwrap_err();
+        assert!(err.to_string().contains("hors des répertoires gérés"));
+        assert!(external.exists());
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM audio_files WHERE meeting_id = ?1",
+                [&meeting.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "la ligne DB doit rester si la suppression disque échoue"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_keeps_db_row_when_disk_remove_fails() {
+        use std::os::unix::fs::PermissionsExt;
+
+        use crate::audio::paths::ManagedAudioRoots;
+        use crate::retention::purge_meeting_audio;
+
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Verrou disque".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = ManagedAudioRoots::from_app_data_dir(tmp.path().to_path_buf());
+        roots.ensure_dirs().unwrap();
+        let audio_path = roots.imports_dir.join("locked.mp3");
+        std::fs::write(&audio_path, b"audio").unwrap();
+
+        MeetingRepository::attach_audio_file(
+            &conn,
+            &meeting.id,
+            &audio_path.to_string_lossy(),
+            Some(1000),
+            Some("mp3"),
+        )
+        .unwrap();
+
+        let mut perms = std::fs::metadata(&roots.imports_dir).unwrap().permissions();
+        perms.set_mode(0o555);
+        std::fs::set_permissions(&roots.imports_dir, perms).unwrap();
+
+        let result = purge_meeting_audio(&roots, &conn, &meeting.id);
+
+        let mut restore = std::fs::metadata(&roots.imports_dir).unwrap().permissions();
+        restore.set_mode(0o755);
+        std::fs::set_permissions(&roots.imports_dir, restore).unwrap();
+
+        assert!(result.is_err());
+        assert!(audio_path.exists());
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM audio_files WHERE meeting_id = ?1",
+                [&meeting.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]
@@ -811,6 +907,9 @@ mod tests {
 
     #[test]
     fn delete_audio_files_for_meeting_keeps_transcription() {
+        use crate::audio::paths::ManagedAudioRoots;
+        use crate::retention::purge_meeting_audio;
+
         let conn = open_in_memory().unwrap();
         let meeting = MeetingRepository::create(
             &conn,
@@ -821,9 +920,10 @@ mod tests {
         )
         .unwrap();
 
-        let dir = std::env::temp_dir().join(format!("laminute-purge-audio-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
-        let audio_path = dir.join("meeting.mp3");
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = ManagedAudioRoots::from_app_data_dir(tmp.path().to_path_buf());
+        roots.ensure_dirs().unwrap();
+        let audio_path = roots.imports_dir.join("meeting.mp3");
         std::fs::write(&audio_path, b"audio").unwrap();
 
         let audio = MeetingRepository::attach_audio_file(
@@ -847,15 +947,13 @@ mod tests {
         .unwrap();
 
         assert!(audio_path.is_file());
-        MeetingRepository::delete_audio_files_for_meeting(&conn, &meeting.id).unwrap();
+        purge_meeting_audio(&roots, &conn, &meeting.id).unwrap();
         assert!(!audio_path.exists());
 
         let detail = MeetingRepository::get_detail(&conn, &meeting.id).unwrap();
         assert!(detail.audio_files.is_empty());
         assert_eq!(detail.transcriptions.len(), 1);
         assert!(detail.transcriptions[0].audio_file_id.is_none());
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     fn empty_filters() -> MeetingSearchFilters {
