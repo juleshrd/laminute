@@ -1,7 +1,7 @@
-use tauri::{AppHandle, Manager};
 use rusqlite::Connection;
+use tauri::{AppHandle, Manager};
 
-use crate::audio::{paths::remove_owned, ManagedAudioRoots, AudioState};
+use crate::audio::{paths::remove_owned, AudioState, ManagedAudioRoots};
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::repository::MeetingRepository;

@@ -43,16 +43,10 @@ impl ManagedAudioRoots {
 
     fn canonical_roots(&self) -> Result<(PathBuf, PathBuf), AudioError> {
         self.ensure_dirs()?;
-        let imports = fs::canonicalize(&self.imports_dir).map_err(|err| {
-            AudioError::Io(format!(
-                "impossible de résoudre imports/ : {err}"
-            ))
-        })?;
-        let recordings = fs::canonicalize(&self.recordings_dir).map_err(|err| {
-            AudioError::Io(format!(
-                "impossible de résoudre recordings/ : {err}"
-            ))
-        })?;
+        let imports = fs::canonicalize(&self.imports_dir)
+            .map_err(|err| AudioError::Io(format!("impossible de résoudre imports/ : {err}")))?;
+        let recordings = fs::canonicalize(&self.recordings_dir)
+            .map_err(|err| AudioError::Io(format!("impossible de résoudre recordings/ : {err}")))?;
         Ok((imports, recordings))
     }
 
@@ -103,7 +97,8 @@ pub fn resolve_owned(path: &Path, roots: &ManagedAudioRoots) -> Result<PathBuf, 
                     "le chemin fourni ne correspond pas à un fichier".into(),
                 ));
             }
-            let canonical = fs::canonicalize(path).map_err(|err| AudioError::Io(err.to_string()))?;
+            let canonical =
+                fs::canonicalize(path).map_err(|err| AudioError::Io(err.to_string()))?;
             if !roots.contains_canonical(&canonical)? {
                 return Err(AudioError::PathNotOwned);
             }
@@ -112,7 +107,8 @@ pub fn resolve_owned(path: &Path, roots: &ManagedAudioRoots) -> Result<PathBuf, 
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             let file_name = path.file_name().ok_or(AudioError::PathNotOwned)?;
             let parent = path.parent().ok_or(AudioError::PathNotOwned)?;
-            let parent_canonical = fs::canonicalize(parent).map_err(|_| AudioError::PathNotOwned)?;
+            let parent_canonical =
+                fs::canonicalize(parent).map_err(|_| AudioError::PathNotOwned)?;
             let candidate = parent_canonical.join(file_name);
             if !roots.contains_canonical(&candidate)? {
                 return Err(AudioError::PathNotOwned);
@@ -151,9 +147,7 @@ pub fn ingest_if_needed(source: &Path, roots: &ManagedAudioRoots) -> Result<Path
         }
         Some("wav") => {
             validate_wav_header(source)?;
-            let dest = roots
-                .recordings_dir
-                .join(format!("{}.wav", Uuid::new_v4()));
+            let dest = roots.recordings_dir.join(format!("{}.wav", Uuid::new_v4()));
             fs::copy(source, &dest)?;
             resolve_owned(&dest, roots)
         }
@@ -224,7 +218,7 @@ mod tests {
     use std::io::Write;
 
     #[cfg(unix)]
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use std::os::unix::fs::{symlink, PermissionsExt};
 
     fn temp_roots(label: &str) -> (tempfile::TempDir, ManagedAudioRoots) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -280,11 +274,7 @@ mod tests {
     #[test]
     fn resolve_owned_rejects_parent_traversal() {
         let (_tmp, roots) = temp_roots("owned-dotdot");
-        let outside = roots
-            .imports_dir
-            .parent()
-            .unwrap()
-            .join("secret.mp3");
+        let outside = roots.imports_dir.parent().unwrap().join("secret.mp3");
         write_mp3(&outside);
         let traversal = roots.imports_dir.join("..").join("secret.mp3");
 
@@ -296,11 +286,7 @@ mod tests {
     #[test]
     fn resolve_owned_rejects_symlink_under_imports() {
         let (_tmp, roots) = temp_roots("owned-symlink");
-        let secret = roots
-            .imports_dir
-            .parent()
-            .unwrap()
-            .join("secret.txt");
+        let secret = roots.imports_dir.parent().unwrap().join("secret.txt");
         fs::write(&secret, b"secret").unwrap();
         let link = roots.imports_dir.join("link.mp3");
         symlink(&secret, &link).unwrap();
@@ -318,17 +304,16 @@ mod tests {
         // For unit test of path confinement, place a pre-validated-looking path by
         // writing directly then testing PathNotOwned → copy path for wav instead.
 
-        let external = roots
-            .imports_dir
-            .parent()
-            .unwrap()
-            .join("external.wav");
+        let external = roots.imports_dir.parent().unwrap().join("external.wav");
         write_wav(&external);
 
         let owned = ingest_if_needed(&external, &roots).unwrap();
         assert!(owned.starts_with(fs::canonicalize(&roots.recordings_dir).unwrap()));
         assert!(owned.exists());
-        assert!(external.exists(), "la source externe ne doit pas être déplacée");
+        assert!(
+            external.exists(),
+            "la source externe ne doit pas être déplacée"
+        );
     }
 
     #[test]
@@ -354,11 +339,7 @@ mod tests {
     #[test]
     fn remove_owned_rejects_external_and_leaves_file() {
         let (_tmp, roots) = temp_roots("remove-ext");
-        let external = roots
-            .imports_dir
-            .parent()
-            .unwrap()
-            .join("keep.mp3");
+        let external = roots.imports_dir.parent().unwrap().join("keep.mp3");
         write_mp3(&external);
 
         let err = remove_owned(&external, &roots).unwrap_err();
@@ -369,11 +350,7 @@ mod tests {
     #[test]
     fn try_remove_owned_ignores_external() {
         let (_tmp, roots) = temp_roots("try-remove");
-        let external = roots
-            .imports_dir
-            .parent()
-            .unwrap()
-            .join("keep2.mp3");
+        let external = roots.imports_dir.parent().unwrap().join("keep2.mp3");
         write_mp3(&external);
 
         try_remove_owned(&external, &roots).unwrap();

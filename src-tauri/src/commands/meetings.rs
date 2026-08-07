@@ -28,7 +28,9 @@ pub fn get_meeting(state: State<'_, AppState>, id: String) -> Result<MeetingDeta
 
 #[tauri::command]
 pub fn list_meetings(state: State<'_, AppState>) -> Result<Vec<MeetingSummary>, String> {
-    state.with_db(MeetingRepository::list).map_err(|e| e.to_string())
+    state
+        .with_db(MeetingRepository::list)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

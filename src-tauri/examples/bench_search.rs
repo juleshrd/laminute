@@ -1,16 +1,18 @@
 //! Bench de la recherche historique FTS5 (JUL-172).
 
-use std::time::Instant;
 use chrono::Utc;
-use laminute_lib::{MeetingRepository, MeetingSearchFilters, open_in_memory};
+use laminute_lib::{open_in_memory, MeetingRepository, MeetingSearchFilters};
 use rusqlite::params;
+use std::time::Instant;
 use uuid::Uuid;
 
 const MEETING_COUNT: usize = 1_000;
 const SEARCH_ITERATIONS: usize = 50;
 
 fn percentile(sorted: &[u128], p: f64) -> u128 {
-    if sorted.is_empty() { return 0; }
+    if sorted.is_empty() {
+        return 0;
+    }
     let idx = ((sorted.len() as f64 - 1.0) * p / 100.0).round() as usize;
     sorted[idx]
 }
@@ -32,7 +34,13 @@ fn main() {
     let conn = open_in_memory().expect("open db");
     println!("Seeding {MEETING_COUNT} meetings…");
     seed(&conn);
-    let filters = MeetingSearchFilters { query: Some("Dufour".into()), status: None, provider_id: None, date_from: None, date_to: None };
+    let filters = MeetingSearchFilters {
+        query: Some("Dufour".into()),
+        status: None,
+        provider_id: None,
+        date_from: None,
+        date_to: None,
+    };
     let mut durations = Vec::with_capacity(SEARCH_ITERATIONS);
     for _ in 0..SEARCH_ITERATIONS {
         let start = Instant::now();

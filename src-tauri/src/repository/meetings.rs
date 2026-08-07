@@ -812,7 +812,10 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(count, 1, "la ligne DB doit rester si la suppression disque échoue");
+        assert_eq!(
+            count, 1,
+            "la ligne DB doit rester si la suppression disque échoue"
+        );
     }
 
     #[cfg(unix)]
