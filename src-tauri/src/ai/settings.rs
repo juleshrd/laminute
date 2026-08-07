@@ -101,6 +101,11 @@ impl SettingsStore {
         self.save()
     }
 
+    /// Remet les préférences en mémoire aux valeurs par défaut (fichier déjà supprimé).
+    pub fn reset_in_memory(&mut self) {
+        self.data = PersistedAiSettings::default();
+    }
+
     pub fn transcription_model_for(&self, provider_id: &str) -> Option<String> {
         self.data
             .provider_models

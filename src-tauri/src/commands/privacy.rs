@@ -6,7 +6,6 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::ai::structured_summary::parse_structured_summary;
-use crate::audio::paths::ManagedAudioRoots;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::export_write::{issue_grant, write_granted};
@@ -179,31 +178,50 @@ pub fn get_local_storage_info(
 }
 
 #[tauri::command]
-pub fn delete_all_local_data(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+pub fn delete_all_local_data(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    ai_state: State<'_, crate::AiAppState>,
+    audio_state: State<'_, crate::audio::AudioState>,
+    transcription_state: State<'_, crate::ai::TranscriptionState>,
+    gate: State<'_, crate::local_activity::LocalActivityGate>,
+) -> Result<(), String> {
     let app_data_dir = app_data_dir(&app)?;
-    let roots = ManagedAudioRoots::from_app_data_dir(app_data_dir.clone());
-    roots.ensure_dirs().map_err(|err| err.to_string())?;
+    let paths = crate::purge::LocalDataPaths::new(app_data_dir);
+    let provider_ids: Vec<String> = ai_state
+        .registry
+        .list()
+        .into_iter()
+        .map(|provider| provider.id)
+        .collect();
 
-    with_db(&state, |conn| {
-        let mut stmt = conn.prepare("SELECT file_path FROM audio_files")?;
-        let paths = stmt
-            .query_map([], |row| row.get::<_, String>(0))?
-            .collect::<Result<Vec<_>, _>>()?;
+    let stop_recording = || {
+        audio_state
+            .stop_recording_if_active()
+            .map_err(|err| AppError::Message(err.to_string()))
+    };
+    let reset_audio_memory = || {
+        audio_state
+            .reset_persisted_settings()
+            .map_err(|err| AppError::Message(err.to_string()))
+    };
+    let reset_transcription = || transcription_state.reset().map_err(AppError::Message);
 
-        for path in paths {
-            // Ne jamais supprimer hors racines gérées (DB éventuellement empoisonnée).
-            crate::audio::paths::try_remove_owned(Path::new(&path), &roots)
-                .map_err(|err| AppError::Message(err.to_string()))?;
-        }
-
-        conn.execute("DELETE FROM meetings", [])?;
-        Ok(())
+    crate::purge::purge_all_local_data(crate::purge::PurgeRequest {
+        paths: &paths,
+        db: &state,
+        gate: &gate,
+        ai_settings: Some(&ai_state.settings),
+        provider_ids: &provider_ids,
+        stop_recording: Some(&stop_recording),
+        reset_audio_memory: Some(&reset_audio_memory),
+        reset_transcription: Some(&reset_transcription),
+        clear_secrets: true,
     })
     .map_err(|err| err.to_string())?;
 
-    clear_dir_files(&roots.imports_dir).map_err(|err| err.to_string())?;
-    clear_dir_files(&roots.recordings_dir).map_err(|err| err.to_string())?;
-
+    // Resynchroniser Ollama sur l'URL par défaut après reset mémoire.
+    crate::ai::commands::sync_ollama_base_url(&ai_state);
     Ok(())
 }
 
@@ -420,27 +438,6 @@ fn dir_size(path: &Path) -> Option<u64> {
     Some(total)
 }
 
-fn clear_dir_files(dir: &Path) -> AppResult<()> {
-    if !dir.exists() {
-        return Ok(());
-    }
-
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() {
-            remove_file_if_present(&path);
-        }
-    }
-    Ok(())
-}
-
-fn remove_file_if_present(path: &Path) {
-    if path.is_file() {
-        let _ = std::fs::remove_file(path);
-    }
-}
-
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|err| err.to_string())
 }
@@ -649,19 +646,5 @@ mod tests {
         let with_ext =
             sanitize_default_file_name("laminute-reunion-2026-08-06", ExportFormat::Pdf).unwrap();
         assert_eq!(with_ext, "laminute-reunion-2026-08-06.pdf");
-    }
-
-    #[test]
-    fn delete_all_local_data_empties_meetings() {
-        let conn = open_in_memory().unwrap();
-        let meeting_id = seed_meeting_with_secrets(&conn);
-
-        conn.execute("DELETE FROM meetings", []).unwrap();
-
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(count, 0);
-        assert!(MeetingRepository::get_by_id(&conn, &meeting_id).is_err());
     }
 }

@@ -7,6 +7,7 @@ use crate::ai::secrets;
 use crate::ai::structured_summary::{self, StructuredSummary};
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
+use crate::local_activity::LocalActivityGate;
 use crate::models::{Action, CreateMeetingInput, Summary};
 use crate::repository::{MeetingRepository, SummaryRepository};
 use crate::retention;
@@ -35,9 +36,10 @@ pub async fn generate_structured_summary(
     app: AppHandle,
     db_state: State<'_, AppState>,
     ai_state: State<'_, AiAppState>,
+    gate: State<'_, LocalActivityGate>,
     input: GenerateStructuredSummaryInput,
 ) -> Result<GenerateStructuredSummaryOutput, String> {
-    generate_structured_summary_inner(&app, &db_state, &ai_state, input)
+    generate_structured_summary_inner(&app, &db_state, &ai_state, &gate, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -46,8 +48,11 @@ async fn generate_structured_summary_inner(
     app: &AppHandle,
     db_state: &State<'_, AppState>,
     ai_state: &State<'_, AiAppState>,
+    gate: &State<'_, LocalActivityGate>,
     input: GenerateStructuredSummaryInput,
 ) -> AppResult<GenerateStructuredSummaryOutput> {
+    let activity = gate.begin_operation()?;
+
     let (provider_id, default_model) = {
         let settings = ai_state
             .settings
@@ -81,6 +86,8 @@ async fn generate_structured_summary_inner(
     let model = input.model.clone().or(default_model);
     let (meeting_id, transcription_text) = resolve_input(db_state, input)?;
 
+    gate.ensure_generation(activity)?;
+
     let summary_result = ai_state
         .registry
         .summarize_text(
@@ -97,6 +104,8 @@ async fn generate_structured_summary_inner(
 
     let structured = structured_summary::parse_structured_summary(&summary_result.text)
         .map_err(|e| AppError::Message(e.to_string()))?;
+
+    gate.ensure_generation(activity)?;
 
     let (summary, actions) = db_state.with_db(|conn| {
         SummaryRepository::save_structured_summary(

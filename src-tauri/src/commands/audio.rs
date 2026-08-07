@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::audio::AudioError;
 use crate::db::AppState;
 use crate::error::AppError;
+use crate::local_activity::LocalActivityGate;
 use crate::models::MeetingDetail;
 use crate::repository::MeetingRepository;
 
@@ -12,8 +13,12 @@ use crate::repository::MeetingRepository;
 pub fn import_mp3_meeting(
     app: AppHandle,
     state: State<'_, AppState>,
+    gate: State<'_, LocalActivityGate>,
     source_path: String,
 ) -> Result<MeetingDetail, AudioError> {
+    gate.ensure_not_purging()
+        .map_err(|err| AudioError::Internal(err.to_string()))?;
+
     let app_data_dir = app
         .path()
         .app_data_dir()

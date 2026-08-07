@@ -37,7 +37,7 @@ export function PrivacySettings() {
   function startWipe() {
     if (
       !window.confirm(
-        "Supprimer toutes les réunions et fichiers audio locaux ? Cette action est irréversible.",
+        "Supprimer toutes les réunions, fichiers audio, réglages et clés API locales ? Cette action est irréversible.",
       )
     ) {
       return;
