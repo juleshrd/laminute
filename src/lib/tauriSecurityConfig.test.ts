@@ -1,13 +1,6 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-
-const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
-
-function readJson(relativePath: string): unknown {
-  return JSON.parse(readFileSync(join(root, relativePath), "utf8"));
-}
+import tauriConf from "../../src-tauri/tauri.conf.json";
+import capabilities from "../../src-tauri/capabilities/default.json";
 
 function serializeCsp(csp: unknown): string {
   if (typeof csp === "string") {
@@ -25,20 +18,6 @@ function serializeCsp(csp: unknown): string {
 }
 
 describe("configuration sécurité Tauri", () => {
-  const tauriConf = readJson("src-tauri/tauri.conf.json") as {
-    build?: { removeUnusedCommands?: boolean };
-    app: {
-      security: {
-        csp: unknown;
-        assetProtocol?: { enable?: boolean; scope?: string[] };
-      };
-    };
-  };
-
-  const capabilities = readJson("src-tauri/capabilities/default.json") as {
-    permissions: string[];
-  };
-
   it("refuse csp: null et interdit unsafe-eval", () => {
     const { csp } = tauriConf.app.security;
     expect(csp).not.toBeNull();
