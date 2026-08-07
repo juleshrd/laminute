@@ -6,10 +6,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { generateStructuredSummary, getAiSettings, listAiProviders } from "../lib/ai/api";
 import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../lib/ai/types";
 import { type AudioInputDevice, type RecordingStatus } from "../lib/audio";
-import {
-  type MeetingDetail,
-  updateMeetingTitle,
-} from "../lib/meetings";
+import { type MeetingDetail, updateMeetingTitle } from "../lib/meetings";
 import {
   type MeetingFlowPhase,
   defaultRecordingTitle,
