@@ -142,6 +142,7 @@ jobs:
             libasound2-dev patchelf
 
       - name: Install frontend dependencies
+        shell: bash
         run: |
           chmod +x .github/scripts/retry.sh
           .github/scripts/retry.sh 3 npm ci
@@ -169,7 +170,7 @@ jobs:
             Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}
 
       - name: Checksums des bundles
