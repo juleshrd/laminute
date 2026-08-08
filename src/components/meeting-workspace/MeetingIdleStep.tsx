@@ -23,7 +23,9 @@ export function MeetingIdleStep({
 }: MeetingIdleStepProps) {
   return (
     <section className="meeting-hero" aria-labelledby="meeting-hero-title">
-      <h2 id="meeting-hero-title">Prêt à enregistrer ?</h2>
+      <h2 id="meeting-hero-title" className="meeting-hero__title">
+        Prêt à enregistrer ?
+      </h2>
 
       <button
         type="button"
@@ -32,16 +34,23 @@ export function MeetingIdleStep({
         onClick={onRequestStartRecording}
         disabled={!canStartRecording}
       >
-        <ClockMark className="meeting-logo-cta__mark" />
+        <span className="meeting-logo-cta__halo" aria-hidden="true" />
+        <span className="meeting-logo-cta__surface">
+          <ClockMark className="meeting-logo-cta__mark" />
+        </span>
       </button>
 
       {!hasDevices ? (
-        <p className="warning meeting-hero__hint">Aucun périphérique d&apos;entrée détecté.</p>
-      ) : (
-        <p className="meeting-hero__hint lm-subtle">
-          Cliquez sur le logo pour démarrer la réunion.
+        <p className="meeting-hero__hint meeting-hero__hint--soft">
+          Aucun micro détecté — vous pouvez quand même importer un MP3.
         </p>
+      ) : (
+        <p className="meeting-hero__hint lm-subtle">Cliquez sur le logo pour démarrer la réunion.</p>
       )}
+
+      <div className="meeting-hero__divider" aria-hidden="true">
+        <span>ou</span>
+      </div>
 
       <section
         className={`meeting-hero__import drop-zone${dragOver ? " drop-zone-active" : ""}`}
@@ -52,7 +61,7 @@ export function MeetingIdleStep({
           onDragEnter();
         }}
       >
-        <p className="drop-zone-hint">Ou importez un fichier MP3</p>
+        <p className="drop-zone-hint">Importez un fichier MP3</p>
         <div className="row controls">
           <button type="button" onClick={() => void onPickMp3()} disabled={importing}>
             {importing ? "Import en cours…" : "Choisir un fichier MP3"}

@@ -97,6 +97,38 @@ describe("useMeetingFlow", () => {
     expect(result.current.devices).toHaveLength(1);
   });
 
+  it("traite l'absence de micro comme un état idle sans erreur bloquante", async () => {
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "list_audio_input_devices") {
+        return Promise.reject({
+          code: "no_input_device",
+          message: "aucun périphérique d'entrée audio détecté",
+        });
+      }
+      if (command === "get_recording_status") {
+        return Promise.resolve({
+          phase: "idle",
+          deviceId: null,
+          filePath: null,
+          durationSecs: null,
+          error: null,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const { result } = renderHook(() => useMeetingFlow());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.flowPhase).toBe("idle");
+    expect(result.current.devices).toHaveLength(0);
+    expect(result.current.canStartRecording).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
   it("passe en phase ready après import MP3", async () => {
     invokeMock.mockImplementation((command: string) => {
       if (command === "import_mp3_meeting") {

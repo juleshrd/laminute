@@ -27,6 +27,7 @@ describe("MeetingIdleStep", () => {
     expect(screen.getByRole("heading", { name: "Prêt à enregistrer ?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
+    expect(screen.getByText(/Importez un fichier MP3/i)).toBeInTheDocument();
     expect(screen.getByText(/100 Mo max \(limite transcription cloud\)/i)).toBeInTheDocument();
   });
 
@@ -44,7 +45,8 @@ describe("MeetingIdleStep", () => {
       />,
     );
 
-    expect(screen.getByText(/Aucun périphérique d'entrée détecté/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aucun micro détecté/i)).toBeInTheDocument();
+    expect(screen.getByText(/importer un MP3/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeDisabled();
   });
 

@@ -109,6 +109,7 @@ describe("MeetingWorkspace", () => {
     expect(
       await screen.findByRole("heading", { name: "Prêt à enregistrer ?" }),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("Prêt à enregistrer ?")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
   });
