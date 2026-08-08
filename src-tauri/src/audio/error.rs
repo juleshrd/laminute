@@ -32,6 +32,11 @@ pub enum AudioError {
     #[error("fichier trop volumineux (maximum {max_mb} Mo, limite de la transcription cloud)")]
     FileTooLarge { max_mb: u64 },
 
+    #[error(
+        "enregistrement trop volumineux pour la transcription cloud (maximum {max_mb} Mo). Aucune version tronquée n'a été conservée ; enregistrez une séquence plus courte en attendant l'encodage ou le découpage audio."
+    )]
+    RecordingTooLarge { max_mb: u64 },
+
     #[error("durée audio trop courte (minimum {min_secs} s)")]
     DurationTooShort { min_secs: i64 },
 
@@ -60,6 +65,7 @@ impl AudioError {
             Self::Internal(_) => "internal_error",
             Self::UnsupportedFormat => "unsupported_format",
             Self::FileTooLarge { .. } => "file_too_large",
+            Self::RecordingTooLarge { .. } => "recording_too_large",
             Self::DurationTooShort { .. } => "duration_too_short",
             Self::DurationTooLong { .. } => "duration_too_long",
             Self::InvalidAudio(_) => "invalid_audio",
