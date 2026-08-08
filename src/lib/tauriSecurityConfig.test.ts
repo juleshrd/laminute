@@ -29,14 +29,42 @@ describe("configuration sécurité Tauri", () => {
     expect(serialized).toContain("'self'");
     expect(serialized).toMatch(/connect-src.*ipc:/);
     expect(serialized).toMatch(/media-src.*asset:/);
+    expect(serialized).toMatch(/media-src.*http:\/\/asset\.localhost/);
   });
 
-  it("active le protocole asset sur imports/ et recordings/", () => {
+  it("confine asset: / asset.localhost à media-src uniquement", () => {
+    const csp = tauriConf.app.security.csp;
+    expect(csp).toBeTruthy();
+    expect(typeof csp).toBe("object");
+
+    const directives = csp as Record<string, unknown>;
+    for (const [directive, value] of Object.entries(directives)) {
+      const sources = Array.isArray(value) ? value.join(" ") : String(value);
+      if (directive === "media-src") {
+        expect(sources).toContain("asset:");
+        expect(sources).toContain("http://asset.localhost");
+        continue;
+      }
+      expect(sources).not.toMatch(/\basset:/);
+      expect(sources).not.toContain("asset.localhost");
+    }
+  });
+
+  it("active le protocole asset strictement sur imports/ et recordings/", () => {
     const assetProtocol = tauriConf.app.security.assetProtocol;
     expect(assetProtocol?.enable).toBe(true);
-    expect(assetProtocol?.scope).toEqual(
-      expect.arrayContaining(["$APPDATA/imports/**", "$APPDATA/recordings/**"]),
-    );
+
+    const scope = assetProtocol?.scope;
+    expect(Array.isArray(scope)).toBe(true);
+    expect(scope).toEqual(["$APPDATA/imports/**/*", "$APPDATA/recordings/**/*"]);
+
+    const patterns = scope as string[];
+    for (const pattern of patterns) {
+      expect(pattern).not.toMatch(/^\$HOME(\/|$)/);
+      expect(pattern).not.toBe("**/*");
+      expect(pattern).not.toBe("**");
+      expect(pattern).not.toMatch(/\/\*\*$/);
+    }
   });
 
   it("limite dialog à open/save et exclut opener", () => {
