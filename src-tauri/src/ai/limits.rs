@@ -1,7 +1,9 @@
 use crate::ai::error::AiError;
+use crate::audio::import::MAX_IMPORT_BYTES;
 
 /// Taille maximale acceptée par les API cloud (Mistral, OpenAI) pour la transcription.
-pub const MAX_AUDIO_BYTES: u64 = 100 * 1024 * 1024;
+/// Alignée sur [`MAX_IMPORT_BYTES`] pour éviter d'importer un fichier non transcriptible.
+pub const MAX_AUDIO_BYTES: u64 = MAX_IMPORT_BYTES;
 
 /// Vérifie la taille d'un fichier audio avant lecture du contenu (metadata uniquement).
 pub fn validate_transcription_audio_size(len: u64) -> Result<(), AiError> {

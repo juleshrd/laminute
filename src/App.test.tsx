@@ -52,8 +52,7 @@ vi.mock("./lib/ai/api", () => ({
 }));
 
 vi.mock("./lib/transcription", async () => {
-  const actual =
-    await vi.importActual<typeof import("./lib/transcription")>("./lib/transcription");
+  const actual = await vi.importActual<typeof import("./lib/transcription")>("./lib/transcription");
   return {
     ...actual,
     getTranscriptionProgress: vi.fn().mockResolvedValue(null),

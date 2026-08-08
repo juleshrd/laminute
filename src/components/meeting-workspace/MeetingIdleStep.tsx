@@ -59,7 +59,7 @@ export function MeetingIdleStep({
           </button>
         </div>
         <p className="drop-zone-constraints">
-          MP3 · import 500 Mo max · transcription cloud 100 Mo max · 1 s–4 h
+          MP3 · 100 Mo max (limite transcription cloud) · 1 s–4 h
         </p>
       </section>
     </section>

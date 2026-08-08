@@ -1,11 +1,8 @@
-use std::path::Path;
-
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
 
-use crate::audio::import::{import_mp3, title_from_path, ImportedAudio};
-use crate::audio::AudioError;
+use crate::audio::import::ImportedAudio;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem,
@@ -180,16 +177,6 @@ impl MeetingRepository {
         )?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
-    pub fn create_from_mp3_import(
-        conn: &Connection,
-        source: &Path,
-        imports_dir: &Path,
-    ) -> AppResult<MeetingDetail> {
-        let imported = import_mp3(source, imports_dir).map_err(map_audio_error)?;
-        let title = title_from_path(source);
-        Self::create_from_imported_audio(conn, &title, &imported)
     }
 
     pub fn create_from_imported_audio(
@@ -479,10 +466,6 @@ fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
     })
-}
-
-fn map_audio_error(error: AudioError) -> AppError {
-    AppError::Message(error.to_string())
 }
 
 /// Escapes a user query for FTS5 MATCH (trigram substring search).

@@ -29,7 +29,7 @@ pub enum AudioError {
     #[error("format non supporté — seuls les fichiers MP3 sont acceptés pour l'import")]
     UnsupportedFormat,
 
-    #[error("fichier trop volumineux (maximum {max_mb} Mo)")]
+    #[error("fichier trop volumineux (maximum {max_mb} Mo, limite de la transcription cloud)")]
     FileTooLarge { max_mb: u64 },
 
     #[error("durée audio trop courte (minimum {min_secs} s)")]
