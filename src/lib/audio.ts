@@ -12,6 +12,8 @@ export interface RecordingStatus {
   filePath: string | null;
   durationSecs: number | null;
   error: string | null;
+  droppedChunks?: number;
+  droppedSamples?: number;
 }
 
 export interface AudioFile {

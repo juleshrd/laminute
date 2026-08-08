@@ -118,6 +118,11 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     try {
       const status = await invoke<RecordingStatus>("get_recording_status");
       setRecordingStatus(status);
+      if (status.phase === "stopped" && status.error) {
+        setFilePath(null);
+        setError(status.error);
+        setFlowPhase("error");
+      }
       return status;
     } catch (err) {
       setError(formatMeetingError(err));
