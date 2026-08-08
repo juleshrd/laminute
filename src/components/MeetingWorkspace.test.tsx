@@ -57,12 +57,17 @@ vi.mock("../lib/transcription", async () => {
     ...actual,
     getTranscriptionProgress: vi.fn().mockResolvedValue(null),
     listenTranscriptionProgress: vi.fn().mockResolvedValue(() => undefined),
-    transcribeAudioFile: vi.fn().mockResolvedValue({
-      id: "tx-1",
-      meetingId: "meeting-rec",
-      content: "Transcription test",
-      language: "fr",
-    }),
+    transcribeAudioFile: vi.fn().mockImplementation((input: { jobId?: string }) =>
+      Promise.resolve({
+        jobId: input.jobId ?? "transcription-test",
+        transcription: {
+          id: "tx-1",
+          meetingId: "meeting-rec",
+          content: "Transcription test",
+          language: "fr",
+        },
+      }),
+    ),
   };
 });
 

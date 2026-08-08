@@ -123,22 +123,16 @@ pub fn set_model_preferences(
         .map_err(|e| e.to_string())?;
 
     if let Some(model) = &input.transcription_model {
-        let allowed = model_catalog::transcription_models(&input.provider_id);
-        if !allowed.is_empty() && !allowed.iter().any(|m| m.id == *model) {
-            return Err(format!(
-                "Modèle de transcription « {model} » non supporté pour {}.",
-                input.provider_id
-            ));
+        if !model.trim().is_empty() {
+            model_catalog::validate_transcription_model(&input.provider_id, Some(model.clone()))
+                .map_err(|e| e.to_string())?;
         }
     }
 
     if let Some(model) = &input.summary_model {
-        let allowed = model_catalog::summary_models(&input.provider_id);
-        if !allowed.is_empty() && !allowed.iter().any(|m| m.id == *model) {
-            return Err(format!(
-                "Modèle de compte-rendu « {model} » non supporté pour {}.",
-                input.provider_id
-            ));
+        if !model.trim().is_empty() {
+            model_catalog::validate_summary_model(&input.provider_id, Some(model.clone()))
+                .map_err(|e| e.to_string())?;
         }
     }
 

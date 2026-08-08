@@ -130,18 +130,18 @@ describe("App navigation + enregistrement", () => {
     setOnboardingDone(true);
     setupInvoke();
     const { getTranscriptionProgress, transcribeAudioFile } = await import("./lib/transcription");
-    vi.mocked(getTranscriptionProgress).mockResolvedValue({
-      phase: "idle",
-      message: "",
-    });
+    vi.mocked(getTranscriptionProgress).mockResolvedValue(null);
     vi.mocked(transcribeAudioFile).mockReset();
-    vi.mocked(transcribeAudioFile).mockResolvedValue({
-      id: "tx-1",
-      meetingId: "meeting-1",
-      content: "ok",
-      createdAt: "2026-01-01T00:00:00Z",
-      updatedAt: "2026-01-01T00:00:00Z",
-    });
+    vi.mocked(transcribeAudioFile).mockImplementation(async (input) => ({
+      jobId: input.jobId ?? "transcription-test",
+      transcription: {
+        id: "tx-1",
+        meetingId: "meeting-1",
+        content: "ok",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    }));
   });
 
   afterEach(() => {
@@ -187,6 +187,7 @@ describe("App navigation + enregistrement", () => {
   it("restaure un traitement IA actif sans second job après navigation", async () => {
     const { getTranscriptionProgress, transcribeAudioFile } = await import("./lib/transcription");
     vi.mocked(getTranscriptionProgress).mockResolvedValue({
+      jobId: "transcription-nav",
       phase: "transcribing",
       message: "Transcription en cours…",
       meetingId: "meeting-nav",

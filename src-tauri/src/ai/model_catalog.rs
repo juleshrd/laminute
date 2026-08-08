@@ -1,3 +1,4 @@
+use crate::ai::error::AiError;
 use crate::ai::models::ModelInfo;
 
 /// Modèles audio / transcription proposés à l'utilisateur (catalogue produit, pas la liste brute `/models`).
@@ -96,6 +97,54 @@ pub fn supports_diarization(provider_id: &str) -> bool {
 /// OpenAI utilise un modèle dédié dès que la diarisation est activée.
 pub const OPENAI_DIARIZE_MODEL: &str = "gpt-4o-transcribe-diarize";
 
+pub fn validate_transcription_model(
+    provider_id: &str,
+    model: Option<String>,
+) -> Result<Option<String>, AiError> {
+    validate_catalog_model(
+        provider_id,
+        model,
+        transcription_models(provider_id),
+        "transcription",
+    )
+}
+
+pub fn validate_summary_model(
+    provider_id: &str,
+    model: Option<String>,
+) -> Result<Option<String>, AiError> {
+    validate_catalog_model(
+        provider_id,
+        model,
+        summary_models(provider_id),
+        "compte-rendu",
+    )
+}
+
+fn validate_catalog_model(
+    provider_id: &str,
+    model: Option<String>,
+    catalog: Vec<ModelInfo>,
+    label: &str,
+) -> Result<Option<String>, AiError> {
+    let Some(model) = model else {
+        return Ok(None);
+    };
+
+    let trimmed = model.trim().to_string();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    if catalog.iter().any(|entry| entry.id == trimmed) {
+        return Ok(Some(trimmed));
+    }
+
+    Err(AiError::Other(format!(
+        "Modèle de {label} « {trimmed} » non supporté pour {provider_id}."
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,5 +167,13 @@ mod tests {
             default_transcription_model("openai"),
             Some("gpt-4o-mini-transcribe")
         );
+    }
+
+    #[test]
+    fn rejects_models_outside_catalog() {
+        assert!(validate_summary_model("mistral", Some("mistral-small-latest".into())).is_ok());
+        assert!(validate_summary_model("mistral", Some("not-a-catalog-model".into())).is_err());
+        assert!(validate_transcription_model("openai", Some("whisper-1".into())).is_ok());
+        assert!(validate_transcription_model("openai", Some("gpt-5-transcribe".into())).is_err());
     }
 }

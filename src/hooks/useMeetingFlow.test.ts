@@ -82,10 +82,7 @@ describe("useMeetingFlow", () => {
     listenMock.mockClear();
     setupDefaultInvoke();
     const { getTranscriptionProgress } = await import("../lib/transcription");
-    vi.mocked(getTranscriptionProgress).mockResolvedValue({
-      phase: "idle",
-      message: "",
-    });
+    vi.mocked(getTranscriptionProgress).mockResolvedValue(null);
   });
 
   it("initialise en phase idle avec les périphériques audio", async () => {
@@ -242,6 +239,7 @@ describe("useMeetingFlow", () => {
   it("reprend un traitement IA en cours sans relancer de job", async () => {
     const { getTranscriptionProgress, transcribeAudioFile } = await import("../lib/transcription");
     vi.mocked(getTranscriptionProgress).mockResolvedValue({
+      jobId: "transcription-active",
       phase: "uploading",
       message: "Envoi de l'audio…",
       meetingId: "meeting-tx",
@@ -257,5 +255,58 @@ describe("useMeetingFlow", () => {
     expect(result.current.processingStep).toBe("transcribing");
     expect(result.current.meetingId).toBe("meeting-tx");
     expect(transcribeAudioFile).not.toHaveBeenCalled();
+  });
+
+  it("ne lance qu'un traitement facturable sur double clic", async () => {
+    const { transcribeAudioFile } = await import("../lib/transcription");
+    const { generateStructuredSummary } = await import("../lib/ai/api");
+    vi.mocked(transcribeAudioFile).mockImplementation(async (input) => ({
+      jobId: input.jobId ?? "transcription-test",
+      transcription: {
+        id: "tx-1",
+        meetingId: "meeting-1",
+        content: "Transcription",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    }));
+    vi.mocked(generateStructuredSummary).mockImplementation(async (input) => ({
+      jobId: input.jobId ?? "summary-test",
+      meetingId: input.meetingId ?? "meeting-1",
+      summary: {
+        id: "summary-1",
+        meetingId: input.meetingId ?? "meeting-1",
+        providerId: "mistral",
+        content: "Résumé",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      structured: {
+        synthese: "Résumé",
+        decisions: [],
+        actions: [],
+        risques: [],
+        questionsOuvertes: [],
+      },
+      actions: [],
+    }));
+
+    const { result } = renderHook(() => useMeetingFlow());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      await Promise.all([
+        result.current.runProcessing({ filePath: "/tmp/import.mp3", meetingTitle: "Comité" }),
+        result.current.runProcessing({ filePath: "/tmp/import.mp3", meetingTitle: "Comité" }),
+      ]);
+    });
+
+    expect(transcribeAudioFile).toHaveBeenCalledTimes(1);
+    expect(generateStructuredSummary).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(transcribeAudioFile).mock.calls[0][0].jobId).toMatch(/^transcription-/);
+    expect(vi.mocked(generateStructuredSummary).mock.calls[0][0].jobId).toMatch(/^summary-/);
   });
 });

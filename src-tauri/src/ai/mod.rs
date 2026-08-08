@@ -3,6 +3,7 @@ pub mod commands;
 pub mod diarize;
 pub mod error;
 pub mod http;
+pub mod jobs;
 pub mod limits;
 pub mod model_catalog;
 pub mod models;

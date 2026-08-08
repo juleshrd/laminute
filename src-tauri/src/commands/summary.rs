@@ -2,6 +2,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
+use crate::ai::jobs::{meeting_job_key, summary_fallback_key, AiJobKind, AiJobState};
+use crate::ai::limits::validate_summary_input_text;
+use crate::ai::model_catalog;
 use crate::ai::models::SummaryOptions;
 use crate::ai::secrets;
 use crate::ai::structured_summary::{self, StructuredSummary};
@@ -16,6 +19,7 @@ use crate::AiAppState;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateStructuredSummaryInput {
+    pub job_id: Option<String>,
     pub meeting_id: Option<String>,
     pub text: Option<String>,
     pub provider_id: Option<String>,
@@ -25,6 +29,7 @@ pub struct GenerateStructuredSummaryInput {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateStructuredSummaryOutput {
+    pub job_id: String,
     pub meeting_id: String,
     pub summary: Summary,
     pub structured: StructuredSummary,
@@ -42,10 +47,11 @@ pub async fn generate_structured_summary(
     app: AppHandle,
     db_state: State<'_, AppState>,
     ai_state: State<'_, AiAppState>,
+    jobs: State<'_, AiJobState>,
     gate: State<'_, LocalActivityGate>,
     input: GenerateStructuredSummaryInput,
 ) -> Result<GenerateStructuredSummaryOutput, String> {
-    generate_structured_summary_inner(&app, &db_state, &ai_state, &gate, input)
+    generate_structured_summary_inner(&app, &db_state, &ai_state, &jobs, &gate, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -54,12 +60,17 @@ async fn generate_structured_summary_inner(
     app: &AppHandle,
     db_state: &State<'_, AppState>,
     ai_state: &State<'_, AiAppState>,
+    jobs: &State<'_, AiJobState>,
     gate: &State<'_, LocalActivityGate>,
     input: GenerateStructuredSummaryInput,
 ) -> AppResult<GenerateStructuredSummaryOutput> {
+    let job_id = input
+        .job_id
+        .clone()
+        .unwrap_or_else(|| AiJobState::new_job_id(AiJobKind::Summary));
     let activity = gate.begin_operation()?;
 
-    let (provider_id, default_model) = {
+    let (provider_id, default_model, requested_model) = {
         let settings = ai_state
             .settings
             .lock()
@@ -70,7 +81,7 @@ async fn generate_structured_summary_inner(
             .or_else(|| settings.selected_provider_id().map(str::to_string))
             .ok_or_else(|| AppError::Message("aucun fournisseur IA sélectionné".into()))?;
         let default_model = settings.summary_model_for(&provider_id);
-        (provider_id, default_model)
+        (provider_id, default_model, input.model.clone())
     };
 
     let provider = ai_state
@@ -90,13 +101,27 @@ async fn generate_structured_summary_inner(
             })?
     };
 
-    let model = input.model.clone().or(default_model);
+    let model =
+        model_catalog::validate_summary_model(&provider_id, requested_model.or(default_model))
+            .map_err(|e| AppError::Message(e.to_string()))?;
     let resolved = resolve_input(db_state, input)?;
     let transcription_text = match &resolved {
         ResolvedSummaryInput::ExistingMeeting { text, .. }
         | ResolvedSummaryInput::PastedText { text } => text.clone(),
     };
+    validate_summary_input_text(&transcription_text)
+        .map_err(|e| AppError::Message(e.to_string()))?;
 
+    let job_key = match &resolved {
+        ResolvedSummaryInput::ExistingMeeting { meeting_id, .. } => meeting_job_key(meeting_id),
+        ResolvedSummaryInput::PastedText { text } => summary_fallback_key(text),
+    };
+    let job = jobs
+        .begin(job_id.clone(), AiJobKind::Summary, job_key)
+        .map_err(|e| AppError::Message(e.to_string()))?;
+
+    jobs.ensure_not_cancelled(job.job_id())
+        .map_err(AppError::Message)?;
     gate.ensure_generation(activity)?;
 
     let summary_result = ai_state
@@ -112,6 +137,9 @@ async fn generate_structured_summary_inner(
         )
         .await
         .map_err(|e| AppError::Message(e.to_string()))?;
+
+    jobs.ensure_not_cancelled(job.job_id())
+        .map_err(AppError::Message)?;
 
     let structured = structured_summary::parse_structured_summary(&summary_result.text)
         .map_err(|e| AppError::Message(e.to_string()))?;
@@ -153,7 +181,10 @@ async fn generate_structured_summary_inner(
 
     retention::maybe_purge_audio_files(app, db_state, &meeting_id)?;
 
+    job.finish_completed();
+
     Ok(GenerateStructuredSummaryOutput {
+        job_id,
         meeting_id,
         summary,
         structured,

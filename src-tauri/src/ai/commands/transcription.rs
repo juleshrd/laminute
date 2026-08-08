@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -5,7 +6,11 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::ai::jobs::{
+    meeting_job_key, transcription_fallback_key, AiJobKind, AiJobState, CancelAiJobOutput,
+};
 use crate::ai::limits::validate_transcription_audio_size;
+use crate::ai::model_catalog;
 use crate::ai::models::TranscriptionOptions;
 use crate::ai::secrets;
 use crate::audio::paths::{ingest_if_needed, resolve_owned, ManagedAudioRoots};
@@ -34,6 +39,7 @@ pub enum TranscriptionPhase {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionProgress {
+    pub job_id: String,
     pub phase: TranscriptionPhase,
     pub message: String,
     pub meeting_id: Option<String>,
@@ -42,6 +48,7 @@ pub struct TranscriptionProgress {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribeAudioInput {
+    pub job_id: Option<String>,
     pub file_path: String,
     pub meeting_id: Option<String>,
     pub meeting_title: Option<String>,
@@ -49,31 +56,35 @@ pub struct TranscribeAudioInput {
     pub duration_ms: Option<i64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscribeAudioOutput {
+    pub job_id: String,
+    pub transcription: Transcription,
+}
+
 pub struct TranscriptionState {
-    pub last_progress: Mutex<TranscriptionProgress>,
+    pub progress_by_job: Mutex<HashMap<String, TranscriptionProgress>>,
+    pub latest_job_id: Mutex<Option<String>>,
 }
 
 impl TranscriptionState {
     pub fn new() -> Self {
         Self {
-            last_progress: Mutex::new(TranscriptionProgress {
-                phase: TranscriptionPhase::Idle,
-                message: "En attente.".to_string(),
-                meeting_id: None,
-            }),
+            progress_by_job: Mutex::new(HashMap::new()),
+            latest_job_id: Mutex::new(None),
         }
     }
 
     pub fn reset(&self) -> Result<(), String> {
-        let mut progress = self
-            .last_progress
+        self.progress_by_job
             .lock()
-            .map_err(|_| "verrou transcription indisponible".to_string())?;
-        *progress = TranscriptionProgress {
-            phase: TranscriptionPhase::Idle,
-            message: "En attente.".to_string(),
-            meeting_id: None,
-        };
+            .map_err(|_| "verrou transcription indisponible".to_string())?
+            .clear();
+        *self
+            .latest_job_id
+            .lock()
+            .map_err(|_| "verrou transcription indisponible".to_string())? = None;
         Ok(())
     }
 }
@@ -89,8 +100,11 @@ fn emit_progress(
     transcription_state: &TranscriptionState,
     progress: TranscriptionProgress,
 ) {
-    if let Ok(mut last) = transcription_state.last_progress.lock() {
-        *last = progress.clone();
+    if let Ok(mut by_job) = transcription_state.progress_by_job.lock() {
+        by_job.insert(progress.job_id.clone(), progress.clone());
+    }
+    if let Ok(mut latest_job_id) = transcription_state.latest_job_id.lock() {
+        *latest_job_id = Some(progress.job_id.clone());
     }
     let _ = app.emit(TRANSCRIPTION_PROGRESS_EVENT, &progress);
 }
@@ -98,12 +112,40 @@ fn emit_progress(
 #[tauri::command]
 pub fn get_transcription_progress(
     state: State<'_, TranscriptionState>,
-) -> Result<TranscriptionProgress, String> {
-    state
-        .last_progress
+    job_id: Option<String>,
+) -> Result<Option<TranscriptionProgress>, String> {
+    get_transcription_progress_for_job(&state, job_id)
+}
+
+#[tauri::command]
+pub fn cancel_ai_job(
+    jobs: State<'_, AiJobState>,
+    job_id: String,
+) -> Result<CancelAiJobOutput, String> {
+    jobs.cancel(&job_id)
+}
+
+fn get_transcription_progress_for_job(
+    state: &TranscriptionState,
+    job_id: Option<String>,
+) -> Result<Option<TranscriptionProgress>, String> {
+    let progress_by_job = state
+        .progress_by_job
         .lock()
-        .map(|progress| progress.clone())
-        .map_err(|_| "verrou transcription indisponible".to_string())
+        .map_err(|_| "verrou transcription indisponible".to_string())?;
+
+    if let Some(job_id) = job_id {
+        return Ok(progress_by_job.get(&job_id).cloned());
+    }
+
+    let latest_job_id = state
+        .latest_job_id
+        .lock()
+        .map_err(|_| "verrou transcription indisponible".to_string())?;
+    Ok(latest_job_id
+        .as_deref()
+        .and_then(|id| progress_by_job.get(id))
+        .cloned())
 }
 
 #[tauri::command]
@@ -112,9 +154,23 @@ pub async fn transcribe_audio_file(
     ai_state: State<'_, AiAppState>,
     db_state: State<'_, AppState>,
     transcription_state: State<'_, TranscriptionState>,
+    jobs: State<'_, AiJobState>,
     gate: State<'_, LocalActivityGate>,
     input: TranscribeAudioInput,
-) -> Result<Transcription, String> {
+) -> Result<TranscribeAudioOutput, String> {
+    let job_id = input
+        .job_id
+        .clone()
+        .unwrap_or_else(|| AiJobState::new_job_id(AiJobKind::Transcription));
+    let job_key = input
+        .meeting_id
+        .as_deref()
+        .map(meeting_job_key)
+        .unwrap_or_else(|| transcription_fallback_key(&input.file_path));
+    let job = jobs
+        .begin(job_id.clone(), AiJobKind::Transcription, job_key)
+        .map_err(|err| err.to_string())?;
+
     let activity = gate.begin_operation().map_err(|e| e.to_string())?;
 
     let (provider_id, transcription_model, diarize) = {
@@ -128,6 +184,9 @@ pub async fn transcribe_audio_file(
             .unwrap_or_else(|| DEFAULT_PROVIDER_ID.to_string());
         let transcription_model = settings.transcription_model_for(&provider_id);
         let diarize = settings.diarization_enabled();
+        let transcription_model =
+            model_catalog::validate_transcription_model(&provider_id, transcription_model)
+                .map_err(|e| e.to_string())?;
         (provider_id, transcription_model, diarize)
     };
 
@@ -159,12 +218,14 @@ pub async fn transcribe_audio_file(
         &app,
         &transcription_state,
         TranscriptionProgress {
+            job_id: job.job_id().to_string(),
             phase: TranscriptionPhase::Preparing,
             message: "Préparation de la transcription…".to_string(),
             meeting_id: input.meeting_id.clone(),
         },
     );
 
+    jobs.ensure_not_cancelled(job.job_id())?;
     gate.ensure_generation(activity)
         .map_err(|e| e.to_string())?;
 
@@ -174,6 +235,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: message.clone(),
                 meeting_id: input.meeting_id.clone(),
@@ -189,6 +251,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: message.clone(),
                 meeting_id: input.meeting_id.clone(),
@@ -203,6 +266,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: message.clone(),
                 meeting_id: input.meeting_id.clone(),
@@ -217,6 +281,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: message.clone(),
                 meeting_id: input.meeting_id.clone(),
@@ -265,6 +330,7 @@ pub async fn transcribe_audio_file(
         &app,
         &transcription_state,
         TranscriptionProgress {
+            job_id: job_id.clone(),
             phase: TranscriptionPhase::Preparing,
             message: "Enregistrement de l'audio…".to_string(),
             meeting_id: Some(meeting_id.clone()),
@@ -297,6 +363,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: message.clone(),
                 meeting_id: Some(meeting_id.clone()),
@@ -309,12 +376,14 @@ pub async fn transcribe_audio_file(
         &app,
         &transcription_state,
         TranscriptionProgress {
+            job_id: job_id.clone(),
             phase: TranscriptionPhase::Uploading,
             message: format!("Envoi de l'audio à {provider_display_name}…"),
             meeting_id: Some(meeting_id.clone()),
         },
     );
 
+    jobs.ensure_not_cancelled(job.job_id())?;
     gate.ensure_generation(activity)
         .map_err(|e| e.to_string())?;
 
@@ -341,6 +410,7 @@ pub async fn transcribe_audio_file(
                 &app,
                 &transcription_state,
                 TranscriptionProgress {
+                    job_id: job_id.clone(),
                     phase: TranscriptionPhase::Failed,
                     message: message.clone(),
                     meeting_id: Some(meeting_id.clone()),
@@ -349,10 +419,28 @@ pub async fn transcribe_audio_file(
             message
         })?;
 
+    if let Err(message) = jobs.ensure_not_cancelled(job.job_id()) {
+        let _ = db_state.with_db(|conn| {
+            MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Draft)
+        });
+        emit_progress(
+            &app,
+            &transcription_state,
+            TranscriptionProgress {
+                job_id: job_id.clone(),
+                phase: TranscriptionPhase::Failed,
+                message: message.clone(),
+                meeting_id: Some(meeting_id.clone()),
+            },
+        );
+        return Err(message);
+    }
+
     emit_progress(
         &app,
         &transcription_state,
         TranscriptionProgress {
+            job_id: job_id.clone(),
             phase: TranscriptionPhase::Saving,
             message: "Enregistrement de la transcription…".to_string(),
             meeting_id: Some(meeting_id.clone()),
@@ -364,6 +452,7 @@ pub async fn transcribe_audio_file(
             &app,
             &transcription_state,
             TranscriptionProgress {
+                job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
                 message: e.to_string(),
                 meeting_id: Some(meeting_id.clone()),
@@ -394,13 +483,19 @@ pub async fn transcribe_audio_file(
         &app,
         &transcription_state,
         TranscriptionProgress {
+            job_id: job_id.clone(),
             phase: TranscriptionPhase::Completed,
             message: "Transcription terminée.".to_string(),
             meeting_id: Some(meeting_id),
         },
     );
 
-    Ok(transcription)
+    job.finish_completed();
+
+    Ok(TranscribeAudioOutput {
+        job_id,
+        transcription,
+    })
 }
 
 #[cfg(test)]
@@ -411,8 +506,8 @@ mod tests {
     #[test]
     fn default_progress_is_idle() {
         let state = TranscriptionState::new();
-        let progress = state.last_progress.lock().expect("lock");
-        assert!(matches!(progress.phase, TranscriptionPhase::Idle));
+        let progress = get_transcription_progress_for_job(&state, None).expect("progress");
+        assert!(progress.is_none());
     }
 
     #[test]

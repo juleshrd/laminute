@@ -127,6 +127,7 @@ pub fn run() {
             ai::commands::sync_ollama_base_url(&ai_state);
             app.manage(ai_state);
             app.manage(ai::TranscriptionState::new());
+            app.manage(ai::jobs::AiJobState::new());
             app.manage(LocalActivityGate::new());
 
             let audio_state = AudioState::initialize(app.handle())?;
@@ -160,6 +161,7 @@ pub fn run() {
             ai::commands::validate_api_key,
             ai::commands::transcription::transcribe_audio_file,
             ai::commands::transcription::get_transcription_progress,
+            ai::commands::transcription::cancel_ai_job,
             list_audio_input_devices,
             get_selected_audio_input_device,
             set_selected_audio_input_device,

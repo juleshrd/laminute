@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
 use crate::ai::http;
+use crate::ai::limits::truncate_error_message;
 use crate::ai::models::{KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult};
 use crate::ai::ollama_url;
 use crate::ai::provider::AiProvider;
@@ -221,18 +222,23 @@ impl SummaryProvider for OllamaProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+            let body = http::read_provider_error(response).await?;
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
                 message: if status == StatusCode::NOT_FOUND {
                     format!("modèle « {model} » introuvable sur Ollama")
                 } else {
-                    format!("réponse inattendue ({status}) : {body}")
+                    truncate_error_message(&format!("réponse inattendue ({status}) : {body}"))
                 },
             });
         }
 
-        let payload: OllamaChatResponse = response.json().await?;
+        let body = http::read_provider_response(response).await?;
+        let payload: OllamaChatResponse =
+            serde_json::from_str(&body).map_err(|err| AiError::Provider {
+                provider: self.id().to_string(),
+                message: format!("réponse compte-rendu illisible : {err}"),
+            })?;
         if payload.message.content.trim().is_empty() {
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
@@ -330,6 +336,43 @@ mod tests {
             .await
             .expect_err("must reject");
         assert!(err.to_string().contains("link-local") || err.to_string().contains("metadata"));
+    }
+
+    #[tokio::test]
+    async fn summarize_rejects_oversized_response() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/tags"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "models": [{ "name": "llama3.2:latest" }]
+            })))
+            .mount(&mock_server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(
+                    "x".repeat(crate::ai::limits::MAX_PROVIDER_RESPONSE_BYTES + 1),
+                ),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let provider =
+            OllamaProvider::with_base_url(mock_server.uri(), false, http::build_ollama_client());
+        let err = provider
+            .summarize(
+                "",
+                "Texte de réunion",
+                SummaryOptions {
+                    model: None,
+                    max_tokens: None,
+                },
+            )
+            .await
+            .expect_err("oversized response");
+
+        assert!(err.to_string().contains("trop volumineuse"));
     }
 
     #[tokio::test]

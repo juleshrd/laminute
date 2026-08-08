@@ -7,6 +7,10 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::ai::error::AiError;
+use crate::ai::limits::{
+    truncate_error_message, validate_provider_error_size, validate_provider_response_size,
+    MAX_PROVIDER_ERROR_BYTES, MAX_PROVIDER_RESPONSE_BYTES,
+};
 use crate::ai::models::TranscriptionOptions;
 use crate::ai::ollama_url;
 
@@ -73,6 +77,44 @@ pub async fn audio_file_part(
         .map_err(|err| AiError::Other(err.to_string()))
 }
 
+pub async fn read_provider_response(response: reqwest::Response) -> Result<String, AiError> {
+    read_limited_text(
+        response,
+        MAX_PROVIDER_RESPONSE_BYTES,
+        validate_provider_response_size,
+    )
+    .await
+}
+
+pub async fn read_provider_error(response: reqwest::Response) -> Result<String, AiError> {
+    read_limited_text(
+        response,
+        MAX_PROVIDER_ERROR_BYTES,
+        validate_provider_error_size,
+    )
+    .await
+}
+
+async fn read_limited_text(
+    mut response: reqwest::Response,
+    max_bytes: usize,
+    validate: fn(usize) -> Result<(), AiError>,
+) -> Result<String, AiError> {
+    if let Some(len) = response.content_length() {
+        validate(len as usize)?;
+    }
+
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if body.len() + chunk.len() > max_bytes {
+            validate(max_bytes + 1)?;
+        }
+        body.extend_from_slice(&chunk);
+    }
+
+    String::from_utf8(body).map_err(|err| AiError::Other(format!("réponse IA non UTF-8 : {err}")))
+}
+
 pub fn map_http_error(status: StatusCode, body: &str, brand: &str, provider_id: &str) -> AiError {
     let message = match status {
         StatusCode::UNAUTHORIZED => "Clé API invalide ou expirée.".to_string(),
@@ -94,7 +136,7 @@ pub fn map_http_error(status: StatusCode, body: &str, brand: &str, provider_id: 
 
     AiError::Provider {
         provider: provider_id.to_string(),
-        message,
+        message: truncate_error_message(&message),
     }
 }
 
@@ -159,5 +201,14 @@ mod tests {
         let body = r#"{"error":{"message":"invalid model"}}"#;
         let err = map_http_error(StatusCode::BAD_REQUEST, body, "OpenAI", "openai");
         assert!(err.to_string().contains("invalid model"));
+    }
+
+    #[test]
+    fn map_http_error_truncates_extracted_message() {
+        let long = "x".repeat(crate::ai::limits::MAX_ERROR_MESSAGE_CHARS + 10);
+        let body = format!(r#"{{"message":"{long}"}}"#);
+        let err = map_http_error(StatusCode::BAD_REQUEST, &body, "Mistral", "mistral");
+        assert!(err.to_string().len() < long.len());
+        assert!(err.to_string().ends_with('…'));
     }
 }
