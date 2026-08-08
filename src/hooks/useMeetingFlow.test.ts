@@ -77,10 +77,15 @@ function setupDefaultInvoke() {
 }
 
 describe("useMeetingFlow", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     invokeMock.mockReset();
     listenMock.mockClear();
     setupDefaultInvoke();
+    const { getTranscriptionProgress } = await import("../lib/transcription");
+    vi.mocked(getTranscriptionProgress).mockResolvedValue({
+      phase: "idle",
+      message: "",
+    });
   });
 
   it("initialise en phase idle avec les périphériques audio", async () => {
@@ -201,5 +206,56 @@ describe("useMeetingFlow", () => {
 
     expect(result.current.flowPhase).toBe("recording");
     expect(result.current.isRecording).toBe(true);
+  });
+
+  it("reprend la phase recording depuis le statut natif", async () => {
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "list_audio_input_devices") {
+        return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
+      }
+      if (command === "get_selected_audio_input_device") {
+        return Promise.resolve({ id: "mic-1", name: "Micro intégré", isDefault: true });
+      }
+      if (command === "get_recording_status") {
+        return Promise.resolve({
+          phase: "recording",
+          deviceId: "mic-1",
+          filePath: null,
+          durationSecs: 18,
+          error: null,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const { result } = renderHook(() => useMeetingFlow());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.flowPhase).toBe("recording");
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.recordingStatus?.durationSecs).toBe(18);
+  });
+
+  it("reprend un traitement IA en cours sans relancer de job", async () => {
+    const { getTranscriptionProgress, transcribeAudioFile } = await import("../lib/transcription");
+    vi.mocked(getTranscriptionProgress).mockResolvedValue({
+      phase: "uploading",
+      message: "Envoi de l'audio…",
+      meetingId: "meeting-tx",
+    });
+
+    const { result } = renderHook(() => useMeetingFlow());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.flowPhase).toBe("processing");
+    expect(result.current.processingStep).toBe("transcribing");
+    expect(result.current.meetingId).toBe("meeting-tx");
+    expect(transcribeAudioFile).not.toHaveBeenCalled();
   });
 });

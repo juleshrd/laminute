@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultRecordingTitle,
   durationFromMeetingDetail,
+  hydrateMeetingFlowFromNative,
   isMp3Path,
   isTranscriptionBusy,
   meetingFlowStatusLabel,
@@ -50,5 +51,76 @@ describe("meetingFlow helpers", () => {
   it("detects mp3 paths", () => {
     expect(isMp3Path("/tmp/audio.MP3")).toBe(true);
     expect(isMp3Path("/tmp/audio.wav")).toBe(false);
+  });
+
+  it("hydrates recording flow from native status", () => {
+    const hydrated = hydrateMeetingFlowFromNative({
+      recording: {
+        phase: "recording",
+        deviceId: "mic-1",
+        filePath: null,
+        durationSecs: 42,
+        error: null,
+      },
+      transcription: null,
+    });
+
+    expect(hydrated?.flowPhase).toBe("recording");
+    expect(hydrated?.durationSecs).toBe(42);
+    expect(hydrated?.title).toMatch(/^Enregistrement /);
+  });
+
+  it("hydrates busy transcription without starting a new job", () => {
+    const hydrated = hydrateMeetingFlowFromNative({
+      recording: {
+        phase: "idle",
+        deviceId: null,
+        filePath: null,
+        durationSecs: null,
+        error: null,
+      },
+      transcription: {
+        phase: "transcribing",
+        message: "Transcription en cours…",
+        meetingId: "meeting-1",
+      },
+    });
+
+    expect(hydrated?.flowPhase).toBe("processing");
+    expect(hydrated?.processingStep).toBe("transcribing");
+    expect(hydrated?.meetingId).toBe("meeting-1");
+  });
+
+  it("prefers active recording over transcription progress", () => {
+    const hydrated = hydrateMeetingFlowFromNative({
+      recording: {
+        phase: "recording",
+        deviceId: "mic-1",
+        filePath: null,
+        durationSecs: 3,
+        error: null,
+      },
+      transcription: {
+        phase: "uploading",
+        message: "Envoi…",
+      },
+    });
+
+    expect(hydrated?.flowPhase).toBe("recording");
+  });
+
+  it("returns null when nothing is active", () => {
+    expect(
+      hydrateMeetingFlowFromNative({
+        recording: {
+          phase: "idle",
+          deviceId: null,
+          filePath: null,
+          durationSecs: null,
+          error: null,
+        },
+        transcription: null,
+      }),
+    ).toBeNull();
   });
 });

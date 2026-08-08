@@ -11,6 +11,7 @@ import {
   type MeetingFlowPhase,
   defaultRecordingTitle,
   durationFromMeetingDetail,
+  hydrateMeetingFlowFromNative,
   isMp3Path,
   isTranscriptionBusy,
   transcriptionPhaseLabel,
@@ -138,11 +139,56 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     void (async () => {
       setLoading(true);
-      await Promise.all([refreshDevices(), refreshRecordingStatus(), refreshAiSettings()]);
+      const [, recordingStatusResult] = await Promise.all([
+        refreshDevices(),
+        refreshRecordingStatus(),
+        refreshAiSettings(),
+      ]);
+
+      let transcriptionProgressResult: TranscriptionProgress | null = null;
+      try {
+        transcriptionProgressResult = await getTranscriptionProgress();
+      } catch {
+        transcriptionProgressResult = null;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      const hydrated = hydrateMeetingFlowFromNative({
+        recording: recordingStatusResult,
+        transcription: transcriptionProgressResult,
+      });
+
+      if (hydrated) {
+        setFlowPhase(hydrated.flowPhase);
+        if (hydrated.filePath != null) {
+          setFilePath(hydrated.filePath);
+        }
+        if (hydrated.durationSecs != null) {
+          setDurationSecs(hydrated.durationSecs);
+        }
+        if (hydrated.title) {
+          setTitle(hydrated.title);
+        }
+        if (hydrated.meetingId) {
+          setMeetingId(hydrated.meetingId);
+        }
+        setProcessingStep(hydrated.processingStep);
+        setTranscriptionProgress(hydrated.transcriptionProgress);
+      }
+
       setLoading(false);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshAiSettings, refreshDevices, refreshRecordingStatus]);
 
   useEffect(() => {

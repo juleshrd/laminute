@@ -7,6 +7,7 @@ import {
   isOnboardingDone,
   setOnboardingDone,
 } from "./lib/preferences";
+import { useMeetingFlow } from "./hooks/useMeetingFlow";
 import { LmShell, type AppScreen } from "./components/LmShell";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingWorkspace } from "./components/MeetingWorkspace";
@@ -22,6 +23,7 @@ function App() {
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const meetingFlow = useMeetingFlow();
 
   useEffect(() => {
     applyReduceMotionToDocument();
@@ -101,8 +103,13 @@ function App() {
 
   return (
     <div className="lm-root">
-      <LmShell active={activeScreen} onNavigate={setActiveScreen}>
-        {activeScreen === "meeting" ? <MeetingWorkspace /> : null}
+      <LmShell
+        active={activeScreen}
+        onNavigate={setActiveScreen}
+        isRecording={meetingFlow.isRecording}
+        recordingDurationSecs={meetingFlow.recordingStatus?.durationSecs ?? null}
+      >
+        {activeScreen === "meeting" ? <MeetingWorkspace flow={meetingFlow} /> : null}
         {activeScreen === "history" ? <MeetingHistory /> : null}
         {activeScreen === "settings" ? (
           <SettingsScreen
