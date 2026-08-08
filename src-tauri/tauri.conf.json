@@ -39,7 +39,7 @@
     "macOS": {
       "infoPlist": "Info.plist"
     },
-    "targets": ["nsis", "dmg", "appimage"],
+    "targets": ["app", "nsis", "dmg", "appimage"],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
