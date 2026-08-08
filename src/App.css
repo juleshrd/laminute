@@ -1443,7 +1443,7 @@ textarea:focus-visible,
 }
 
 @media (max-width: 720px) {
-  .lm-shell,
+  .lm-shell__body,
   .lm-onboarding {
     grid-template-columns: 1fr;
   }
