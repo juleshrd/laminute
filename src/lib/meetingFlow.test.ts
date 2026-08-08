@@ -80,6 +80,7 @@ describe("meetingFlow helpers", () => {
         error: null,
       },
       transcription: {
+        jobId: "transcription-1",
         phase: "transcribing",
         message: "Transcription en cours…",
         meetingId: "meeting-1",
@@ -101,6 +102,7 @@ describe("meetingFlow helpers", () => {
         error: null,
       },
       transcription: {
+        jobId: "transcription-2",
         phase: "uploading",
         message: "Envoi…",
       },

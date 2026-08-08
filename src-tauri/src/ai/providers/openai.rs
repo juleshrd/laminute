@@ -7,7 +7,7 @@ use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::diarize::{self, DiarizedSegment};
 use crate::ai::error::AiError;
 use crate::ai::http;
-use crate::ai::limits::validate_transcription_audio_size;
+use crate::ai::limits::{truncate_error_message, validate_transcription_audio_size};
 use crate::ai::model_catalog::{self, OPENAI_DIARIZE_MODEL};
 use crate::ai::models::{
     KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult, TranscriptionOptions,
@@ -234,12 +234,13 @@ impl TranscriptionProvider for OpenAiProvider {
             .await?;
 
         let status = response.status();
-        let body = response.text().await?;
 
         if !status.is_success() {
+            let body = http::read_provider_error(response).await?;
             return Err(http::map_http_error(status, &body, "OpenAI", self.id()));
         }
 
+        let body = http::read_provider_response(response).await?;
         let payload: OpenAiTranscriptionResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -323,14 +324,19 @@ impl SummaryProvider for OpenAiProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+            let body = http::read_provider_error(response).await?;
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
-                message: format!("réponse inattendue ({status}) : {body}"),
+                message: truncate_error_message(&format!("réponse inattendue ({status}) : {body}")),
             });
         }
 
-        let payload: ChatCompletionResponse = response.json().await?;
+        let body = http::read_provider_response(response).await?;
+        let payload: ChatCompletionResponse =
+            serde_json::from_str(&body).map_err(|err| AiError::Provider {
+                provider: self.id().to_string(),
+                message: format!("réponse compte-rendu illisible : {err}"),
+            })?;
         let text = payload
             .choices
             .first()
@@ -495,5 +501,37 @@ mod tests {
 
         assert!(result.text.contains("synthese"));
         assert_eq!(result.model, "gpt-4o-mini");
+    }
+
+    #[tokio::test]
+    async fn summarize_rejects_oversized_response() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(
+                    "x".repeat(crate::ai::limits::MAX_PROVIDER_RESPONSE_BYTES + 1),
+                ),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let provider = OpenAiProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
+        let err = provider
+            .summarize(
+                "sk-test",
+                "Texte",
+                SummaryOptions {
+                    model: None,
+                    max_tokens: None,
+                },
+            )
+            .await
+            .expect_err("oversized response");
+
+        assert!(err.to_string().contains("trop volumineuse"));
     }
 }

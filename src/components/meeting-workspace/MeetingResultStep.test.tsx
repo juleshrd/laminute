@@ -15,6 +15,7 @@ describe("MeetingResultStep", () => {
           updatedAt: "2026-01-01T00:00:00Z",
         }}
         summary={{
+          jobId: "summary-1",
           meetingId: "meeting-1",
           summary: {
             id: "summary-1",

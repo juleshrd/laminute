@@ -80,6 +80,7 @@ export interface SummaryRecord {
 }
 
 export interface GenerateStructuredSummaryInput {
+  jobId?: string;
   meetingId?: string;
   text?: string;
   providerId?: string;
@@ -87,6 +88,7 @@ export interface GenerateStructuredSummaryInput {
 }
 
 export interface GenerateStructuredSummaryOutput {
+  jobId: string;
   meetingId: string;
   summary: SummaryRecord;
   structured: StructuredSummary;

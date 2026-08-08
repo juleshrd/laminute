@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -71,6 +71,13 @@ export interface UseMeetingFlowResult {
   runSummarizeFromText: () => Promise<void>;
 }
 
+function createAiJobId(prefix: "transcription" | "summary"): string {
+  if (globalThis.crypto?.randomUUID) {
+    return `${prefix}-${globalThis.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function useMeetingFlow(): UseMeetingFlowResult {
   const [flowPhase, setFlowPhase] = useState<MeetingFlowPhase>("idle");
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
@@ -96,6 +103,8 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   const [providerName, setProviderName] = useState("Mistral");
   const [selectedProvider, setSelectedProvider] = useState<ProviderInfo | null>(null);
   const [pastedText, setPastedText] = useState("");
+  const activeTranscriptionJobIdRef = useRef<string | null>(null);
+  const processingPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -184,6 +193,9 @@ export function useMeetingFlow(): UseMeetingFlowResult {
         if (hydrated.meetingId) {
           setMeetingId(hydrated.meetingId);
         }
+        if (hydrated.transcriptionProgress?.jobId) {
+          activeTranscriptionJobIdRef.current = hydrated.transcriptionProgress.jobId;
+        }
         setProcessingStep(hydrated.processingStep);
         setTranscriptionProgress(hydrated.transcriptionProgress);
       }
@@ -213,12 +225,26 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       return;
     }
 
-    void getTranscriptionProgress()
-      .then(setTranscriptionProgress)
+    const jobId = activeTranscriptionJobIdRef.current;
+
+    void getTranscriptionProgress(jobId ?? undefined)
+      .then((progress) => {
+        if (!progress) {
+          return;
+        }
+        if (jobId && progress.jobId !== jobId) {
+          return;
+        }
+        setTranscriptionProgress(progress);
+      })
       .catch(() => undefined);
 
     let unlisten: (() => void) | undefined;
     void listenTranscriptionProgress((progress) => {
+      const activeJobId = activeTranscriptionJobIdRef.current;
+      if (activeJobId && progress.jobId !== activeJobId) {
+        return;
+      }
       setTranscriptionProgress(progress);
     }).then((fn) => {
       unlisten = fn;
@@ -316,61 +342,88 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       durationSecs?: number | null;
       meetingTitle?: string;
     }) => {
-      const activeFilePath = overrides?.filePath ?? filePath;
-      const activeDurationSecs = overrides?.durationSecs ?? durationSecs;
-      const activeTitle = overrides?.meetingTitle ?? title;
-
-      if (!activeFilePath) {
-        return;
+      if (processingPromiseRef.current) {
+        return processingPromiseRef.current;
       }
 
-      const providerCanTranscribe = selectedProvider?.capabilities.transcription ?? true;
+      const promise = (async () => {
+        const activeFilePath = overrides?.filePath ?? filePath;
+        const activeDurationSecs = overrides?.durationSecs ?? durationSecs;
+        const activeTitle = overrides?.meetingTitle ?? title;
 
-      setFlowPhase("processing");
-      setError(null);
+        if (!activeFilePath) {
+          return;
+        }
 
-      try {
-        let nextTranscription = transcription;
+        const providerCanTranscribe = selectedProvider?.capabilities.transcription ?? true;
 
-        if (!nextTranscription && providerCanTranscribe) {
-          setProcessingStep("transcribing");
-          nextTranscription = await transcribeAudioFile({
-            filePath: activeFilePath,
-            meetingId: meetingId ?? undefined,
-            meetingTitle: meetingId ? undefined : activeTitle.trim() || undefined,
-            language: "fr",
-            durationMs:
-              activeDurationSecs != null ? Math.round(activeDurationSecs * 1000) : undefined,
+        setFlowPhase("processing");
+        setError(null);
+
+        try {
+          let nextTranscription = transcription;
+
+          if (!nextTranscription && providerCanTranscribe) {
+            const transcriptionJobId = createAiJobId("transcription");
+            activeTranscriptionJobIdRef.current = transcriptionJobId;
+            setProcessingStep("transcribing");
+            const output = await transcribeAudioFile({
+              jobId: transcriptionJobId,
+              filePath: activeFilePath,
+              meetingId: meetingId ?? undefined,
+              meetingTitle: meetingId ? undefined : activeTitle.trim() || undefined,
+              language: "fr",
+              durationMs:
+                activeDurationSecs != null ? Math.round(activeDurationSecs * 1000) : undefined,
+            });
+            if (activeTranscriptionJobIdRef.current !== output.jobId) {
+              return;
+            }
+            nextTranscription = output.transcription;
+            setTranscription(nextTranscription);
+            setMeetingId(nextTranscription.meetingId);
+          }
+
+          const summaryText = nextTranscription?.content ?? pastedText.trim();
+          if (!summaryText) {
+            throw new Error("Aucun texte disponible pour générer le compte-rendu.");
+          }
+
+          if (activeTitle.trim() && (nextTranscription?.meetingId ?? meetingId)) {
+            await updateMeetingTitle(
+              nextTranscription?.meetingId ?? meetingId!,
+              activeTitle.trim(),
+            );
+          }
+
+          setProcessingStep("summarizing");
+          const nextSummary = await generateStructuredSummary({
+            jobId: createAiJobId("summary"),
+            meetingId: nextTranscription?.meetingId ?? meetingId ?? undefined,
+            text: nextTranscription ? undefined : summaryText,
           });
-          setTranscription(nextTranscription);
-          setMeetingId(nextTranscription.meetingId);
+          setSummary(nextSummary);
+          if (!meetingId) {
+            setMeetingId(nextSummary.meetingId);
+          }
+          setFlowPhase("done");
+        } catch (err) {
+          setError(formatMeetingError(err));
+          setFlowPhase("error");
+        } finally {
+          activeTranscriptionJobIdRef.current = null;
+          setProcessingStep(null);
+          await refreshAiSettings();
         }
+      })();
 
-        const summaryText = nextTranscription?.content ?? pastedText.trim();
-        if (!summaryText) {
-          throw new Error("Aucun texte disponible pour générer le compte-rendu.");
-        }
-
-        if (activeTitle.trim() && (nextTranscription?.meetingId ?? meetingId)) {
-          await updateMeetingTitle(nextTranscription?.meetingId ?? meetingId!, activeTitle.trim());
-        }
-
-        setProcessingStep("summarizing");
-        const nextSummary = await generateStructuredSummary({
-          meetingId: nextTranscription?.meetingId ?? meetingId ?? undefined,
-          text: nextTranscription ? undefined : summaryText,
-        });
-        setSummary(nextSummary);
-        if (!meetingId) {
-          setMeetingId(nextSummary.meetingId);
-        }
-        setFlowPhase("done");
-      } catch (err) {
-        setError(formatMeetingError(err));
-        setFlowPhase("error");
+      processingPromiseRef.current = promise;
+      try {
+        await promise;
       } finally {
-        setProcessingStep(null);
-        await refreshAiSettings();
+        if (processingPromiseRef.current === promise) {
+          processingPromiseRef.current = null;
+        }
       }
     },
     [
@@ -459,29 +512,45 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   );
 
   const runSummarizeFromText = useCallback(async () => {
-    const text = pastedText.trim();
-    if (!text) {
-      return;
+    if (processingPromiseRef.current) {
+      return processingPromiseRef.current;
     }
 
-    setFlowPhase("processing");
-    setError(null);
-    setProcessingStep("summarizing");
+    const promise = (async () => {
+      const text = pastedText.trim();
+      if (!text) {
+        return;
+      }
 
+      setFlowPhase("processing");
+      setError(null);
+      setProcessingStep("summarizing");
+
+      try {
+        const nextSummary = await generateStructuredSummary({
+          jobId: createAiJobId("summary"),
+          meetingId: meetingId ?? undefined,
+          text,
+        });
+        setSummary(nextSummary);
+        setMeetingId(nextSummary.meetingId);
+        setFlowPhase("done");
+      } catch (err) {
+        setError(formatMeetingError(err));
+        setFlowPhase("error");
+      } finally {
+        setProcessingStep(null);
+        await refreshAiSettings();
+      }
+    })();
+
+    processingPromiseRef.current = promise;
     try {
-      const nextSummary = await generateStructuredSummary({
-        meetingId: meetingId ?? undefined,
-        text,
-      });
-      setSummary(nextSummary);
-      setMeetingId(nextSummary.meetingId);
-      setFlowPhase("done");
-    } catch (err) {
-      setError(formatMeetingError(err));
-      setFlowPhase("error");
+      await promise;
     } finally {
-      setProcessingStep(null);
-      await refreshAiSettings();
+      if (processingPromiseRef.current === promise) {
+        processingPromiseRef.current = null;
+      }
     }
   }, [meetingId, pastedText, refreshAiSettings]);
 

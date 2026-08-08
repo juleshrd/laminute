@@ -5,6 +5,7 @@ export type TranscriptionPhase =
   "idle" | "preparing" | "uploading" | "transcribing" | "saving" | "completed" | "failed";
 
 export interface TranscriptionProgress {
+  jobId: string;
   phase: TranscriptionPhase;
   message: string;
   meetingId?: string;
@@ -22,6 +23,7 @@ export interface Transcription {
 }
 
 export interface TranscribeAudioInput {
+  jobId?: string;
   filePath: string;
   meetingId?: string;
   meetingTitle?: string;
@@ -29,12 +31,19 @@ export interface TranscribeAudioInput {
   durationMs?: number;
 }
 
-export function getTranscriptionProgress(): Promise<TranscriptionProgress> {
-  return invoke<TranscriptionProgress>("get_transcription_progress");
+export interface TranscribeAudioOutput {
+  jobId: string;
+  transcription: Transcription;
 }
 
-export function transcribeAudioFile(input: TranscribeAudioInput): Promise<Transcription> {
-  return invoke<Transcription>("transcribe_audio_file", { input });
+export function getTranscriptionProgress(jobId?: string): Promise<TranscriptionProgress | null> {
+  return invoke<TranscriptionProgress | null>("get_transcription_progress", {
+    jobId: jobId ?? null,
+  });
+}
+
+export function transcribeAudioFile(input: TranscribeAudioInput): Promise<TranscribeAudioOutput> {
+  return invoke<TranscribeAudioOutput>("transcribe_audio_file", { input });
 }
 
 export function listenTranscriptionProgress(

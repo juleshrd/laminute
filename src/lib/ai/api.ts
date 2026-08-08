@@ -51,3 +51,7 @@ export function generateStructuredSummary(
     input,
   });
 }
+
+export function cancelAiJob(jobId: string): Promise<{ jobId: string; cancelled: boolean }> {
+  return invoke<{ jobId: string; cancelled: boolean }>("cancel_ai_job", { jobId });
+}
