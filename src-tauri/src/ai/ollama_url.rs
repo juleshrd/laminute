@@ -7,16 +7,11 @@ use url::Url;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedOllamaUrl {
     url: Url,
-    remote: bool,
 }
 
 impl NormalizedOllamaUrl {
     pub fn as_str(&self) -> &str {
         self.url.as_str().trim_end_matches('/')
-    }
-
-    pub fn is_remote(&self) -> bool {
-        self.remote
     }
 
     pub fn into_string(self) -> String {
@@ -107,7 +102,7 @@ pub fn normalize(raw: &str, allow_remote: bool) -> Result<NormalizedOllamaUrl, O
         return Err(OllamaUrlError::RemoteNotAllowed);
     }
 
-    Ok(NormalizedOllamaUrl { url, remote })
+    Ok(NormalizedOllamaUrl { url })
 }
 
 /// Cible de redirection acceptable (même contrôles réseau, sans exiger l'opt-in remote
@@ -192,14 +187,12 @@ mod tests {
     fn accepts_loopback_default() {
         let normalized = normalize("http://127.0.0.1:11434", false).expect("loopback");
         assert_eq!(normalized.as_str(), "http://127.0.0.1:11434");
-        assert!(!normalized.is_remote());
     }
 
     #[test]
     fn accepts_localhost_and_strips_trailing_slash() {
         let normalized = normalize(" http://localhost:11434/ ", false).expect("localhost");
         assert_eq!(normalized.as_str(), "http://localhost:11434");
-        assert!(!normalized.is_remote());
     }
 
     #[test]
@@ -247,7 +240,6 @@ mod tests {
             Err(OllamaUrlError::RemoteNotAllowed)
         );
         let normalized = normalize("http://192.168.1.10:11434", true).expect("lan");
-        assert!(normalized.is_remote());
         assert_eq!(normalized.as_str(), "http://192.168.1.10:11434");
     }
 
