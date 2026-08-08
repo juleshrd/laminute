@@ -57,6 +57,8 @@ jobs:
       - uses: ./.github/actions/install-tauri-deps
 
       - name: Vérifier tag, branche et versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x .github/scripts/check-release-version.sh
           .github/scripts/check-release-version.sh
