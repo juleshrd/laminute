@@ -68,8 +68,18 @@ jobs:
           chmod +x .github/scripts/retry.sh
           .github/scripts/retry.sh 3 npm ci
 
-      - name: check:ci
-        run: npm run check:ci
+      # Aligné sur ci.yml : cargo-deny via action (pas besoin de cargo install).
+      - name: check (format, lint, tests, build)
+        run: npm run check
+
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+          manifest-path: src-tauri/Cargo.toml
+          arguments: --config deny.toml
+
+      - name: npm audit (high severity)
+        run: npm run audit:npm
 
   build:
     name: build-${{ matrix.platform }}
