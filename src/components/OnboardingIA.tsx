@@ -135,6 +135,20 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
           <>
             <h2>Bienvenue</h2>
             <p className="lm-subtle lm-onboarding-lead">{onboardingWelcomeLead()}</p>
+            {ordered.length > 0 ? (
+              <ul className="lm-provider-logo-row" aria-label="Fournisseurs IA disponibles">
+                {ordered.map((provider) => (
+                  <li key={provider.id} className="lm-provider-logo-row__item">
+                    <ProviderLogo
+                      providerId={provider.id}
+                      displayName={provider.displayName}
+                      size="sm"
+                    />
+                    <span>{provider.displayName}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className="lm-row lm-onboarding-actions">
               <button type="button" className="lm-btn" disabled={busy} onClick={onSkip}>
                 Plus tard
@@ -168,7 +182,11 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                     aria-pressed={selected}
                   >
                     <span className="lm-provider-head">
-                      <ProviderLogo providerId={provider.id} displayName={provider.displayName} />
+                      <ProviderLogo
+                        providerId={provider.id}
+                        displayName={provider.displayName}
+                        size={featured ? "lg" : "md"}
+                      />
                       <span className="lm-provider-title">
                         {provider.displayName}
                         {featured ? <span className="lm-recommended">Recommandé</span> : null}
@@ -204,7 +222,16 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
 
         {step === "config" ? (
           <>
-            <h2>Configurer {selectedProvider?.displayName ?? "le fournisseur"}</h2>
+            <h2 className="lm-config-title">
+              {selectedProvider ? (
+                <ProviderLogo
+                  providerId={selectedProvider.id}
+                  displayName={selectedProvider.displayName}
+                  size="md"
+                />
+              ) : null}
+              <span>Configurer {selectedProvider?.displayName ?? "le fournisseur"}</span>
+            </h2>
             <p className="lm-subtle lm-onboarding-lead">
               Optionnel pour l’instant — vous pourrez configurer plus tard dans Réglages.
             </p>
