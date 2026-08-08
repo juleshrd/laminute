@@ -8,7 +8,7 @@ pub use action::{Action, ActionStatus};
 pub use audio::AudioFile;
 pub use meeting::{
     CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters,
-    MeetingStatus, MeetingSummary,
+    MeetingSearchPage, MeetingStatus, MeetingSummary,
 };
 pub use summary::Summary;
 pub use transcription::Transcription;

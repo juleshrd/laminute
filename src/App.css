@@ -903,6 +903,11 @@ select {
   overflow: hidden;
 }
 
+.meeting-history__more {
+  display: flex;
+  justify-content: center;
+}
+
 .meeting-history__empty {
   margin: 0;
   color: var(--lm-muted);
