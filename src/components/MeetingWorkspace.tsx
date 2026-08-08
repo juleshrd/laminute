@@ -56,6 +56,7 @@ export function MeetingWorkspace() {
               hasApiKey={flow.hasApiKey}
               providerName={flow.providerName}
               selectedProvider={flow.selectedProvider}
+              ollamaBaseUrl={flow.ollamaBaseUrl}
               isSummarizeOnly={flow.isSummarizeOnly}
               isBusy={flow.isBusy}
               pastedText={flow.pastedText}

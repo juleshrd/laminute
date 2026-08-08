@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { onboardingProviderDescription, onboardingWelcomeLead } from "../content/privacyNotices";
 import { getAiSettings, listAiProviders, setSelectedProvider } from "../lib/ai/api";
 import type { ProviderInfo } from "../lib/ai/types";
 import { BrandMark } from "./LmShell";
@@ -15,13 +16,7 @@ interface OnboardingIAProps {
 }
 
 function providerDescription(provider: ProviderInfo): string {
-  if (provider.capabilities.local) {
-    return "Traitement local via Ollama.";
-  }
-  if (provider.capabilities.transcription) {
-    return "Transcription + compte-rendu.";
-  }
-  return "Compte-rendu à partir d’un texte.";
+  return onboardingProviderDescription(provider.id, provider.capabilities);
 }
 
 function stepIndex(step: OnboardingStep): number {
@@ -139,10 +134,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
         {step === "welcome" ? (
           <>
             <h2>Bienvenue</h2>
-            <p className="lm-subtle lm-onboarding-lead">
-              Enregistrez ou importez un audio, lancez le traitement, et consultez le résultat. Tout
-              reste sur votre ordinateur — avec la clé du fournisseur que vous choisissez.
-            </p>
+            <p className="lm-subtle lm-onboarding-lead">{onboardingWelcomeLead()}</p>
             <div className="lm-row lm-onboarding-actions">
               <button type="button" className="lm-btn" disabled={busy} onClick={onSkip}>
                 Plus tard

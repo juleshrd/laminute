@@ -12,6 +12,7 @@ interface MeetingReadyStepProps {
   hasApiKey: boolean;
   providerName: string;
   selectedProvider: ProviderInfo | null;
+  ollamaBaseUrl: string | null;
   isSummarizeOnly: boolean;
   isBusy: boolean;
   pastedText: string;
@@ -31,6 +32,7 @@ export function MeetingReadyStep({
   hasApiKey,
   providerName,
   selectedProvider,
+  ollamaBaseUrl,
   isSummarizeOnly,
   isBusy,
   pastedText,
@@ -82,7 +84,9 @@ export function MeetingReadyStep({
 
       {showActionControls && hasApiKey && (
         <DataProcessingNotice
+          providerId={selectedProvider?.id}
           providerName={providerName}
+          ollamaBaseUrl={ollamaBaseUrl}
           capabilities={selectedProvider?.capabilities}
         />
       )}

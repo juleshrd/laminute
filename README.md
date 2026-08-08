@@ -4,7 +4,7 @@
 
 **La Minute** transforme vos réunions en comptes-rendus structurés : synthèse, décisions et actions.
 
-Enregistrez ou importez un audio, lancez le traitement, et consultez le résultat. Tout reste sur votre ordinateur.
+Enregistrez ou importez un audio, lancez le traitement, et consultez le résultat. Les réunions restent stockées sur votre ordinateur ; le traitement dépend du fournisseur IA choisi.
 
 [![CI](https://github.com/juleshrd/laminute/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/juleshrd/laminute/actions/workflows/ci.yml)
 

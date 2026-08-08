@@ -20,14 +20,29 @@ Ce répertoire contient notamment :
 
 Les données y restent **jusqu'à ce que vous les supprimiez** (réunion par réunion ou effacement complet depuis les réglages « Confidentialité »).
 
-## Fournisseur IA (BYOK — Mistral)
+Le **stockage** est toujours local. Le **traitement** (transcription / compte-rendu) dépend du fournisseur IA configuré.
 
-Si vous configurez une clé API Mistral :
+## Fournisseurs IA
 
-- **Transcription** : le fichier audio de la réunion est envoyé à l'API Mistral pour produire le texte.
-- **Compte-rendu structuré** : uniquement le **texte transcrit** est envoyé à Mistral pour générer la synthèse.
+### Mistral et OpenAI (BYOK)
 
-Votre clé API est stockée dans le **trousseau système** (Secret Service / Keychain / Credential Manager), jamais en clair dans la base ni dans les exports. La Minute n'a pas accès à vos serveurs Mistral en dehors de ces appels que vous déclenchez.
+Si vous configurez une clé API Mistral ou OpenAI :
+
+- **Transcription** : le fichier audio de la réunion est envoyé à l'API du fournisseur pour produire le texte.
+- **Compte-rendu structuré** : uniquement le **texte** (transcrit ou collé) est envoyé pour générer la synthèse.
+
+Votre clé API est :
+
+- **au repos** : stockée dans le **trousseau système** (Secret Service / Keychain / Credential Manager), jamais en clair dans la base ni dans les exports ;
+- **en transit** : transmise au fournisseur via **TLS** dans l'en-tête d'authentification (`Authorization: Bearer …`), jamais intégrée au contenu audio/texte ni aux exports.
+
+La Minute n'initie ces appels que lorsque vous déclenchez une transcription ou un compte-rendu.
+
+### Ollama
+
+- **URL loopback** (`127.0.0.1`, `localhost`, `::1`) : le compte-rendu est généré sur votre machine ; aucune donnée n'est envoyée à un service cloud.
+- **URL distante / LAN** : uniquement avec opt-in explicite ; le texte du compte-rendu est envoyé au serveur Ollama configuré. Aucune clé API n'est transmise.
+- La transcription audio n'est pas disponible via Ollama.
 
 ## Export et suppression
 
@@ -40,7 +55,7 @@ L'enregistrement via microphone peut capturer la voix d'autres participants. **I
 
 ## Télémétrie
 
-La Minute **n'envoie aucune télémétrie** ni donnée d'usage à ses développeurs. Seuls les appels que vous initiez vers Mistral (si configuré) quittent votre machine.
+La Minute **n'envoie aucune télémétrie** ni donnée d'usage à ses développeurs. Seuls les appels que vous initiez vers le fournisseur IA configuré (Mistral, OpenAI, ou Ollama distant) quittent votre machine.
 
 ## Licence
 

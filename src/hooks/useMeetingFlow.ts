@@ -38,6 +38,7 @@ export interface UseMeetingFlowResult {
   durationSecs: number | null;
   title: string;
   hasApiKey: boolean;
+  ollamaBaseUrl: string | null;
   transcription: Transcription | null;
   summary: GenerateStructuredSummaryOutput | null;
   transcriptionProgress: TranscriptionProgress | null;
@@ -79,6 +80,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   const [durationSecs, setDurationSecs] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState<string | null>("http://127.0.0.1:11434");
   const [transcription, setTranscription] = useState<Transcription | null>(null);
   const [summary, setSummary] = useState<GenerateStructuredSummaryOutput | null>(null);
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(
@@ -126,6 +128,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     try {
       const [settings, providers] = await Promise.all([getAiSettings(), listAiProviders()]);
       setHasApiKey(settings.hasApiKey);
+      setOllamaBaseUrl(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
       const selected = providers.find((provider) => provider.id === settings.selectedProviderId);
       setSelectedProvider(selected ?? providers[0] ?? null);
       setProviderName(selected?.displayName ?? providers[0]?.displayName ?? "Mistral");
@@ -460,6 +463,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     durationSecs,
     title,
     hasApiKey,
+    ollamaBaseUrl,
     transcription,
     summary,
     transcriptionProgress,

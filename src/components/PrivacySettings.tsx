@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { privacySettingsIntro } from "../content/privacyNotices";
 import { PRIVACY_POLICY_SHORT } from "../content/privacyPolicyShort";
 import {
   deleteAllLocalData,
@@ -71,10 +72,7 @@ export function PrivacySettings() {
     <section className="privacy-settings" aria-labelledby="privacy-settings-title">
       <header className="privacy-settings__header">
         <h2 id="privacy-settings-title">Confidentialité et données locales</h2>
-        <p>
-          Vos réunions restent sur cet ordinateur jusqu&apos;à suppression. Les clés API Mistral
-          restent dans le trousseau système (réglages IA).
-        </p>
+        <p>{privacySettingsIntro()}</p>
       </header>
 
       {loading && <p className="privacy-settings__loading">Chargement…</p>}
