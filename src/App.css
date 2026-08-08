@@ -51,9 +51,6 @@ body {
 .lm-shell {
   --lm-ambient-ease: cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
-  display: grid;
-  grid-template-columns: 12.5rem minmax(0, 1fr);
-  grid-template-rows: minmax(100vh, auto);
   min-height: 100vh;
   isolation: isolate;
   overflow: hidden;
@@ -61,13 +58,11 @@ body {
 }
 
 .lm-ambient {
-  /* Couvre toute la grille : un enfant absolute sans span restait coincé en col. 1. */
-  grid-column: 1 / -1;
-  grid-row: 1;
+  position: absolute;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  min-height: 100%;
   background:
     radial-gradient(
       95% 80% at 12% 18%,
@@ -132,11 +127,15 @@ body {
   animation: lm-orb-drift-c 28s var(--lm-ambient-ease) infinite alternate;
 }
 
-.lm-nav {
+.lm-shell__body {
   position: relative;
-  grid-column: 1;
-  grid-row: 1;
   z-index: 1;
+  display: grid;
+  grid-template-columns: 12.5rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.lm-nav {
   padding: 0.85rem 0.7rem;
   border-right: 1px solid color-mix(in srgb, var(--lm-line) 40%, transparent);
   background: color-mix(in srgb, var(--lm-paper) 18%, transparent);
@@ -251,10 +250,6 @@ body {
 }
 
 .lm-main {
-  position: relative;
-  grid-column: 2;
-  grid-row: 1;
-  z-index: 1;
   padding: 1.25rem 1.35rem 2rem;
   min-width: 0;
   background: transparent;

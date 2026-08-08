@@ -37,44 +37,46 @@ export function LmShell({
         <span className="lm-ambient__orb lm-ambient__orb--b" />
         <span className="lm-ambient__orb lm-ambient__orb--c" />
       </div>
-      <aside className="lm-nav" aria-label="Navigation">
-        <div className="lm-nav-brand">
-          <BrandMark />
-          La Minute
-        </div>
-        {isRecording ? (
-          <button
-            type="button"
-            className="lm-mic-live"
-            onClick={() => onNavigate("meeting")}
-            aria-label={`Micro actif — retour à la réunion courante${
-              recordingDurationSecs != null
-                ? `, durée ${formatDuration(recordingDurationSecs)}`
-                : ""
-            }`}
-          >
-            <span className="lm-mic-live__dot" aria-hidden="true" />
-            <span className="lm-mic-live__label">Micro actif</span>
-            {recordingDurationSecs != null ? (
-              <span className="lm-mic-live__chrono" aria-hidden="true">
-                {formatDuration(recordingDurationSecs)}
-              </span>
-            ) : null}
-          </button>
-        ) : null}
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`lm-navitem${active === item.id ? " is-current" : ""}`}
-            aria-current={active === item.id ? "page" : undefined}
-            onClick={() => onNavigate(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </aside>
-      <div className="lm-main">{children}</div>
+      <div className="lm-shell__body">
+        <aside className="lm-nav" aria-label="Navigation">
+          <div className="lm-nav-brand">
+            <BrandMark />
+            La Minute
+          </div>
+          {isRecording ? (
+            <button
+              type="button"
+              className="lm-mic-live"
+              onClick={() => onNavigate("meeting")}
+              aria-label={`Micro actif — retour à la réunion courante${
+                recordingDurationSecs != null
+                  ? `, durée ${formatDuration(recordingDurationSecs)}`
+                  : ""
+              }`}
+            >
+              <span className="lm-mic-live__dot" aria-hidden="true" />
+              <span className="lm-mic-live__label">Micro actif</span>
+              {recordingDurationSecs != null ? (
+                <span className="lm-mic-live__chrono" aria-hidden="true">
+                  {formatDuration(recordingDurationSecs)}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`lm-navitem${active === item.id ? " is-current" : ""}`}
+              aria-current={active === item.id ? "page" : undefined}
+              onClick={() => onNavigate(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </aside>
+        <div className="lm-main">{children}</div>
+      </div>
     </div>
   );
 }
