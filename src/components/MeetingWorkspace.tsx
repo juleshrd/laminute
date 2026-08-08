@@ -14,7 +14,7 @@ interface MeetingWorkspaceProps {
 export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
   return (
     <div className={`meeting-workspace${flow.isRecording ? " meeting-workspace--recording" : ""}`}>
-      {!flow.isRecording && (
+      {!flow.isRecording && flow.flowPhase !== "idle" && (
         <div
           className={`status-banner status-banner--${flow.flowPhase}`}
           role="status"
