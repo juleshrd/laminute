@@ -7,6 +7,7 @@
 Enregistrez ou importez un audio, lancez le traitement, et consultez le résultat. Les réunions restent stockées sur votre ordinateur ; le traitement dépend du fournisseur IA choisi.
 
 [![CI](https://github.com/juleshrd/laminute/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/juleshrd/laminute/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 ## Télécharger et installer
 
@@ -20,10 +21,9 @@ Téléchargez la [dernière version](https://github.com/juleshrd/laminute/releas
 
 Installez, puis ouvrez **La Minute**.
 
-- **macOS** : si macOS bloque l’ouverture, clic droit sur l’app → **Ouvrir**.
-- **Windows** : si SmartScreen s’affiche, choisissez **Exécuter quand même**.
+Les installateurs et le flux d’auto-update (`latest.json`) sont publiés sur GitHub Releases. Les artefacts d’update sont **signés Minisign** et vérifiés par l’application. En v0.1.0, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) : le système peut afficher un avertissement à la première ouverture (macOS : clic droit → **Ouvrir** ; Windows : SmartScreen).
 
-Quand une nouvelle version est disponible, l’app vous propose la mise à jour.
+Quand une nouvelle version est disponible, l’app vous propose la mise à jour. Si la vérification échoue (réseau, dépôt inaccessible), un message non bloquant s’affiche.
 
 ## Configuration recommandée (Mistral)
 
@@ -79,6 +79,8 @@ Détails : [PRIVACY.md](PRIVACY.md).
 
 ## Pour les développeurs
 
+Prérequis et détail des commandes : [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ```bash
 npm install
 npm run dev
@@ -90,6 +92,9 @@ Validation complète avant une PR (équivalent CI) :
 npm run check:ci
 ```
 
+Budgets de taille / démarrage : [docs/performance-budget.md](docs/performance-budget.md).  
+Sécurité : [SECURITY.md](SECURITY.md). Code de conduite : [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
 ### Performance — recherche historique
 
 La recherche texte sur l'historique utilise un index SQLite FTS5 (tokenizer trigram). Pour mesurer les latences sur un jeu de données synthétique (1 000 réunions) :
@@ -98,8 +103,6 @@ La recherche texte sur l'historique utilise un index SQLite FTS5 (tokenizer trig
 cd src-tauri && cargo run --example bench_search --release
 ```
 
-Prérequis, structure du dépôt et contributions : [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## Licence
 
-GPL-3.0 — voir [LICENSE](LICENSE).
+[GPL-3.0-only](LICENSE) — contributions sous la même licence (voir [CONTRIBUTING.md](CONTRIBUTING.md)).

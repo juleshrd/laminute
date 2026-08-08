@@ -11,7 +11,13 @@ vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: relaunchMock,
 }));
 
-import { applyAppUpdate, checkForAppUpdate, formatUpdateProgress } from "./updater";
+import {
+  applyAppUpdate,
+  checkForAppUpdate,
+  describeUpdateCheckError,
+  formatUpdateProgress,
+  probeAppUpdate,
+} from "./updater";
 
 describe("updater", () => {
   beforeEach(() => {
@@ -30,6 +36,33 @@ describe("updater", () => {
     checkMock.mockResolvedValueOnce(null);
 
     await expect(checkForAppUpdate()).resolves.toBeNull();
+  });
+
+  it("checkForAppUpdate propage les erreurs réseau", async () => {
+    checkMock.mockRejectedValueOnce(new Error("network down"));
+
+    await expect(checkForAppUpdate()).rejects.toThrow("network down");
+  });
+
+  it("probeAppUpdate distingue update / à jour / erreur", async () => {
+    const update = { version: "0.2.0" };
+    checkMock.mockResolvedValueOnce(update);
+    await expect(probeAppUpdate()).resolves.toEqual({ status: "available", update });
+
+    checkMock.mockResolvedValueOnce(null);
+    await expect(probeAppUpdate()).resolves.toEqual({ status: "up-to-date" });
+
+    checkMock.mockRejectedValueOnce(new Error("timeout"));
+    await expect(probeAppUpdate()).resolves.toEqual({
+      status: "error",
+      message: "Vérification des mises à jour impossible : timeout",
+    });
+  });
+
+  it("describeUpdateCheckError fournit un message par défaut", () => {
+    expect(describeUpdateCheckError("x")).toBe(
+      "Vérification des mises à jour impossible (réseau indisponible ou flux inaccessible).",
+    );
   });
 
   it("applyAppUpdate télécharge, installe puis relance", async () => {
