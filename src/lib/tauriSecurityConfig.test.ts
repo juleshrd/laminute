@@ -56,10 +56,7 @@ describe("configuration sécurité Tauri", () => {
 
     const scope = assetProtocol?.scope;
     expect(Array.isArray(scope)).toBe(true);
-    expect(scope).toEqual([
-      "$APPDATA/imports/**/*",
-      "$APPDATA/recordings/**/*",
-    ]);
+    expect(scope).toEqual(["$APPDATA/imports/**/*", "$APPDATA/recordings/**/*"]);
 
     const patterns = scope as string[];
     for (const pattern of patterns) {
