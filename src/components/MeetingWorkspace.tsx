@@ -92,11 +92,12 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
         </>
       )}
 
-      {flow.error && (
+      {flow.error &&
+      !(flow.flowPhase === "idle" && /périphérique/i.test(flow.error)) ? (
         <p className="error" role="alert">
           {flow.error}
         </p>
-      )}
+      ) : null}
 
       {flow.showRecordingConsent && (
         <RecordingConsentModal

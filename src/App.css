@@ -959,6 +959,13 @@ select {
     color 0.2s ease;
 }
 
+.record-card__dot {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--lm-red);
+}
+
 .record-card__btn:hover:not(:disabled) {
   transform: scale(1.04);
 }
@@ -975,6 +982,11 @@ select {
   font-size: 1.05rem;
   border: 0.45rem solid #fff;
   outline: 1px solid #ffd0d3;
+}
+
+.record-card__btn--stop .record-card__dot,
+.record-card.is-recording .record-card__dot {
+  display: none;
 }
 
 .record-card__source {

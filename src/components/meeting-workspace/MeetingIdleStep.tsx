@@ -54,7 +54,7 @@ export function MeetingIdleStep({
           onClick={onRequestStartRecording}
           disabled={!canStartRecording}
         >
-          ●
+          <span className="record-card__dot" aria-hidden="true" />
         </button>
         <h3>Nouvelle réunion</h3>
         <p>Un clic. Aucun formulaire.</p>
