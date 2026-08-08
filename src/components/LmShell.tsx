@@ -32,6 +32,11 @@ export function LmShell({
 }: LmShellProps) {
   return (
     <div className="lm-shell">
+      <div className="lm-ambient" aria-hidden="true">
+        <span className="lm-ambient__orb lm-ambient__orb--a" />
+        <span className="lm-ambient__orb lm-ambient__orb--b" />
+        <span className="lm-ambient__orb lm-ambient__orb--c" />
+      </div>
       <aside className="lm-nav" aria-label="Navigation">
         <div className="lm-nav-brand">
           <BrandMark />

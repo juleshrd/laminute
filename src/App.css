@@ -59,17 +59,84 @@ body {
 }
 
 .lm-shell {
+  --lm-ambient-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
   display: grid;
   grid-template-columns: 12.5rem minmax(0, 1fr);
   min-height: 100vh;
+  isolation: isolate;
+  overflow: hidden;
+  background: transparent;
+}
+
+.lm-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      90% 70% at 18% 12%,
+      color-mix(in srgb, var(--lm-soft) 78%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      80% 65% at 88% 18%,
+      color-mix(in srgb, var(--lm-wash) 70%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      70% 55% at 62% 88%,
+      color-mix(in srgb, var(--lm-navy) 8%, transparent),
+      transparent 60%
+    ),
+    var(--lm-cream);
+}
+
+.lm-ambient__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.8;
+  will-change: transform;
+}
+
+.lm-ambient__orb--a {
+  width: min(72vw, 34rem);
+  height: min(72vw, 34rem);
+  top: -8%;
+  left: -6%;
+  background: color-mix(in srgb, var(--lm-soft) 90%, var(--lm-red) 5%);
+  animation: lm-orb-drift-a 20s var(--lm-ambient-ease) infinite alternate;
+}
+
+.lm-ambient__orb--b {
+  width: min(64vw, 30rem);
+  height: min(64vw, 30rem);
+  right: -10%;
+  top: 8%;
+  background: color-mix(in srgb, var(--lm-wash) 58%, var(--lm-navy) 9%);
+  animation: lm-orb-drift-b 24s var(--lm-ambient-ease) infinite alternate;
+}
+
+.lm-ambient__orb--c {
+  width: min(58vw, 26rem);
+  height: min(58vw, 26rem);
+  left: 28%;
+  bottom: -16%;
+  background: color-mix(in srgb, var(--lm-navy) 12%, transparent);
+  animation: lm-orb-drift-c 28s var(--lm-ambient-ease) infinite alternate;
 }
 
 .lm-nav {
+  position: relative;
+  z-index: 1;
   padding: 0.85rem 0.7rem;
-  border-right: 1px solid var(--lm-line);
-  background: color-mix(in srgb, var(--lm-cream) 82%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid color-mix(in srgb, var(--lm-line) 70%, transparent);
+  background: color-mix(in srgb, var(--lm-cream) 42%, transparent);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
 }
 
 .lm-nav-brand {
@@ -179,8 +246,11 @@ body {
 }
 
 .lm-main {
+  position: relative;
+  z-index: 1;
   padding: 1.25rem 1.35rem 2rem;
   min-width: 0;
+  background: transparent;
 }
 
 .lm-heading {
@@ -695,70 +765,10 @@ select {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 1.75rem 1rem 2.25rem;
-  overflow: hidden;
-  isolation: isolate;
-  border-radius: 1rem;
-  background:
-    radial-gradient(
-      70% 55% at 50% 28%,
-      color-mix(in srgb, var(--lm-paper) 70%, transparent),
-      transparent 72%
-    ),
-    color-mix(in srgb, var(--lm-wash) 35%, transparent);
-}
-
-.meeting-hero__ambient {
-  position: absolute;
-  inset: -18% -12%;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.meeting-hero__orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(56px);
-  opacity: 0.85;
-  will-change: transform;
-}
-
-.meeting-hero__orb--a {
-  width: min(58vw, 26rem);
-  height: min(58vw, 26rem);
-  top: 2%;
-  left: 6%;
-  background: color-mix(in srgb, var(--lm-soft) 88%, var(--lm-red) 6%);
-  animation: meeting-orb-drift-a 18s var(--meeting-hero-ease) infinite alternate;
-}
-
-.meeting-hero__orb--b {
-  width: min(52vw, 22rem);
-  height: min(52vw, 22rem);
-  right: 2%;
-  bottom: 8%;
-  background: color-mix(in srgb, var(--lm-wash) 55%, var(--lm-navy) 10%);
-  animation: meeting-orb-drift-b 22s var(--meeting-hero-ease) infinite alternate;
-}
-
-.meeting-hero__orb--c {
-  width: min(42vw, 16rem);
-  height: min(42vw, 16rem);
-  left: 40%;
-  top: 42%;
-  background: color-mix(in srgb, var(--lm-navy) 14%, transparent);
-  animation: meeting-orb-drift-c 26s var(--meeting-hero-ease) infinite alternate;
-}
-
-.meeting-hero__stage {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   gap: 1.05rem;
   width: min(100%, 26rem);
+  margin: 0 auto;
+  padding: 1.75rem 1rem 2.25rem;
   animation: meeting-stage-in 0.55s var(--meeting-hero-ease) both;
 }
 
@@ -998,7 +1008,7 @@ select {
   }
 }
 
-@keyframes meeting-orb-drift-a {
+@keyframes lm-orb-drift-a {
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
@@ -1007,7 +1017,7 @@ select {
   }
 }
 
-@keyframes meeting-orb-drift-b {
+@keyframes lm-orb-drift-b {
   from {
     transform: translate3d(0, 0, 0) scale(1.05);
   }
@@ -1016,7 +1026,7 @@ select {
   }
 }
 
-@keyframes meeting-orb-drift-c {
+@keyframes lm-orb-drift-c {
   from {
     transform: translate3d(0, 0, 0) scale(0.96);
   }
@@ -1504,7 +1514,7 @@ textarea:focus-visible,
     -webkit-backdrop-filter: none !important;
   }
 
-  .meeting-hero__orb,
+  .lm-ambient__orb,
   .meeting-logo-cta__halo {
     animation: none !important;
     filter: none;
@@ -1531,7 +1541,7 @@ textarea:focus-visible,
   -webkit-backdrop-filter: none !important;
 }
 
-:root[data-reduce-motion="true"] .meeting-hero__orb,
+:root[data-reduce-motion="true"] .lm-ambient__orb,
 :root[data-reduce-motion="true"] .meeting-logo-cta__halo {
   animation: none !important;
   filter: none;
