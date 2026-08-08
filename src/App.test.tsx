@@ -21,6 +21,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 vi.mock("./lib/updater", () => ({
   checkForAppUpdate: vi.fn().mockResolvedValue(null),
+  probeAppUpdate: vi.fn().mockResolvedValue({ status: "up-to-date" }),
   applyAppUpdate: vi.fn(),
 }));
 

@@ -859,6 +859,15 @@ select {
   color: var(--lm-red);
 }
 
+.update-check-banner {
+  margin: 0.75rem 1rem 0;
+}
+
+.update-check-banner p {
+  margin: 0;
+  flex: 1;
+}
+
 .meeting-workspace__field {
   display: flex;
   flex-direction: column;

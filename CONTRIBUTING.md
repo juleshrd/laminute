@@ -106,17 +106,24 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --ignored
 
 Les pull requests et les pushes sur `main` déclenchent le workflow [CI](.github/workflows/ci.yml), découpé en checks relançables :
 
-| Check GHA       | Commande locale                               |
-| --------------- | --------------------------------------------- |
-| `format_lint`   | `npm run format:check` puis `npm run lint`    |
-| `test_frontend` | `npm run test:web`                            |
-| `test_rust`     | `npm run test:rust`                           |
-| `build`         | `npm run build`                               |
-| `audits`        | `npm run audit:rust` puis `npm run audit:npm` |
+| Check GHA       | Commande locale                                |
+| --------------- | ---------------------------------------------- |
+| `format_lint`   | `npm run format:check` puis `npm run lint`     |
+| `test_frontend` | `npm run test:web`                             |
+| `test_rust`     | `npm run test:rust`                            |
+| `build`         | `npm run build`                                |
+| `size_budget`   | build web + binaire release, seuils documentés |
+| `audits`        | `npm run audit:rust` puis `npm run audit:npm`  |
 
 `npm run check:ci` exécute l’ensemble. Un job `summary` classe les échecs en **produit** (format, tests, build, audits) ou **infrastructure** (annulation runner / concurrence PR). Sur les PR, les anciens runs sont annulés ; un push sur `main` ne l’est jamais.
 
-Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) qui produit des artefacts installables non signés pour Linux, macOS et Windows.
+Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) :
+
+1. **validate** — tag sur `main`, versions alignées, `npm run check:ci`
+2. **build** (environnement GitHub `release`) — installateurs Linux / macOS / Windows, `latest.json`, signature **Minisign** obligatoire (`TAURI_SIGNING_PRIVATE_KEY`)
+3. **publish-meta** — `SHA256SUMS` + SBOM joints à la release
+
+La signature code OS (notarisation Apple, Authenticode) n’est pas encore exigée en v0.1.0.
 
 ## Style et portée
 

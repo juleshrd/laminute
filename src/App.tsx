@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
 
-import { applyAppUpdate, checkForAppUpdate, type UpdateProgress } from "./lib/updater";
+import { applyAppUpdate, probeAppUpdate, type UpdateProgress } from "./lib/updater";
 import {
   applyReduceMotionToDocument,
   isOnboardingDone,
@@ -23,6 +23,7 @@ function App() {
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateCheckNotice, setUpdateCheckNotice] = useState<string | null>(null);
   const meetingFlow = useMeetingFlow();
 
   useEffect(() => {
@@ -33,13 +34,17 @@ function App() {
     let cancelled = false;
 
     void (async () => {
-      try {
-        const update = await checkForAppUpdate();
-        if (!cancelled && update) {
-          setPendingUpdate(update);
-        }
-      } catch {
-        // Mode dev / réseau indisponible : pas de toast.
+      const result = await probeAppUpdate();
+      if (cancelled) {
+        return;
+      }
+      if (result.status === "available") {
+        setPendingUpdate(result.update);
+        setUpdateCheckNotice(null);
+      } else if (result.status === "error") {
+        setUpdateCheckNotice(result.message);
+      } else {
+        setUpdateCheckNotice(null);
       }
     })();
 
@@ -75,34 +80,49 @@ function App() {
     setActiveScreen("meeting");
   }
 
+  const updateModal =
+    pendingUpdate != null ? (
+      <UpdateAvailableModal
+        currentVersion={pendingUpdate.currentVersion}
+        nextVersion={pendingUpdate.version}
+        notes={pendingUpdate.body}
+        busy={updateBusy}
+        progress={updateProgress}
+        error={updateError}
+        onConfirm={handleApplyUpdate}
+        onCancel={() => {
+          if (!updateBusy) {
+            setPendingUpdate(null);
+            setUpdateError(null);
+            setUpdateProgress(null);
+          }
+        }}
+      />
+    ) : null;
+
+  const updateCheckBanner =
+    updateCheckNotice != null ? (
+      <div className="status-banner status-banner--error update-check-banner" role="status">
+        <p>{updateCheckNotice}</p>
+        <button type="button" className="lm-btn" onClick={() => setUpdateCheckNotice(null)}>
+          Fermer
+        </button>
+      </div>
+    ) : null;
+
   if (showOnboarding) {
     return (
       <div className="lm-root">
+        {updateCheckBanner}
         <OnboardingIA onComplete={finishOnboarding} onSkip={finishOnboarding} />
-        {pendingUpdate ? (
-          <UpdateAvailableModal
-            currentVersion={pendingUpdate.currentVersion}
-            nextVersion={pendingUpdate.version}
-            notes={pendingUpdate.body}
-            busy={updateBusy}
-            progress={updateProgress}
-            error={updateError}
-            onConfirm={handleApplyUpdate}
-            onCancel={() => {
-              if (!updateBusy) {
-                setPendingUpdate(null);
-                setUpdateError(null);
-                setUpdateProgress(null);
-              }
-            }}
-          />
-        ) : null}
+        {updateModal}
       </div>
     );
   }
 
   return (
     <div className="lm-root">
+      {updateCheckBanner}
       <LmShell
         active={activeScreen}
         onNavigate={setActiveScreen}
@@ -113,6 +133,7 @@ function App() {
         {activeScreen === "history" ? <MeetingHistory /> : null}
         {activeScreen === "settings" ? (
           <SettingsScreen
+            updateCheckNotice={updateCheckNotice}
             onReplayOnboarding={() => {
               setShowOnboarding(true);
             }}
@@ -120,24 +141,7 @@ function App() {
         ) : null}
       </LmShell>
 
-      {pendingUpdate ? (
-        <UpdateAvailableModal
-          currentVersion={pendingUpdate.currentVersion}
-          nextVersion={pendingUpdate.version}
-          notes={pendingUpdate.body}
-          busy={updateBusy}
-          progress={updateProgress}
-          error={updateError}
-          onConfirm={handleApplyUpdate}
-          onCancel={() => {
-            if (!updateBusy) {
-              setPendingUpdate(null);
-              setUpdateError(null);
-              setUpdateProgress(null);
-            }
-          }}
-        />
-      ) : null}
+      {updateModal}
     </div>
   );
 }

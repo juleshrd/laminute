@@ -27,3 +27,8 @@ src-tauri/target
 # Clés de signature updater Tauri (ne jamais committer la privée)
 *.key
 *.key.pub
+
+# Secrets locaux
+.env
+.env.*
+!.env.example

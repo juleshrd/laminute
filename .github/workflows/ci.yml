@@ -124,6 +124,67 @@ jobs:
 
       - run: npm run build
 
+  size_budget:
+    name: size_budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: ./.github/actions/install-tauri-deps
+
+      - name: npm ci
+        run: |
+          chmod +x .github/scripts/retry.sh
+          .github/scripts/retry.sh 3 npm ci
+
+      - name: build web + binaire release
+        run: |
+          npm run build:web
+          cargo build --manifest-path src-tauri/Cargo.toml --release
+
+      - name: Vérifier budgets (docs/performance-budget.md)
+        run: |
+          set -euo pipefail
+          MAX_BIN=$((45 * 1024 * 1024))
+          MAX_DIST=$((3 * 1024 * 1024))
+          BIN=src-tauri/target/release/laminute
+          BIN_SIZE=$(stat -c '%s' "$BIN")
+          DIST_SIZE=$(find dist -type f -print0 | xargs -0 stat -c '%s' | awk '{s+=$1} END {print s+0}')
+          echo "Binaire release : $BIN_SIZE octets (max $MAX_BIN)"
+          echo "Frontend dist/  : $DIST_SIZE octets (max $MAX_DIST)"
+          {
+            echo "## Budgets taille"
+            echo ""
+            echo "| Artefact | Taille | Seuil |"
+            echo "| -------- | ------ | ----- |"
+            echo "| binaire release | $BIN_SIZE | $MAX_BIN |"
+            echo "| dist/ | $DIST_SIZE | $MAX_DIST |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BIN_SIZE" -gt "$MAX_BIN" ]; then
+            echo "Budget binaire dépassé." >&2
+            exit 1
+          fi
+          if [ "$DIST_SIZE" -gt "$MAX_DIST" ]; then
+            echo "Budget dist/ dépassé." >&2
+            exit 1
+          fi
+
   audits:
     name: audits
     runs-on: ubuntu-24.04
@@ -160,6 +221,7 @@ jobs:
       - test_frontend
       - test_rust
       - build
+      - size_budget
       - audits
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -170,6 +232,7 @@ jobs:
           TEST_FRONTEND: ${{ needs.test_frontend.result }}
           TEST_RUST: ${{ needs.test_rust.result }}
           BUILD: ${{ needs.build.result }}
+          SIZE_BUDGET: ${{ needs.size_budget.result }}
           AUDITS: ${{ needs.audits.result }}
         run: |
           set -euo pipefail
@@ -209,6 +272,7 @@ jobs:
           classify test_frontend "$TEST_FRONTEND"
           classify test_rust "$TEST_RUST"
           classify build "$BUILD"
+          classify size_budget "$SIZE_BUDGET"
           classify audits "$AUDITS"
 
           {
@@ -216,7 +280,7 @@ jobs:
             if [ "$failed_product" -eq 0 ] && [ "$failed_infra" -eq 0 ]; then
               echo "✅ Tous les contrôles produit sont verts."
             elif [ "$failed_product" -eq 1 ]; then
-              echo "❌ Échec **produit** : corriger le job rouge (format/lint, tests, build ou audits)."
+              echo "❌ Échec **produit** : corriger le job rouge (format/lint, tests, build, budgets ou audits)."
             else
               echo "⚠️ Échec / annulation classé **infrastructure** (runner, concurrence PR, réseau)."
               echo "Relancer le job concerné ; ne pas traiter comme un défaut du code tant qu’aucun contrôle produit n’a échoué."

@@ -12,9 +12,13 @@ import { ToggleSwitch } from "./ToggleSwitch";
 
 interface SettingsScreenProps {
   onReplayOnboarding: () => void;
+  updateCheckNotice?: string | null;
 }
 
-export function SettingsScreen({ onReplayOnboarding }: SettingsScreenProps) {
+export function SettingsScreen({
+  onReplayOnboarding,
+  updateCheckNotice = null,
+}: SettingsScreenProps) {
   const [keepAudio, setKeepAudio] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -116,6 +120,25 @@ export function SettingsScreen({ onReplayOnboarding }: SettingsScreenProps) {
           >
             Relancer
           </button>
+        </div>
+      </section>
+
+      <section className="lm-panel lm-setting">
+        <div>
+          <h3>Mises à jour</h3>
+          <p className="lm-subtle">
+            L’application vérifie le flux public GitHub Releases au démarrage (artefacts signés
+            Minisign).
+          </p>
+          {updateCheckNotice ? (
+            <p className="error" role="alert">
+              {updateCheckNotice}
+            </p>
+          ) : (
+            <p className="lm-subtle" role="status">
+              Aucun problème de vérification signalé pour cette session.
+            </p>
+          )}
         </div>
       </section>
 

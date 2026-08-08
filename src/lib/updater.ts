@@ -9,9 +9,35 @@ export type UpdateProgress = {
 
 export type UpdateProgressHandler = (progress: UpdateProgress) => void;
 
-/** Vérifie s'il existe une mise à jour. Renvoie `null` si aucune ou en cas d'échec silencieux côté appelant. */
+export type UpdateCheckResult =
+  | { status: "available"; update: Update }
+  | { status: "up-to-date" }
+  | { status: "error"; message: string };
+
+/** Message utilisateur pour une erreur de vérification de mise à jour. */
+export function describeUpdateCheckError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return `Vérification des mises à jour impossible : ${error.message}`;
+  }
+  return "Vérification des mises à jour impossible (réseau indisponible ou flux inaccessible).";
+}
+
+/** Vérifie s'il existe une mise à jour. Propague les erreurs réseau au lieu de les avaler. */
 export async function checkForAppUpdate(): Promise<Update | null> {
   return check();
+}
+
+/** Résultat discriminant : update, à jour, ou erreur diagnosticable. */
+export async function probeAppUpdate(): Promise<UpdateCheckResult> {
+  try {
+    const update = await checkForAppUpdate();
+    if (update) {
+      return { status: "available", update };
+    }
+    return { status: "up-to-date" };
+  } catch (error) {
+    return { status: "error", message: describeUpdateCheckError(error) };
+  }
 }
 
 /** Télécharge, installe la mise à jour puis relance l'application. */

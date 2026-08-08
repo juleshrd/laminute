@@ -21,7 +21,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 async-trait = "0.1"
 keyring = "3"
-reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls", "stream"] }
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -48,3 +48,10 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mobile)'] }
 
 [lints.clippy]
 all = "warn"
+
+# Profil release : taille et démarrage (voir docs/performance-budget.md).
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"
