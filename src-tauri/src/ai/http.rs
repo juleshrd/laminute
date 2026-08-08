@@ -208,7 +208,8 @@ mod tests {
         let long = "x".repeat(crate::ai::limits::MAX_ERROR_MESSAGE_CHARS + 10);
         let body = format!(r#"{{"message":"{long}"}}"#);
         let err = map_http_error(StatusCode::BAD_REQUEST, &body, "Mistral", "mistral");
-        assert!(err.to_string().len() < long.len());
-        assert!(err.to_string().ends_with('…'));
+        let message = err.to_string();
+        assert!(!message.contains(&long));
+        assert!(message.ends_with('…'));
     }
 }

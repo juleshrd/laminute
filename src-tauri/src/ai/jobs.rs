@@ -76,7 +76,7 @@ impl AiJobState {
     pub fn begin(
         &self,
         job_id: String,
-        kind: AiJobKind,
+        _kind: AiJobKind,
         key: String,
     ) -> Result<AiJobGuard<'_>, BeginAiJobError> {
         let mut registry = self
@@ -112,7 +112,6 @@ impl AiJobState {
         Ok(AiJobGuard {
             state: self,
             job_id,
-            kind,
             finished: false,
         })
     }
@@ -182,7 +181,6 @@ impl Default for AiJobState {
 pub struct AiJobGuard<'a> {
     state: &'a AiJobState,
     job_id: String,
-    kind: AiJobKind,
     finished: bool,
 }
 
@@ -191,17 +189,8 @@ impl AiJobGuard<'_> {
         &self.job_id
     }
 
-    pub fn kind(&self) -> AiJobKind {
-        self.kind
-    }
-
     pub fn finish_completed(mut self) {
         self.state.finish(&self.job_id, AiJobStatus::Completed);
-        self.finished = true;
-    }
-
-    pub fn finish_failed(mut self) {
-        self.state.finish(&self.job_id, AiJobStatus::Failed);
         self.finished = true;
     }
 }
