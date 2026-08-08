@@ -45,7 +45,9 @@ export function MeetingIdleStep({
           Aucun micro détecté — vous pouvez quand même importer un MP3.
         </p>
       ) : (
-        <p className="meeting-hero__hint lm-subtle">Cliquez sur le logo pour démarrer la réunion.</p>
+        <p className="meeting-hero__hint lm-subtle">
+          Cliquez sur le logo pour démarrer la réunion.
+        </p>
       )}
 
       <div className="meeting-hero__divider" aria-hidden="true">

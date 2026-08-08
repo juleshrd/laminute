@@ -1,9 +1,11 @@
-const ONBOARDING_KEY = "laminute.onboardingDone";
+const LEGACY_ONBOARDING_KEY = "laminute.onboardingDone";
+const ONBOARDING_VERSION_KEY = "laminute.onboardingVersion";
+export const CURRENT_ONBOARDING_VERSION = 2;
 const REDUCE_MOTION_KEY = "laminute.reduceMotion";
 
 export function isOnboardingDone(): boolean {
   try {
-    return localStorage.getItem(ONBOARDING_KEY) === "1";
+    return localStorage.getItem(ONBOARDING_VERSION_KEY) === String(CURRENT_ONBOARDING_VERSION);
   } catch {
     return false;
   }
@@ -12,9 +14,11 @@ export function isOnboardingDone(): boolean {
 export function setOnboardingDone(done: boolean): void {
   try {
     if (done) {
-      localStorage.setItem(ONBOARDING_KEY, "1");
+      localStorage.setItem(ONBOARDING_VERSION_KEY, String(CURRENT_ONBOARDING_VERSION));
+      localStorage.removeItem(LEGACY_ONBOARDING_KEY);
     } else {
-      localStorage.removeItem(ONBOARDING_KEY);
+      localStorage.removeItem(ONBOARDING_VERSION_KEY);
+      localStorage.removeItem(LEGACY_ONBOARDING_KEY);
     }
   } catch {
     // ignore

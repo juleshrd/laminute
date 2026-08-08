@@ -37,7 +37,8 @@
   "bundle": {
     "active": true,
     "macOS": {
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "hardenedRuntime": true
     },
     "targets": ["app", "nsis", "dmg", "appimage"],
     "createUpdaterArtifacts": true,

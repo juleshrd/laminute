@@ -3,12 +3,18 @@ import { useEffect, useState } from "react";
 import { onboardingProviderDescription, onboardingWelcomeLead } from "../content/privacyNotices";
 import { getAiSettings, listAiProviders, setSelectedProvider } from "../lib/ai/api";
 import type { ProviderInfo } from "../lib/ai/types";
+import {
+  prepareFirstRun,
+  saveFirstRunStoragePreference,
+  type FirstRunStatus,
+} from "../lib/firstRun";
 import { BrandMark } from "./LmShell";
 import { ProviderCredentialsForm } from "./ProviderCredentialsForm";
 import { ProviderLogo } from "./ProviderLogo";
+import { ToggleSwitch } from "./ToggleSwitch";
 import "./AiProviderSettings.css";
 
-type OnboardingStep = "welcome" | "choose" | "config";
+type OnboardingStep = "welcome" | "storage" | "choose" | "config" | "ready";
 
 interface OnboardingIAProps {
   onComplete: () => void;
@@ -19,10 +25,15 @@ function providerDescription(provider: ProviderInfo): string {
   return onboardingProviderDescription(provider.id, provider.capabilities);
 }
 
+const STEPS: OnboardingStep[] = ["welcome", "storage", "choose", "config", "ready"];
+
 function stepIndex(step: OnboardingStep): number {
-  if (step === "welcome") return 0;
-  if (step === "choose") return 1;
-  return 2;
+  return STEPS.indexOf(step);
+}
+
+function compactPath(path: string): string {
+  const homeMatch = path.match(/^(\/Users\/[^/]+|\/home\/[^/]+)(\/.*)?$/);
+  return homeMatch ? `~${homeMatch[2] ?? ""}` : path;
 }
 
 export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
@@ -32,11 +43,33 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://127.0.0.1:11434");
   const [ollamaAllowRemote, setOllamaAllowRemote] = useState(false);
+  const [setupStatus, setSetupStatus] = useState<FirstRunStatus | null>(null);
+  const [keepAudioFiles, setKeepAudioFiles] = useState(true);
+  const [loadingSetup, setLoadingSetup] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credKey, setCredKey] = useState(0);
 
+  async function loadSetup() {
+    setLoadingSetup(true);
+    setError(null);
+    try {
+      const status = await prepareFirstRun();
+      setSetupStatus(status);
+      setKeepAudioFiles(status.keepAudioFiles);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de préparer les dossiers locaux. Vérifiez les autorisations du disque.",
+      );
+    } finally {
+      setLoadingSetup(false);
+    }
+  }
+
   useEffect(() => {
+    void loadSetup();
     void (async () => {
       try {
         const [list, settings] = await Promise.all([listAiProviders(), getAiSettings()]);
@@ -46,7 +79,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
         setOllamaBaseUrl(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
         setOllamaAllowRemote(settings.ollamaAllowRemote);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Chargement impossible.");
+        setError(err instanceof Error ? err.message : "Chargement de la configuration impossible.");
       }
     })();
   }, []);
@@ -57,25 +90,45 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
     return a.displayName.localeCompare(b.displayName, "fr");
   });
 
-  const selectedProvider = providers.find((p) => p.id === selectedId);
+  const selectedProvider = providers.find((provider) => provider.id === selectedId);
   const isLocal = selectedProvider?.capabilities.local ?? false;
   const activeStep = stepIndex(step);
 
-  const asideCopy =
-    step === "welcome"
-      ? {
-          title: "On commence.",
-          body: "La Minute transforme vos réunions en comptes-rendus structurés — synthèse, décisions et actions.",
-        }
-      : step === "choose"
-        ? {
-            title: "Choisissez l’IA.",
-            body: "Mistral est recommandé. Vous pourrez changer de fournisseur plus tard dans les réglages.",
-          }
-        : {
-            title: "Configurez.",
-            body: "Collez votre clé API ou connectez Ollama. Vous pourrez finaliser plus tard dans les réglages.",
-          };
+  const asideCopy: Record<OnboardingStep, { title: string; body: string }> = {
+    welcome: {
+      title: "On commence.",
+      body: "Quelques réglages suffisent pour que votre première réunion fonctionne immédiatement.",
+    },
+    storage: {
+      title: "Vos données, au clair.",
+      body: "La Minute prépare ses dossiers privés et vous laisse choisir combien de temps garder les audios.",
+    },
+    choose: {
+      title: "Choisissez l’IA.",
+      body: "Mistral est recommandé. Vous pourrez changer de fournisseur plus tard.",
+    },
+    config: {
+      title: "Connectez le service.",
+      body: "La clé reste dans le trousseau macOS. Sans clé, l’app reste utilisable en mode limité.",
+    },
+    ready: {
+      title: "Tout est prêt.",
+      body: "Les réglages essentiels sont appliqués. Vous pouvez lancer ou importer une réunion.",
+    },
+  };
+
+  async function finishStorageStep() {
+    setBusy(true);
+    setError(null);
+    try {
+      await saveFirstRunStoragePreference(keepAudioFiles);
+      setStep("choose");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement de la préférence impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function goToConfig() {
     setBusy(true);
@@ -85,7 +138,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
       setHasStoredKey(settings.hasApiKey);
       setOllamaBaseUrl(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
       setOllamaAllowRemote(settings.ollamaAllowRemote);
-      setCredKey((k) => k + 1);
+      setCredKey((key) => key + 1);
       setStep("config");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sélection impossible.");
@@ -94,12 +147,12 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
     }
   }
 
-  async function finish() {
+  async function reviewSetup() {
     setBusy(true);
     setError(null);
     try {
       await setSelectedProvider(selectedId);
-      onComplete();
+      setStep("ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sélection impossible.");
     } finally {
@@ -115,15 +168,16 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             <BrandMark />
             La Minute
           </div>
+          <p className="lm-onboarding-kicker">Configuration · {activeStep + 1}/5</p>
           <h2 id="onboarding-title" className="lm-welcome-title">
-            {asideCopy.title}
+            {asideCopy[step].title}
           </h2>
-          <p className="lm-subtle">{asideCopy.body}</p>
+          <p className="lm-subtle">{asideCopy[step].body}</p>
         </div>
-        <div className="lm-steps" aria-hidden="true">
-          {[0, 1, 2].map((index) => (
+        <div className="lm-steps" aria-label={`Étape ${activeStep + 1} sur 5`}>
+          {STEPS.map((item, index) => (
             <span
-              key={index}
+              key={item}
               className={`lm-step${index === activeStep ? " is-active" : ""}${index < activeStep ? " is-done" : ""}`}
             />
           ))}
@@ -133,8 +187,14 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
       <main className="lm-choose">
         {step === "welcome" ? (
           <>
+            <p className="lm-eyebrow">Premier lancement</p>
             <h2>Bienvenue</h2>
             <p className="lm-subtle lm-onboarding-lead">{onboardingWelcomeLead()}</p>
+            <ul className="lm-onboarding-benefits">
+              <li>Dossiers locaux préparés et vérifiés</li>
+              <li>Microphone par défaut configuré automatiquement</li>
+              <li>Fournisseur IA modifiable à tout moment</li>
+            </ul>
             {ordered.length > 0 ? (
               <ul className="lm-provider-logo-row" aria-label="Fournisseurs IA disponibles">
                 {ordered.map((provider) => (
@@ -151,15 +211,123 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             ) : null}
             <div className="lm-row lm-onboarding-actions">
               <button type="button" className="lm-btn" disabled={busy} onClick={onSkip}>
-                Plus tard
+                Découvrir sans configurer
               </button>
               <button
                 type="button"
                 className="lm-btn lm-btn-primary"
                 disabled={busy}
-                onClick={() => setStep("choose")}
+                onClick={() => setStep("storage")}
               >
-                Commencer
+                Configurer l’app
+              </button>
+            </div>
+            <p className="lm-onboarding-footnote">
+              Si vous passez cette étape, elle sera reproposée au prochain lancement.
+            </p>
+          </>
+        ) : null}
+
+        {step === "storage" ? (
+          <>
+            <p className="lm-eyebrow">Stockage et microphone</p>
+            <h2>Votre espace est préparé</h2>
+            <p className="lm-subtle lm-onboarding-lead">
+              Les réunions restent dans le dossier privé de La Minute. Les exports PDF ou Markdown
+              vous demanderont toujours où enregistrer le fichier.
+            </p>
+
+            {loadingSetup ? <p className="lm-setup-loading">Vérification des dossiers…</p> : null}
+
+            {setupStatus ? (
+              <div className="lm-setup-card">
+                <div className="lm-setup-row">
+                  <span className="lm-setup-icon" aria-hidden="true">
+                    ✓
+                  </span>
+                  <div>
+                    <strong>Données et réunions</strong>
+                    <code title={setupStatus.storage.dbPath}>
+                      {compactPath(setupStatus.storage.dbPath)}
+                    </code>
+                  </div>
+                </div>
+                <div className="lm-setup-row">
+                  <span className="lm-setup-icon" aria-hidden="true">
+                    ✓
+                  </span>
+                  <div>
+                    <strong>Enregistrements audio</strong>
+                    <code title={setupStatus.storage.recordingsDir}>
+                      {compactPath(setupStatus.storage.recordingsDir)}
+                    </code>
+                  </div>
+                </div>
+                <div className="lm-setup-row">
+                  <span
+                    className={`lm-setup-icon${setupStatus.selectedDevice ? "" : " is-muted"}`}
+                    aria-hidden="true"
+                  >
+                    {setupStatus.selectedDevice ? "✓" : "—"}
+                  </span>
+                  <div>
+                    <strong>Microphone</strong>
+                    <span>
+                      {setupStatus.selectedDevice?.name ??
+                        (setupStatus.deviceCount === 0
+                          ? "Aucun micro détecté — l’import MP3 reste disponible"
+                          : "À sélectionner dans les réglages")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="lm-setup-preference">
+              <div>
+                <strong>Conserver les audios après traitement</strong>
+                <p className="lm-subtle">
+                  Désactivez pour supprimer automatiquement l’audio après transcription.
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={keepAudioFiles}
+                disabled={busy || loadingSetup || !setupStatus}
+                aria-label="Conserver les audios après traitement"
+                onChange={setKeepAudioFiles}
+              />
+            </div>
+
+            {error ? (
+              <div className="lm-setup-error" role="alert">
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="lm-btn"
+                  disabled={loadingSetup}
+                  onClick={() => void loadSetup()}
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : null}
+
+            <div className="lm-row lm-onboarding-actions">
+              <button
+                type="button"
+                className="lm-btn"
+                disabled={busy}
+                onClick={() => setStep("welcome")}
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                className="lm-btn lm-btn-primary"
+                disabled={busy || loadingSetup || !setupStatus}
+                onClick={() => void finishStorageStep()}
+              >
+                Continuer
               </button>
             </div>
           </>
@@ -167,6 +335,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
 
         {step === "choose" ? (
           <>
+            <p className="lm-eyebrow">Intelligence artificielle</p>
             <h2>Choisir l&apos;IA</h2>
             <div className="lm-provider-grid">
               {ordered.map((provider) => {
@@ -205,8 +374,13 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             ) : null}
 
             <div className="lm-row lm-onboarding-actions">
-              <button type="button" className="lm-btn" disabled={busy} onClick={onSkip}>
-                Plus tard
+              <button
+                type="button"
+                className="lm-btn"
+                disabled={busy}
+                onClick={() => setStep("storage")}
+              >
+                Retour
               </button>
               <button
                 type="button"
@@ -222,6 +396,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
 
         {step === "config" ? (
           <>
+            <p className="lm-eyebrow">Connexion</p>
             <h2 className="lm-config-title">
               {selectedProvider ? (
                 <ProviderLogo
@@ -233,7 +408,9 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
               <span>Configurer {selectedProvider?.displayName ?? "le fournisseur"}</span>
             </h2>
             <p className="lm-subtle lm-onboarding-lead">
-              Optionnel pour l’instant — vous pourrez configurer plus tard dans Réglages.
+              {isLocal
+                ? "Testez la connexion à votre serveur local avant de continuer."
+                : "Enregistrez puis validez votre clé. Elle ne quitte pas le trousseau sécurisé du système."}
             </p>
 
             {selectedId ? (
@@ -252,6 +429,13 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
               />
             ) : null}
 
+            {!isLocal && !hasStoredKey ? (
+              <p className="lm-limited-note">
+                Sans clé, vous pourrez importer un MP3 et coller du texte, mais la transcription et
+                le compte-rendu IA resteront indisponibles.
+              </p>
+            ) : null}
+
             {error ? (
               <p className="error" role="alert">
                 {error}
@@ -259,16 +443,77 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             ) : null}
 
             <div className="lm-row lm-onboarding-actions">
-              <button type="button" className="lm-btn" disabled={busy} onClick={onSkip}>
-                Plus tard
+              <button
+                type="button"
+                className="lm-btn"
+                disabled={busy}
+                onClick={() => setStep("choose")}
+              >
+                Retour
               </button>
               <button
                 type="button"
                 className="lm-btn lm-btn-primary"
                 disabled={busy || !selectedId}
-                onClick={() => void finish()}
+                onClick={() => void reviewSetup()}
               >
-                Entrer dans l&apos;app
+                {!isLocal && !hasStoredKey ? "Continuer en mode limité" : "Continuer"}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === "ready" ? (
+          <>
+            <p className="lm-eyebrow">Configuration terminée</p>
+            <h2>La Minute est prête</h2>
+            <div className="lm-ready-list">
+              <div>
+                <span aria-hidden="true">✓</span>
+                <p>
+                  <strong>Stockage local</strong>
+                  <br />
+                  Dossiers créés et accessibles
+                </p>
+              </div>
+              <div>
+                <span aria-hidden="true">{setupStatus?.selectedDevice ? "✓" : "—"}</span>
+                <p>
+                  <strong>Enregistrement</strong>
+                  <br />
+                  {setupStatus?.selectedDevice?.name ?? "Import MP3 disponible"}
+                </p>
+              </div>
+              <div>
+                <span aria-hidden="true">{hasStoredKey || isLocal ? "✓" : "—"}</span>
+                <p>
+                  <strong>IA</strong>
+                  <br />
+                  {hasStoredKey || isLocal
+                    ? selectedProvider?.displayName
+                    : "Mode limité — à terminer plus tard"}
+                </p>
+              </div>
+            </div>
+            <p className="lm-subtle lm-onboarding-lead">
+              Tous ces choix restent modifiables dans Réglages.
+            </p>
+            <div className="lm-row lm-onboarding-actions">
+              <button
+                type="button"
+                className="lm-btn"
+                disabled={busy}
+                onClick={() => setStep("config")}
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                className="lm-btn lm-btn-primary"
+                disabled={busy}
+                onClick={onComplete}
+              >
+                Créer ma première réunion
               </button>
             </div>
           </>

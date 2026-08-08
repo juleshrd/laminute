@@ -18,3 +18,5 @@ La Minute est une application desktop locale (Tauri). Les clés API BYOK sont st
 ## Mises à jour
 
 Les artefacts d’auto-update sont signés Minisign. Vérifiez toujours que vous téléchargez depuis les [releases officielles](https://github.com/juleshrd/laminute/releases).
+
+Les bundles macOS stables sont signés Developer ID, exécutés avec le runtime renforcé et notariés par Apple. La CI contrôle la signature, l’évaluation Gatekeeper et le ticket de notarisation avant de rendre une release publique.
