@@ -39,23 +39,13 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(
-      1200px 500px at 10% -10%,
-      color-mix(in srgb, var(--lm-soft) 70%, transparent),
-      transparent
-    ),
-    radial-gradient(
-      900px 420px at 100% 0%,
-      color-mix(in srgb, var(--lm-wash) 80%, transparent),
-      transparent
-    ),
-    var(--lm-cream);
+  background: var(--lm-cream);
 }
 
 .lm-root {
   min-height: 100vh;
   color: var(--lm-navy);
+  background: transparent;
 }
 
 .lm-shell {
@@ -77,60 +67,65 @@ body {
   overflow: hidden;
   background:
     radial-gradient(
-      120% 90% at 0% 0%,
-      color-mix(in srgb, var(--lm-soft) 92%, transparent),
-      transparent 55%
+      95% 80% at 12% 18%,
+      color-mix(in srgb, var(--lm-soft) 88%, white 4%),
+      transparent 62%
     ),
     radial-gradient(
-      110% 85% at 100% 0%,
-      color-mix(in srgb, var(--lm-wash) 88%, transparent),
-      transparent 52%
+      90% 75% at 88% 22%,
+      color-mix(in srgb, var(--lm-wash) 82%, var(--lm-navy) 6%),
+      transparent 60%
     ),
     radial-gradient(
-      100% 80% at 50% 100%,
-      color-mix(in srgb, var(--lm-soft) 55%, var(--lm-navy) 8%),
-      transparent 58%
+      85% 70% at 48% 92%,
+      color-mix(in srgb, var(--lm-soft) 70%, var(--lm-navy) 10%),
+      transparent 64%
+    ),
+    radial-gradient(
+      70% 55% at 55% 42%,
+      color-mix(in srgb, var(--lm-soft) 48%, transparent),
+      transparent 70%
     ),
     linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--lm-soft) 40%, var(--lm-cream)) 0%,
-      var(--lm-cream) 42%,
-      color-mix(in srgb, var(--lm-wash) 55%, var(--lm-cream)) 100%
+      155deg,
+      color-mix(in srgb, var(--lm-soft) 58%, var(--lm-cream)) 0%,
+      color-mix(in srgb, var(--lm-cream) 72%, var(--lm-wash)) 45%,
+      color-mix(in srgb, var(--lm-wash) 62%, var(--lm-cream)) 100%
     );
 }
 
 .lm-ambient__orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(72px);
-  opacity: 0.9;
+  filter: blur(80px);
+  opacity: 0.95;
   will-change: transform;
 }
 
 .lm-ambient__orb--a {
-  width: min(90vw, 44rem);
-  height: min(90vw, 44rem);
-  top: -18%;
-  left: -14%;
-  background: color-mix(in srgb, var(--lm-soft) 95%, var(--lm-red) 6%);
+  width: min(96vw, 48rem);
+  height: min(96vw, 48rem);
+  top: -22%;
+  left: -16%;
+  background: color-mix(in srgb, var(--lm-soft) 96%, var(--lm-red) 7%);
   animation: lm-orb-drift-a 20s var(--lm-ambient-ease) infinite alternate;
 }
 
 .lm-ambient__orb--b {
-  width: min(82vw, 40rem);
-  height: min(82vw, 40rem);
-  right: -18%;
-  top: -6%;
-  background: color-mix(in srgb, var(--lm-wash) 70%, var(--lm-navy) 12%);
+  width: min(90vw, 44rem);
+  height: min(90vw, 44rem);
+  right: -20%;
+  top: -10%;
+  background: color-mix(in srgb, var(--lm-wash) 78%, var(--lm-navy) 14%);
   animation: lm-orb-drift-b 24s var(--lm-ambient-ease) infinite alternate;
 }
 
 .lm-ambient__orb--c {
-  width: min(78vw, 38rem);
-  height: min(78vw, 38rem);
-  left: 18%;
-  bottom: -28%;
-  background: color-mix(in srgb, var(--lm-soft) 45%, var(--lm-navy) 14%);
+  width: min(88vw, 42rem);
+  height: min(88vw, 42rem);
+  left: 22%;
+  bottom: -30%;
+  background: color-mix(in srgb, var(--lm-soft) 55%, var(--lm-navy) 16%);
   animation: lm-orb-drift-c 28s var(--lm-ambient-ease) infinite alternate;
 }
 
@@ -138,10 +133,10 @@ body {
   position: relative;
   z-index: 1;
   padding: 0.85rem 0.7rem;
-  border-right: 1px solid color-mix(in srgb, var(--lm-line) 55%, transparent);
-  background: color-mix(in srgb, var(--lm-paper) 28%, transparent);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  border-right: 1px solid color-mix(in srgb, var(--lm-line) 40%, transparent);
+  background: color-mix(in srgb, var(--lm-paper) 18%, transparent);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
 }
 
 .lm-nav-brand {
