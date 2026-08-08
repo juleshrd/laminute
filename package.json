@@ -22,7 +22,7 @@
     "test:web": "vitest run",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "audit:npm": "npm audit --audit-level=high",
-    "audit:rust": "cargo deny check --config deny.toml --manifest-path src-tauri/Cargo.toml",
+    "audit:rust": "cargo deny --config deny.toml --manifest-path src-tauri/Cargo.toml check",
     "check": "npm run format:check && npm run lint && npm run test && npm run build",
     "check:ci": "npm run check && npm run audit:rust && npm run audit:npm"
   },

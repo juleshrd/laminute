@@ -3,9 +3,7 @@ all-features = true
 
 [advisories]
 unmaintained = "workspace"
-ignore = [
-  { id = "RUSTSEC-2026-0187", reason = "printpdf 0.7 épingle lopdf <0.42 ; mise à jour printpdf planifiée" },
-]
+ignore = []
 
 [bans]
 multiple-versions = "warn"
