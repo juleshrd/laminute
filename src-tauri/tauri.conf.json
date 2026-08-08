@@ -25,12 +25,12 @@
       "csp": {
         "default-src": "'self'",
         "connect-src": "ipc: http://ipc.localhost",
-        "img-src": "'self' asset: http://asset.localhost",
+        "img-src": "'self'",
         "media-src": "'self' asset: http://asset.localhost"
       },
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/imports/**", "$APPDATA/recordings/**"]
+        "scope": ["$APPDATA/imports/**/*", "$APPDATA/recordings/**/*"]
       }
     }
   },
