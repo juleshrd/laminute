@@ -1,4 +1,4 @@
-import { useMeetingFlow } from "../hooks/useMeetingFlow";
+import type { UseMeetingFlowResult } from "../hooks/useMeetingFlow";
 import { meetingFlowStatusLabel } from "../lib/meetingFlow";
 import { RecordingConsentModal } from "./RecordingConsentModal";
 import { MeetingIdleStep } from "./meeting-workspace/MeetingIdleStep";
@@ -7,9 +7,11 @@ import { MeetingReadyStep } from "./meeting-workspace/MeetingReadyStep";
 import { MeetingRecordingStep } from "./meeting-workspace/MeetingRecordingStep";
 import { MeetingResultStep } from "./meeting-workspace/MeetingResultStep";
 
-export function MeetingWorkspace() {
-  const flow = useMeetingFlow();
+interface MeetingWorkspaceProps {
+  flow: UseMeetingFlowResult;
+}
 
+export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
   return (
     <div className={`meeting-workspace${flow.isRecording ? " meeting-workspace--recording" : ""}`}>
       {!flow.isRecording && (

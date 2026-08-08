@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useMeetingFlow } from "../hooks/useMeetingFlow";
 import { MeetingWorkspace } from "./MeetingWorkspace";
+
+function MeetingWorkspaceHarness() {
+  const flow = useMeetingFlow();
+  return <MeetingWorkspace flow={flow} />;
+}
 
 const invokeMock = vi.fn();
 const listenMock = vi.fn().mockResolvedValue(() => undefined);
@@ -93,7 +99,7 @@ describe("MeetingWorkspace", () => {
   });
 
   it("affiche l'écran d'accueil avec logo CTA et import MP3", async () => {
-    render(<MeetingWorkspace />);
+    render(<MeetingWorkspaceHarness />);
 
     expect(
       await screen.findByRole("heading", { name: "Prêt à enregistrer ?" }),
@@ -103,7 +109,7 @@ describe("MeetingWorkspace", () => {
   });
 
   it("demande le consentement avant de démarrer l'enregistrement", async () => {
-    render(<MeetingWorkspace />);
+    render(<MeetingWorkspaceHarness />);
     await screen.findByRole("button", { name: "Démarrer l'enregistrement" });
 
     fireEvent.click(screen.getByRole("button", { name: "Démarrer l'enregistrement" }));
@@ -145,7 +151,7 @@ describe("MeetingWorkspace", () => {
       return Promise.resolve(null);
     });
 
-    render(<MeetingWorkspace />);
+    render(<MeetingWorkspaceHarness />);
     await screen.findByRole("button", { name: "Démarrer l'enregistrement" });
     fireEvent.click(screen.getByRole("button", { name: "Démarrer l'enregistrement" }));
 
@@ -206,7 +212,7 @@ describe("MeetingWorkspace", () => {
     const { open } = await import("@tauri-apps/plugin-dialog");
     vi.mocked(open).mockResolvedValue("/tmp/import.mp3");
 
-    render(<MeetingWorkspace />);
+    render(<MeetingWorkspaceHarness />);
     await screen.findByRole("button", { name: "Choisir un fichier MP3" });
 
     fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
@@ -278,7 +284,7 @@ describe("MeetingWorkspace", () => {
     const { open } = await import("@tauri-apps/plugin-dialog");
     vi.mocked(open).mockResolvedValue("/tmp/import.mp3");
 
-    render(<MeetingWorkspace />);
+    render(<MeetingWorkspaceHarness />);
     await screen.findByRole("button", { name: "Choisir un fichier MP3" });
     fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
 

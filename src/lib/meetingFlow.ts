@@ -1,7 +1,17 @@
-import type { RecordingPhase } from "./audio";
-import type { TranscriptionPhase } from "./transcription";
+import type { RecordingPhase, RecordingStatus } from "./audio";
+import type { TranscriptionPhase, TranscriptionProgress } from "./transcription";
 
 export type MeetingFlowPhase = "idle" | "recording" | "ready" | "processing" | "done" | "error";
+
+export interface HydratedMeetingFlow {
+  flowPhase: MeetingFlowPhase;
+  filePath: string | null;
+  durationSecs: number | null;
+  title: string | null;
+  processingStep: "transcribing" | "summarizing" | null;
+  transcriptionProgress: TranscriptionProgress | null;
+  meetingId: string | null;
+}
 
 const FLOW_STATUS_LABELS: Record<MeetingFlowPhase, string> = {
   idle: "Prêt à enregistrer ?",
@@ -43,6 +53,40 @@ export function recordingPhaseToFlowPhase(phase: RecordingPhase): "idle" | "reco
     return "ready";
   }
   return "idle";
+}
+
+/** Reconstruit l'état UI depuis les services natifs (enregistrement / transcription). */
+export function hydrateMeetingFlowFromNative(input: {
+  recording: RecordingStatus | null;
+  transcription: TranscriptionProgress | null;
+}): HydratedMeetingFlow | null {
+  const { recording, transcription } = input;
+
+  if (recording?.phase === "recording") {
+    return {
+      flowPhase: "recording",
+      filePath: recording.filePath,
+      durationSecs: recording.durationSecs,
+      title: defaultRecordingTitle(),
+      processingStep: null,
+      transcriptionProgress: null,
+      meetingId: null,
+    };
+  }
+
+  if (transcription && isTranscriptionBusy(transcription.phase)) {
+    return {
+      flowPhase: "processing",
+      filePath: null,
+      durationSecs: null,
+      title: null,
+      processingStep: "transcribing",
+      transcriptionProgress: transcription,
+      meetingId: transcription.meetingId ?? null,
+    };
+  }
+
+  return null;
 }
 
 export function defaultRecordingTitle(now: Date = new Date()): string {

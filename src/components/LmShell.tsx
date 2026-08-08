@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { formatDuration } from "../lib/audio";
 import { ClockMark } from "./ClockMark";
 
 export type AppScreen = "meeting" | "history" | "settings";
@@ -8,6 +9,8 @@ interface LmShellProps {
   active: AppScreen;
   onNavigate: (screen: AppScreen) => void;
   children: ReactNode;
+  isRecording?: boolean;
+  recordingDurationSecs?: number | null;
 }
 
 const NAV_ITEMS: Array<{ id: AppScreen; label: string }> = [
@@ -20,7 +23,13 @@ function BrandMark() {
   return <ClockMark />;
 }
 
-export function LmShell({ active, onNavigate, children }: LmShellProps) {
+export function LmShell({
+  active,
+  onNavigate,
+  children,
+  isRecording = false,
+  recordingDurationSecs = null,
+}: LmShellProps) {
   return (
     <div className="lm-shell">
       <aside className="lm-nav" aria-label="Navigation">
@@ -28,6 +37,26 @@ export function LmShell({ active, onNavigate, children }: LmShellProps) {
           <BrandMark />
           La Minute
         </div>
+        {isRecording ? (
+          <button
+            type="button"
+            className="lm-mic-live"
+            onClick={() => onNavigate("meeting")}
+            aria-label={`Micro actif — retour à la réunion courante${
+              recordingDurationSecs != null
+                ? `, durée ${formatDuration(recordingDurationSecs)}`
+                : ""
+            }`}
+          >
+            <span className="lm-mic-live__dot" aria-hidden="true" />
+            <span className="lm-mic-live__label">Micro actif</span>
+            {recordingDurationSecs != null ? (
+              <span className="lm-mic-live__chrono" aria-hidden="true">
+                {formatDuration(recordingDurationSecs)}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
