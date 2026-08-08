@@ -77,55 +77,60 @@ body {
   overflow: hidden;
   background:
     radial-gradient(
-      90% 70% at 18% 12%,
-      color-mix(in srgb, var(--lm-soft) 78%, transparent),
-      transparent 62%
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--lm-soft) 92%, transparent),
+      transparent 55%
     ),
     radial-gradient(
-      80% 65% at 88% 18%,
-      color-mix(in srgb, var(--lm-wash) 70%, transparent),
+      110% 85% at 100% 0%,
+      color-mix(in srgb, var(--lm-wash) 88%, transparent),
+      transparent 52%
+    ),
+    radial-gradient(
+      100% 80% at 50% 100%,
+      color-mix(in srgb, var(--lm-soft) 55%, var(--lm-navy) 8%),
       transparent 58%
     ),
-    radial-gradient(
-      70% 55% at 62% 88%,
-      color-mix(in srgb, var(--lm-navy) 8%, transparent),
-      transparent 60%
-    ),
-    var(--lm-cream);
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--lm-soft) 40%, var(--lm-cream)) 0%,
+      var(--lm-cream) 42%,
+      color-mix(in srgb, var(--lm-wash) 55%, var(--lm-cream)) 100%
+    );
 }
 
 .lm-ambient__orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(64px);
-  opacity: 0.8;
+  filter: blur(72px);
+  opacity: 0.9;
   will-change: transform;
 }
 
 .lm-ambient__orb--a {
-  width: min(72vw, 34rem);
-  height: min(72vw, 34rem);
-  top: -8%;
-  left: -6%;
-  background: color-mix(in srgb, var(--lm-soft) 90%, var(--lm-red) 5%);
+  width: min(90vw, 44rem);
+  height: min(90vw, 44rem);
+  top: -18%;
+  left: -14%;
+  background: color-mix(in srgb, var(--lm-soft) 95%, var(--lm-red) 6%);
   animation: lm-orb-drift-a 20s var(--lm-ambient-ease) infinite alternate;
 }
 
 .lm-ambient__orb--b {
-  width: min(64vw, 30rem);
-  height: min(64vw, 30rem);
-  right: -10%;
-  top: 8%;
-  background: color-mix(in srgb, var(--lm-wash) 58%, var(--lm-navy) 9%);
+  width: min(82vw, 40rem);
+  height: min(82vw, 40rem);
+  right: -18%;
+  top: -6%;
+  background: color-mix(in srgb, var(--lm-wash) 70%, var(--lm-navy) 12%);
   animation: lm-orb-drift-b 24s var(--lm-ambient-ease) infinite alternate;
 }
 
 .lm-ambient__orb--c {
-  width: min(58vw, 26rem);
-  height: min(58vw, 26rem);
-  left: 28%;
-  bottom: -16%;
-  background: color-mix(in srgb, var(--lm-navy) 12%, transparent);
+  width: min(78vw, 38rem);
+  height: min(78vw, 38rem);
+  left: 18%;
+  bottom: -28%;
+  background: color-mix(in srgb, var(--lm-soft) 45%, var(--lm-navy) 14%);
   animation: lm-orb-drift-c 28s var(--lm-ambient-ease) infinite alternate;
 }
 
@@ -133,10 +138,10 @@ body {
   position: relative;
   z-index: 1;
   padding: 0.85rem 0.7rem;
-  border-right: 1px solid color-mix(in srgb, var(--lm-line) 70%, transparent);
-  background: color-mix(in srgb, var(--lm-cream) 42%, transparent);
-  backdrop-filter: blur(16px) saturate(1.08);
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  border-right: 1px solid color-mix(in srgb, var(--lm-line) 55%, transparent);
+  background: color-mix(in srgb, var(--lm-paper) 28%, transparent);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
 }
 
 .lm-nav-brand {
