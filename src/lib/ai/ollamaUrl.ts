@@ -9,7 +9,8 @@ export function isOllamaLoopbackUrl(raw: string): boolean {
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return false;
     }
-    const host = url.hostname.toLowerCase();
+    // Node/jsdom peut renvoyer « [::1] » ; les navigateurs renvoient « ::1 ».
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
     return host === "localhost" || host === "127.0.0.1" || host === "::1";
   } catch {
     return false;
