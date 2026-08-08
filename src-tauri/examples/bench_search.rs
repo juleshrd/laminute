@@ -6,7 +6,7 @@ use rusqlite::params;
 use std::time::Instant;
 use uuid::Uuid;
 
-const MEETING_COUNT: usize = 1_000;
+const MEETING_COUNT: usize = 10_000;
 const SEARCH_ITERATIONS: usize = 50;
 
 fn percentile(sorted: &[u128], p: f64) -> u128 {
@@ -40,13 +40,15 @@ fn main() {
         provider_id: None,
         date_from: None,
         date_to: None,
+        cursor: None,
     };
     let mut durations = Vec::with_capacity(SEARCH_ITERATIONS);
     for _ in 0..SEARCH_ITERATIONS {
         let start = Instant::now();
         let results = MeetingRepository::search(&conn, &filters).expect("search");
         durations.push(start.elapsed().as_micros());
-        assert!(!results.is_empty());
+        assert!(!results.items.is_empty());
+        assert!(results.items.len() <= 50);
     }
     durations.sort_unstable();
     println!("p50: {} µs", percentile(&durations, 50.0));

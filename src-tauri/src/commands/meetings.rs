@@ -3,7 +3,7 @@ use tauri::{AppHandle, State};
 use crate::audio::paths::ManagedAudioRoots;
 use crate::db::AppState;
 use crate::models::{
-    CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters,
+    CreateMeetingInput, Meeting, MeetingDetail, MeetingSearchFilters, MeetingSearchPage,
     MeetingSummary,
 };
 use crate::repository::MeetingRepository;
@@ -37,7 +37,7 @@ pub fn list_meetings(state: State<'_, AppState>) -> Result<Vec<MeetingSummary>, 
 pub fn search_meetings(
     state: State<'_, AppState>,
     filters: MeetingSearchFilters,
-) -> Result<Vec<MeetingListItem>, String> {
+) -> Result<MeetingSearchPage, String> {
     state
         .with_db(|conn| MeetingRepository::search(conn, &filters))
         .map_err(|e| e.to_string())

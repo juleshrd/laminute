@@ -6,10 +6,14 @@ use crate::audio::import::ImportedAudio;
 use crate::error::{AppError, AppResult};
 use crate::models::{
     Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem,
-    MeetingSearchFilters, MeetingStatus, MeetingSummary, Summary, Transcription,
+    MeetingSearchFilters, MeetingSearchPage, MeetingStatus, MeetingSummary, Summary, Transcription,
 };
 
 pub struct MeetingRepository;
+
+const SEARCH_PAGE_SIZE: usize = 50;
+const SEARCH_QUERY_LIMIT: i64 = (SEARCH_PAGE_SIZE as i64) + 1;
+const SEARCH_CURSOR_SEPARATOR: char = '|';
 
 impl MeetingRepository {
     pub fn create(conn: &Connection, input: CreateMeetingInput) -> AppResult<Meeting> {
@@ -84,7 +88,7 @@ impl MeetingRepository {
     pub fn search(
         conn: &Connection,
         filters: &MeetingSearchFilters,
-    ) -> AppResult<Vec<MeetingListItem>> {
+    ) -> AppResult<MeetingSearchPage> {
         let query = filters
             .query
             .as_deref()
@@ -94,6 +98,14 @@ impl MeetingRepository {
         let fts_query = query.map(escape_fts);
 
         let status_str = filters.status.map(|status| status.as_str().to_string());
+        let cursor = filters
+            .cursor
+            .as_deref()
+            .map(parse_search_cursor)
+            .transpose()?;
+        let (cursor_created_at, cursor_id) = cursor
+            .map(|cursor| (Some(cursor.created_at), Some(cursor.id)))
+            .unwrap_or((None, None));
 
         let sql = r#"
             SELECT
@@ -106,7 +118,7 @@ impl MeetingRepository {
                 m.updated_at,
                 CASE
                     WHEN ?1 IS NOT NULL THEN (
-                        SELECT body
+                        SELECT snippet(meetings_fts, 2, '', '', '…', 24)
                         FROM meetings_fts
                         WHERE meeting_id = m.id
                           AND meetings_fts MATCH ?2
@@ -142,7 +154,13 @@ impl MeetingRepository {
                         WHERE meetings_fts MATCH ?2
                     )
               )
-            ORDER BY m.created_at DESC
+              AND (
+                    ?7 IS NULL
+                    OR m.created_at < ?7
+                    OR (m.created_at = ?7 AND m.id < ?8)
+              )
+            ORDER BY m.created_at DESC, m.id DESC
+            LIMIT ?9
         "#;
 
         let mut stmt = conn.prepare(sql)?;
@@ -155,14 +173,12 @@ impl MeetingRepository {
                 filters.date_from,
                 filters.date_to,
                 filters.provider_id,
+                cursor_created_at,
+                cursor_id,
+                SEARCH_QUERY_LIMIT,
             ],
             |row| {
                 let status_value: String = row.get(2)?;
-                let raw_snippet: Option<String> = row.get(7)?;
-                let snippet = match (raw_snippet, query) {
-                    (Some(text), Some(needle)) => Some(centered_snippet(&text, needle, 120)),
-                    (other, _) => other,
-                };
                 Ok(MeetingListItem {
                     id: row.get(0)?,
                     title: row.get(1)?,
@@ -171,12 +187,20 @@ impl MeetingRepository {
                     started_at: row.get(4)?,
                     ended_at: row.get(5)?,
                     updated_at: row.get(6)?,
-                    snippet,
+                    snippet: row.get(7)?,
                 })
             },
         )?;
 
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        let mut items = rows.collect::<Result<Vec<_>, _>>()?;
+        let next_cursor = if items.len() > SEARCH_PAGE_SIZE {
+            items.truncate(SEARCH_PAGE_SIZE);
+            items.last().map(search_cursor_for)
+        } else {
+            None
+        };
+
+        Ok(MeetingSearchPage { items, next_cursor })
     }
 
     pub fn create_from_imported_audio(
@@ -474,58 +498,28 @@ fn escape_fts(value: &str) -> String {
     format!("\"{escaped}\"")
 }
 
-/// Builds a short excerpt centered on the first case-insensitive match of `needle`.
-fn centered_snippet(haystack: &str, needle: &str, max_chars: usize) -> String {
-    if max_chars == 0 || haystack.is_empty() {
-        return String::new();
-    }
-
-    let needle = needle.trim();
-    if needle.is_empty() {
-        return truncate_chars(haystack, max_chars);
-    }
-
-    let lower_haystack = haystack.to_lowercase();
-    let lower_needle = needle.to_lowercase();
-    let byte_pos = lower_haystack.find(&lower_needle);
-
-    let char_index = match byte_pos {
-        Some(pos) => haystack[..pos].chars().count(),
-        None => 0,
-    };
-
-    let total_chars = haystack.chars().count();
-    if total_chars <= max_chars {
-        return haystack.to_string();
-    }
-
-    let needle_chars = needle.chars().count();
-    let context = max_chars.saturating_sub(needle_chars) / 2;
-    let mut start = char_index.saturating_sub(context);
-    let end = (start + max_chars).min(total_chars);
-    if end - start < max_chars {
-        start = end.saturating_sub(max_chars);
-    }
-
-    let excerpt: String = haystack.chars().skip(start).take(end - start).collect();
-
-    let mut result = String::new();
-    if start > 0 {
-        result.push('…');
-    }
-    result.push_str(&excerpt);
-    if end < total_chars {
-        result.push('…');
-    }
-    result
+struct SearchCursor {
+    created_at: String,
+    id: String,
 }
 
-fn truncate_chars(value: &str, max_chars: usize) -> String {
-    let mut truncated: String = value.chars().take(max_chars).collect();
-    if value.chars().count() > max_chars {
-        truncated.push('…');
+fn search_cursor_for(item: &MeetingListItem) -> String {
+    format!("{}{}{}", item.created_at, SEARCH_CURSOR_SEPARATOR, item.id)
+}
+
+fn parse_search_cursor(value: &str) -> AppResult<SearchCursor> {
+    let (created_at, id) = value
+        .split_once(SEARCH_CURSOR_SEPARATOR)
+        .ok_or_else(|| AppError::Message("curseur de pagination de réunion invalide".into()))?;
+    if created_at.is_empty() || id.is_empty() {
+        return Err(AppError::Message(
+            "curseur de pagination de réunion invalide".into(),
+        ));
     }
-    truncated
+    Ok(SearchCursor {
+        created_at: created_at.to_string(),
+        id: id.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -946,7 +940,17 @@ mod tests {
             provider_id: None,
             date_from: None,
             date_to: None,
+            cursor: None,
         }
+    }
+
+    fn insert_meeting_at(conn: &Connection, id: &str, title: &str, created_at: &str) {
+        conn.execute(
+            "INSERT INTO meetings (id, title, description, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'draft', ?3, ?3)",
+            params![id, title, created_at],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -970,7 +974,49 @@ mod tests {
         .unwrap();
 
         let results = MeetingRepository::search(&conn, &empty_filters()).unwrap();
-        assert_eq!(results.len(), 2);
+        assert_eq!(results.items.len(), 2);
+    }
+
+    #[test]
+    fn search_limits_results_and_paginates_without_duplicates() {
+        let conn = open_in_memory().unwrap();
+        let created_at = "2026-08-08T10:00:00Z";
+        for index in 0..55 {
+            let id = format!("meeting-{index:02}");
+            insert_meeting_at(&conn, &id, &format!("Réunion {index:02}"), created_at);
+        }
+
+        let first_page = MeetingRepository::search(&conn, &empty_filters()).unwrap();
+        assert_eq!(first_page.items.len(), SEARCH_PAGE_SIZE);
+        assert_eq!(first_page.items[0].id, "meeting-54");
+        assert_eq!(first_page.items[SEARCH_PAGE_SIZE - 1].id, "meeting-05");
+
+        let first_ids: std::collections::HashSet<_> = first_page
+            .items
+            .iter()
+            .map(|item| item.id.clone())
+            .collect();
+        assert_eq!(first_ids.len(), SEARCH_PAGE_SIZE);
+
+        let second_page = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                cursor: first_page.next_cursor.clone(),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(second_page.items.len(), 5);
+        assert!(second_page.next_cursor.is_none());
+        assert_eq!(second_page.items[0].id, "meeting-04");
+        for item in &second_page.items {
+            assert!(
+                !first_ids.contains(&item.id),
+                "cursor pagination must not repeat {}",
+                item.id
+            );
+        }
     }
 
     #[test]
@@ -1002,9 +1048,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Comité produit");
-        assert!(results[0].snippet.is_some());
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Comité produit");
+        assert!(results.items[0].snippet.is_some());
     }
 
     #[test]
@@ -1038,8 +1084,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Terminée");
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Terminée");
     }
 
     #[test]
@@ -1073,8 +1119,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Avec IA");
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Avec IA");
     }
 
     #[test]
@@ -1108,8 +1154,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Réunion du jour");
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Réunion du jour");
     }
 
     #[test]
@@ -1152,11 +1198,52 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Point commercial");
-        let snippet = results[0].snippet.as_deref().unwrap();
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Point commercial");
+        let snippet = results.items[0].snippet.as_deref().unwrap();
         assert!(snippet.contains("Dufour"));
         assert!(snippet.starts_with('…'));
+    }
+
+    #[test]
+    fn search_snippet_does_not_return_full_fts_body() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Long verbatim".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let now = Utc::now().to_rfc3339();
+        let full_body = format!(
+            "{} Dufour {} forbidden-tail-marker",
+            "avant ".repeat(250),
+            "après ".repeat(250)
+        );
+        conn.execute(
+            "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at)
+             VALUES ('tx-long', ?1, NULL, NULL, ?2, 'fr', ?3, ?3)",
+            params![meeting.id, &full_body, now],
+        )
+        .unwrap();
+
+        let results = MeetingRepository::search(
+            &conn,
+            &MeetingSearchFilters {
+                query: Some("Dufour".into()),
+                ..empty_filters()
+            },
+        )
+        .unwrap();
+
+        let snippet = results.items[0].snippet.as_deref().unwrap();
+        assert!(snippet.contains("Dufour"));
+        assert!(snippet.len() < 240);
+        assert!(!snippet.contains("forbidden-tail-marker"));
+        assert_ne!(snippet, full_body);
     }
 
     #[test]
@@ -1196,23 +1283,13 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Comité");
-        assert!(results[0]
+        assert_eq!(results.items.len(), 1);
+        assert_eq!(results.items[0].title, "Comité");
+        assert!(results.items[0]
             .snippet
             .as_deref()
             .unwrap()
             .to_lowercase()
             .contains("dufour"));
-    }
-
-    #[test]
-    fn centered_snippet_focuses_on_match() {
-        let haystack = format!("{}Dufour{}", "a".repeat(100), "b".repeat(100));
-        let snippet = centered_snippet(&haystack, "Dufour", 40);
-        assert!(snippet.contains("Dufour"));
-        assert!(snippet.starts_with('…'));
-        assert!(snippet.ends_with('…'));
-        assert!(snippet.chars().count() <= 42); // excerpt + ellipses
     }
 }

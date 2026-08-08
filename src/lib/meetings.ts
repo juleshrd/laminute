@@ -43,6 +43,12 @@ export interface MeetingSearchFilters {
   providerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  cursor?: string;
+}
+
+export interface MeetingSearchPage {
+  items: MeetingListItem[];
+  nextCursor: string | null;
 }
 
 const STATUS_LABELS: Record<MeetingStatus, string> = {
@@ -64,8 +70,8 @@ export function getMeeting(id: string): Promise<MeetingDetail> {
   return invoke<MeetingDetail>("get_meeting", { id });
 }
 
-export function searchMeetings(filters: MeetingSearchFilters): Promise<MeetingListItem[]> {
-  return invoke<MeetingListItem[]>("search_meetings", { filters });
+export function searchMeetings(filters: MeetingSearchFilters): Promise<MeetingSearchPage> {
+  return invoke<MeetingSearchPage>("search_meetings", { filters });
 }
 
 export function deleteMeeting(id: string): Promise<void> {

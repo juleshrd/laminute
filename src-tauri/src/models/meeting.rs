@@ -63,6 +63,7 @@ pub struct MeetingSearchFilters {
     pub provider_id: Option<String>,
     pub date_from: Option<String>,
     pub date_to: Option<String>,
+    pub cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +77,13 @@ pub struct MeetingListItem {
     pub ended_at: Option<String>,
     pub updated_at: String,
     pub snippet: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingSearchPage {
+    pub items: Vec<MeetingListItem>,
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

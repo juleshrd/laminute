@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getMeeting,
@@ -28,11 +28,15 @@ export function MeetingHistory() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [results, setResults] = useState<MeetingListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<MeetingDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const searchRequestId = useRef(0);
+  const detailRequestId = useRef(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -41,17 +45,41 @@ export function MeetingHistory() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  const loadResults = useCallback(async (searchQuery: string) => {
-    setLoading(true);
+  const loadResults = useCallback(async (searchQuery: string, cursor?: string) => {
+    const requestId = ++searchRequestId.current;
+    const append = Boolean(cursor);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setNextCursor(null);
+      setResults([]);
+    }
     setError(null);
     try {
-      const items = await searchMeetings(searchQuery ? { query: searchQuery } : {});
-      setResults(items);
+      const page = await searchMeetings({
+        ...(searchQuery ? { query: searchQuery } : {}),
+        ...(cursor ? { cursor } : {}),
+      });
+      if (requestId !== searchRequestId.current) {
+        return;
+      }
+      setNextCursor(page.nextCursor);
+      setResults((current) => (append ? appendUnique(current, page.items) : page.items));
     } catch (err) {
+      if (requestId !== searchRequestId.current) {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Chargement impossible.");
-      setResults([]);
+      if (!append) {
+        setResults([]);
+        setNextCursor(null);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestId.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
@@ -61,19 +89,39 @@ export function MeetingHistory() {
 
   useEffect(() => {
     if (!selectedId) {
+      detailRequestId.current += 1;
       setDetail(null);
+      setDetailLoading(false);
       return;
     }
 
+    const requestId = ++detailRequestId.current;
+    setDetail(null);
     setDetailLoading(true);
     void getMeeting(selectedId)
-      .then(setDetail)
+      .then((meeting) => {
+        if (requestId === detailRequestId.current) {
+          setDetail(meeting);
+        }
+      })
       .catch((err) => {
+        if (requestId !== detailRequestId.current) {
+          return;
+        }
         setError(err instanceof Error ? err.message : "Chargement impossible.");
         setSelectedId(null);
       })
-      .finally(() => setDetailLoading(false));
+      .finally(() => {
+        if (requestId === detailRequestId.current) {
+          setDetailLoading(false);
+        }
+      });
   }, [selectedId]);
+
+  const selectMeeting = useCallback((id: string) => {
+    setDetail(null);
+    setSelectedId(id);
+  }, []);
 
   if (selectedId && detail) {
     return (
@@ -144,7 +192,7 @@ export function MeetingHistory() {
               key={meeting.id}
               type="button"
               className="lm-listrow"
-              onClick={() => setSelectedId(meeting.id)}
+              onClick={() => selectMeeting(meeting.id)}
             >
               <div className="lm-date">
                 {date.day}
@@ -163,6 +211,23 @@ export function MeetingHistory() {
           );
         })}
       </div>
+      {nextCursor && (
+        <div className="meeting-history__more">
+          <button
+            type="button"
+            onClick={() => void loadResults(debouncedQuery, nextCursor)}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Chargement…" : "Charger plus de réunions"}
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+function appendUnique(current: MeetingListItem[], incoming: MeetingListItem[]): MeetingListItem[] {
+  const seen = new Set(current.map((meeting) => meeting.id));
+  const additions = incoming.filter((meeting) => !seen.has(meeting.id));
+  return [...current, ...additions];
 }
