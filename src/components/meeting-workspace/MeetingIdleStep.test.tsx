@@ -27,9 +27,7 @@ describe("MeetingIdleStep", () => {
     expect(screen.getByRole("heading", { name: "Prêt à enregistrer ?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/100 Mo max \(limite transcription cloud\)/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/100 Mo max \(limite transcription cloud\)/i)).toBeInTheDocument();
   });
 
   it("affiche un avertissement sans périphérique audio", () => {
