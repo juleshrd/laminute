@@ -833,15 +833,15 @@ mod tests {
         complete_after_writer_join(writer_join, &harness.runtime, path)
     }
 
-    fn callback_channels(
-        capacity: usize,
-    ) -> (
+    type CallbackChannels = (
         SyncSender<WriterMsg>,
         Receiver<WriterMsg>,
         SyncSender<SampleBuffer>,
         Receiver<SampleBuffer>,
         Arc<RecordingRuntimeState>,
-    ) {
+    );
+
+    fn callback_channels(capacity: usize) -> CallbackChannels {
         let (tx, rx) = sync_channel(capacity);
         let (free_tx, free_rx) = sync_channel(BUFFER_POOL_SIZE);
         free_tx
