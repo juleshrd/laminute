@@ -68,8 +68,11 @@ export function SettingsScreen({
     <div className="lm-settings">
       <div className="lm-heading">
         <div>
-          <h2>Réglages</h2>
-          <p className="lm-subtle">IA, confidentialité et préférences locales.</p>
+          <p className="lm-kicker">Réglages</p>
+          <h2>Vous gardez le contrôle.</h2>
+          <p className="lm-subtle">
+            La Minute explique ce qui quitte votre machine, avant que cela arrive.
+          </p>
         </div>
       </div>
 

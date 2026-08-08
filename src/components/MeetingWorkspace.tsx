@@ -14,7 +14,7 @@ interface MeetingWorkspaceProps {
 export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
   return (
     <div className={`meeting-workspace${flow.isRecording ? " meeting-workspace--recording" : ""}`}>
-      {!flow.isRecording && (
+      {!flow.isRecording && flow.flowPhase !== "idle" && flow.flowPhase !== "done" && (
         <div
           className={`status-banner status-banner--${flow.flowPhase}`}
           role="status"
@@ -34,6 +34,10 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
               hasDevices={flow.devices.length > 0}
               importing={flow.importing}
               dragOver={flow.dragOver}
+              deviceName={flow.selectedDeviceName}
+              devices={flow.devices}
+              selectedDeviceId={flow.selectedDeviceId}
+              onSelectDevice={(deviceId) => void flow.selectDevice(deviceId)}
               onRequestStartRecording={flow.requestStartRecording}
               onPickMp3={flow.handlePickMp3}
               onDragEnter={() => flow.setDragOver(true)}
@@ -44,6 +48,7 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
           {flow.flowPhase === "recording" && (
             <MeetingRecordingStep
               durationSecs={flow.recordingStatus?.durationSecs ?? 0}
+              deviceName={flow.selectedDeviceName}
               onStopRecording={flow.handleStopRecording}
             />
           )}
@@ -75,7 +80,14 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
           )}
 
           {flow.flowPhase === "done" && (
-            <MeetingResultStep transcription={flow.transcription} summary={flow.summary} />
+            <MeetingResultStep
+              title={flow.title}
+              transcription={flow.transcription}
+              summary={flow.summary}
+              audioPath={flow.filePath}
+              providerName={flow.providerName}
+              selectedProvider={flow.selectedProvider}
+            />
           )}
         </>
       )}

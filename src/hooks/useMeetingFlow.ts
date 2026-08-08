@@ -33,6 +33,9 @@ export interface UseMeetingFlowResult {
   dragOver: boolean;
   showRecordingConsent: boolean;
   devices: AudioInputDevice[];
+  selectedDeviceId: string;
+  selectedDeviceName: string | null;
+  selectDevice: (deviceId: string) => Promise<void>;
   recordingStatus: RecordingStatus | null;
   meetingId: string | null;
   filePath: string | null;
@@ -568,6 +571,18 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     flowPhase === "processing" ||
     (transcriptionProgress != null && isTranscriptionBusy(transcriptionProgress.phase));
   const canStartRecording = Boolean(selectedDeviceId) && devices.length > 0;
+  const selectedDeviceName =
+    devices.find((device) => device.id === selectedDeviceId)?.name ?? null;
+
+  const selectDevice = useCallback(async (deviceId: string) => {
+    setError(null);
+    try {
+      await invoke("set_selected_audio_input_device", { deviceId });
+      setSelectedDeviceId(deviceId);
+    } catch (err) {
+      setError(formatMeetingError(err));
+    }
+  }, []);
 
   return {
     flowPhase,
@@ -577,6 +592,9 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     dragOver,
     showRecordingConsent,
     devices,
+    selectedDeviceId,
+    selectedDeviceName,
+    selectDevice,
     recordingStatus,
     meetingId,
     filePath,

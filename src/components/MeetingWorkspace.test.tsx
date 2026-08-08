@@ -103,14 +103,14 @@ describe("MeetingWorkspace", () => {
     cleanup();
   });
 
-  it("affiche l'écran d'accueil avec logo CTA et import MP3", async () => {
+  it("affiche l'écran Aujourd’hui avec CTA et import", async () => {
     render(<MeetingWorkspaceHarness />);
 
-    expect(
-      await screen.findByRole("heading", { name: "Prêt à enregistrer ?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bonjour." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Importer un enregistrement/i }),
+    ).toBeInTheDocument();
   });
 
   it("demande le consentement avant de démarrer l'enregistrement", async () => {
@@ -218,9 +218,9 @@ describe("MeetingWorkspace", () => {
     vi.mocked(open).mockResolvedValue("/tmp/import.mp3");
 
     render(<MeetingWorkspaceHarness />);
-    await screen.findByRole("button", { name: "Choisir un fichier MP3" });
+    await screen.findByRole("button", { name: /Importer un enregistrement/i });
 
-    fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
+    fireEvent.click(screen.getByRole("button", { name: /Importer un enregistrement/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Audio prêt/i)).toBeInTheDocument();
@@ -290,8 +290,8 @@ describe("MeetingWorkspace", () => {
     vi.mocked(open).mockResolvedValue("/tmp/import.mp3");
 
     render(<MeetingWorkspaceHarness />);
-    await screen.findByRole("button", { name: "Choisir un fichier MP3" });
-    fireEvent.click(screen.getByRole("button", { name: "Choisir un fichier MP3" }));
+    await screen.findByRole("button", { name: /Importer un enregistrement/i });
+    fireEvent.click(screen.getByRole("button", { name: /Importer un enregistrement/i }));
 
     expect(await screen.findByText(/Configurez .* dans les réglages IA/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Traiter" })).toBeDisabled();

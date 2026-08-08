@@ -156,28 +156,32 @@ export function AiProviderSettings() {
   return (
     <section className="ai-settings" aria-labelledby="ai-settings-title">
       <header className="ai-settings__header">
-        <h2 id="ai-settings-title">Fournisseurs IA (BYOK)</h2>
+        <h2 id="ai-settings-title">Fournisseurs IA</h2>
         <p>
-          Sélectionnez un fournisseur et enregistrez votre clé API. Choisissez ensuite le modèle
-          audio pour la transcription et le modèle LLM pour le compte-rendu. Les secrets sont
-          stockés dans le trousseau système, jamais en clair dans l&apos;application.
+          La Minute explique ce qui quitte votre machine, avant que cela arrive. Les secrets restent
+          dans le trousseau système.
         </p>
       </header>
 
-      <div className="ai-settings__field">
-        <label htmlFor="provider-select">Fournisseur</label>
-        <select
-          id="provider-select"
-          value={selectedProviderId}
-          disabled={busy}
-          onChange={(event) => void handleProviderChange(event.target.value)}
-        >
-          {providers.map((provider) => (
-            <option key={provider.id} value={provider.id}>
-              {provider.displayName}
-            </option>
-          ))}
-        </select>
+      <div className="provider-cards" role="list">
+        {providers.map((provider) => {
+          const local = provider.capabilities.local;
+          const active = provider.id === selectedProviderId;
+          return (
+            <button
+              key={provider.id}
+              type="button"
+              role="listitem"
+              className={`provider-card${active ? " is-active" : ""}`}
+              disabled={busy}
+              aria-pressed={active}
+              onClick={() => void handleProviderChange(provider.id)}
+            >
+              <b>{provider.displayName}</b>
+              <small>{local ? "100 % local" : "Cloud"}</small>
+            </button>
+          );
+        })}
       </div>
 
       {selectedProvider ? (
@@ -191,12 +195,14 @@ export function AiProviderSettings() {
               compte-rendu à partir d&apos;un texte collé.
             </p>
           ) : null}
-          <DataProcessingNotice
-            providerId={selectedProvider.id}
-            providerName={selectedProvider.displayName}
-            ollamaBaseUrl={ollamaBaseUrl}
-            capabilities={selectedProvider.capabilities}
-          />
+          <div className={`provider-notice${isLocalProvider ? " is-local" : " is-cloud"}`}>
+            <DataProcessingNotice
+              providerId={selectedProvider.id}
+              providerName={selectedProvider.displayName}
+              ollamaBaseUrl={ollamaBaseUrl}
+              capabilities={selectedProvider.capabilities}
+            />
+          </div>
         </>
       ) : null}
 

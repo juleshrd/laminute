@@ -18,6 +18,7 @@ import "./App.css";
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>("meeting");
+  const [historyMeetingId, setHistoryMeetingId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingDone());
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
@@ -125,12 +126,27 @@ function App() {
       {updateCheckBanner}
       <LmShell
         active={activeScreen}
-        onNavigate={setActiveScreen}
+        onNavigate={(screen) => {
+          if (screen !== "history") {
+            setHistoryMeetingId(null);
+          }
+          setActiveScreen(screen);
+        }}
+        onOpenMeeting={(meetingId) => {
+          setHistoryMeetingId(meetingId);
+          setActiveScreen("history");
+        }}
         isRecording={meetingFlow.isRecording}
         recordingDurationSecs={meetingFlow.recordingStatus?.durationSecs ?? null}
+        onStopRecording={meetingFlow.handleStopRecording}
       >
         {activeScreen === "meeting" ? <MeetingWorkspace flow={meetingFlow} /> : null}
-        {activeScreen === "history" ? <MeetingHistory /> : null}
+        {activeScreen === "history" ? (
+          <MeetingHistory
+            initialSelectedId={historyMeetingId}
+            onSelectedIdChange={setHistoryMeetingId}
+          />
+        ) : null}
         {activeScreen === "settings" ? (
           <SettingsScreen
             updateCheckNotice={updateCheckNotice}
