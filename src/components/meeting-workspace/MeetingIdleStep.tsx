@@ -48,7 +48,9 @@ export function MeetingIdleStep({
         </button>
 
         {!hasDevices ? (
-          <p className="warning meeting-hero__hint">Aucun périphérique d&apos;entrée détecté.</p>
+          <p className="meeting-hero__hint meeting-hero__hint--soft">
+            Aucun micro détecté — vous pouvez quand même importer un MP3.
+          </p>
         ) : (
           <p className="meeting-hero__hint lm-subtle">
             Cliquez sur le logo pour démarrer la réunion.

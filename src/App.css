@@ -698,11 +698,19 @@ select {
   padding: 1.75rem 1rem 2.25rem;
   overflow: hidden;
   isolation: isolate;
+  border-radius: 1rem;
+  background:
+    radial-gradient(
+      70% 55% at 50% 28%,
+      color-mix(in srgb, var(--lm-paper) 70%, transparent),
+      transparent 72%
+    ),
+    color-mix(in srgb, var(--lm-wash) 35%, transparent);
 }
 
 .meeting-hero__ambient {
   position: absolute;
-  inset: -12% -8%;
+  inset: -18% -12%;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
@@ -711,35 +719,35 @@ select {
 .meeting-hero__orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(48px);
-  opacity: 0.55;
+  filter: blur(56px);
+  opacity: 0.85;
   will-change: transform;
 }
 
 .meeting-hero__orb--a {
-  width: min(52vw, 22rem);
-  height: min(52vw, 22rem);
-  top: 8%;
-  left: 12%;
-  background: color-mix(in srgb, var(--lm-soft) 72%, transparent);
+  width: min(58vw, 26rem);
+  height: min(58vw, 26rem);
+  top: 2%;
+  left: 6%;
+  background: color-mix(in srgb, var(--lm-soft) 88%, var(--lm-red) 6%);
   animation: meeting-orb-drift-a 18s var(--meeting-hero-ease) infinite alternate;
 }
 
 .meeting-hero__orb--b {
-  width: min(46vw, 18rem);
-  height: min(46vw, 18rem);
-  right: 8%;
-  bottom: 14%;
-  background: color-mix(in srgb, var(--lm-wash) 80%, transparent);
+  width: min(52vw, 22rem);
+  height: min(52vw, 22rem);
+  right: 2%;
+  bottom: 8%;
+  background: color-mix(in srgb, var(--lm-wash) 55%, var(--lm-navy) 10%);
   animation: meeting-orb-drift-b 22s var(--meeting-hero-ease) infinite alternate;
 }
 
 .meeting-hero__orb--c {
-  width: min(38vw, 14rem);
-  height: min(38vw, 14rem);
-  left: 42%;
-  top: 46%;
-  background: color-mix(in srgb, var(--lm-navy) 8%, transparent);
+  width: min(42vw, 16rem);
+  height: min(42vw, 16rem);
+  left: 40%;
+  top: 42%;
+  background: color-mix(in srgb, var(--lm-navy) 14%, transparent);
   animation: meeting-orb-drift-c 26s var(--meeting-hero-ease) infinite alternate;
 }
 
@@ -767,6 +775,11 @@ select {
   margin: 0;
   max-width: 22rem;
   animation: meeting-fade-up 0.65s var(--meeting-hero-ease) 0.08s both;
+}
+
+.meeting-hero__hint--soft {
+  color: var(--lm-muted);
+  font-size: 0.92rem;
 }
 
 .meeting-logo-cta {

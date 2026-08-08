@@ -5,7 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 import { generateStructuredSummary, getAiSettings, listAiProviders } from "../lib/ai/api";
 import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../lib/ai/types";
-import { type AudioInputDevice, type RecordingStatus } from "../lib/audio";
+import { isAudioError, type AudioInputDevice, type RecordingStatus } from "../lib/audio";
 import { type MeetingDetail, updateMeetingTitle } from "../lib/meetings";
 import {
   type MeetingFlowPhase,
@@ -78,6 +78,13 @@ function createAiJobId(prefix: "transcription" | "summary"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function isNoInputDeviceError(error: unknown): boolean {
+  if (isAudioError(error) && error.code === "no_input_device") {
+    return true;
+  }
+  return formatMeetingError(error).toLowerCase().includes("aucun périphérique d'entrée audio");
+}
+
 export function useMeetingFlow(): UseMeetingFlowResult {
   const [flowPhase, setFlowPhase] = useState<MeetingFlowPhase>("idle");
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
@@ -117,8 +124,16 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       } else if (listed.length > 0) {
         const fallback = listed.find((device) => device.isDefault) ?? listed[0];
         setSelectedDeviceId(fallback.id);
+      } else {
+        setSelectedDeviceId("");
       }
     } catch (err) {
+      // Absence de micro = état attendu (import MP3 toujours possible), pas une erreur bloquante.
+      if (isNoInputDeviceError(err)) {
+        setDevices([]);
+        setSelectedDeviceId("");
+        return;
+      }
       setError(formatMeetingError(err));
     }
   }, []);
