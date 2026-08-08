@@ -192,7 +192,9 @@ export function AiProviderSettings() {
             </p>
           ) : null}
           <DataProcessingNotice
+            providerId={selectedProvider.id}
             providerName={selectedProvider.displayName}
+            ollamaBaseUrl={ollamaBaseUrl}
             capabilities={selectedProvider.capabilities}
           />
         </>

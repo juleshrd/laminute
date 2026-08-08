@@ -21,6 +21,7 @@ const defaultProps = {
       diarization: true,
     },
   },
+  ollamaBaseUrl: "http://127.0.0.1:11434",
   isSummarizeOnly: false,
   isBusy: false,
   pastedText: "",

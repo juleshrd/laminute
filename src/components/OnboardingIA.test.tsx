@@ -93,6 +93,10 @@ describe("OnboardingIA", () => {
     expect(await screen.findByRole("heading", { name: "Bienvenue" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Commencer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Plus tard" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Les réunions restent stockées sur votre ordinateur/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Tout reste sur votre ordinateur/i)).not.toBeInTheDocument();
   });
 
   it("met Mistral en avant à l'étape de choix", async () => {

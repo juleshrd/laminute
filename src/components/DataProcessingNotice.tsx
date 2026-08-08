@@ -1,5 +1,9 @@
+import { buildDataProcessingNotice, type PrivacyProviderId } from "../content/privacyNotices";
+
 interface DataProcessingNoticeProps {
+  providerId?: PrivacyProviderId;
   providerName: string;
+  ollamaBaseUrl?: string | null;
   capabilities?: {
     transcription: boolean;
     summary: boolean;
@@ -7,27 +11,23 @@ interface DataProcessingNoticeProps {
   };
 }
 
-export function DataProcessingNotice({ providerName, capabilities }: DataProcessingNoticeProps) {
-  const isLocal = capabilities?.local ?? false;
-  const hasTranscription = capabilities?.transcription ?? true;
-
-  if (isLocal) {
-    return (
-      <p className="data-processing-notice" role="note">
-        <strong>Traitement local via {providerName} :</strong> le compte-rendu est généré sur votre
-        machine via Ollama. Aucune donnée n&apos;est envoyée à un service cloud. La transcription
-        audio n&apos;est pas disponible avec ce fournisseur.
-      </p>
-    );
-  }
+export function DataProcessingNotice({
+  providerId,
+  providerName,
+  ollamaBaseUrl,
+  capabilities,
+}: DataProcessingNoticeProps) {
+  const resolvedId = providerId ?? (capabilities?.local ? "ollama" : "mistral");
+  const notice = buildDataProcessingNotice({
+    providerId: resolvedId,
+    providerName,
+    ollamaBaseUrl,
+    capabilities,
+  });
 
   return (
     <p className="data-processing-notice" role="note">
-      <strong>Données envoyées à {providerName} :</strong>
-      {hasTranscription
-        ? " la transcription transmet le fichier audio ; le compte-rendu transmet uniquement le texte transcrit."
-        : " le compte-rendu transmet uniquement le texte fourni."}{" "}
-      Aucune clé API n&apos;est incluse dans ces échanges.
+      <strong>{notice.title} :</strong> {notice.body}
     </p>
   );
 }
