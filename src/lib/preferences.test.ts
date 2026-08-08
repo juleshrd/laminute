@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyReduceMotionToDocument,
+  CURRENT_ONBOARDING_VERSION,
   getReduceMotionPreference,
+  isOnboardingDone,
+  setOnboardingDone,
   setReduceMotionPreference,
 } from "./preferences";
 
@@ -76,5 +79,26 @@ describe("reduce motion preference", () => {
     localStorage.setItem("laminute.reduceMotion", "0");
     applyReduceMotionToDocument();
     expect(document.documentElement.dataset.reduceMotion).toBe("false");
+  });
+});
+
+describe("onboarding versioned preference", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  it("ne considère pas l'ancien marqueur comme une configuration actuelle", () => {
+    localStorage.setItem("laminute.onboardingDone", "1");
+    expect(isOnboardingDone()).toBe(false);
+  });
+
+  it("persiste la version courante et peut être réinitialisé", () => {
+    setOnboardingDone(true);
+    expect(localStorage.getItem("laminute.onboardingVersion")).toBe(
+      String(CURRENT_ONBOARDING_VERSION),
+    );
+    expect(isOnboardingDone()).toBe(true);
+
+    setOnboardingDone(false);
+    expect(isOnboardingDone()).toBe(false);
   });
 });

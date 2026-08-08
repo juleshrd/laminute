@@ -122,8 +122,8 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       if (selected) {
         setSelectedDeviceId(selected.id);
       } else if (listed.length > 0) {
-        const fallback = listed.find((device) => device.isDefault) ?? listed[0];
-        setSelectedDeviceId(fallback.id);
+        const fallback = await invoke<AudioInputDevice | null>("ensure_default_audio_input_device");
+        setSelectedDeviceId(fallback?.id ?? "");
       } else {
         setSelectedDeviceId("");
       }

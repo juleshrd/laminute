@@ -5,9 +5,10 @@
 # Secrets obligatoires (environnement GitHub `release`, ou secrets dépôt) :
 #   TAURI_SIGNING_PRIVATE_KEY          — clé privée Minisign updater
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — mot de passe (chaîne vide si aucune)
-#
-# Signature code OS (Apple / Authenticode) : hors scope v0.1.0 ; à brancher pour une
-# release « stable » v1.0 lorsque les certificats sont disponibles.
+#   APPLE_CERTIFICATE                  — certificat Developer ID Application (.p12, base64)
+#   APPLE_CERTIFICATE_PASSWORD         — mot de passe du certificat
+#   APPLE_ID / APPLE_PASSWORD          — compte Apple + mot de passe spécifique à l'app
+#   APPLE_TEAM_ID                      — identifiant de l'équipe Apple Developer
 #
 # Avant chaque tag : aligner version dans package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml.
 
@@ -119,6 +120,29 @@ jobs:
           fi
         shell: bash
 
+      - name: Exiger signature et notarisation Apple
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for secret_name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "Secret GitHub manquant : ${secret_name}" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Publication macOS refusée : une release stable doit être signée et notariée." >&2
+            exit 1
+          fi
+        shell: bash
+
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
@@ -153,6 +177,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v__VERSION__
           releaseName: La Minute v__VERSION__
@@ -164,14 +194,33 @@ jobs:
             - **Linux** : fichier `.AppImage`
 
             Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
-            En v0.1.0, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) ;
-            le système peut afficher un avertissement à la première ouverture.
+            L’application macOS est signée Developer ID, utilise le runtime renforcé et est
+            notariée par Apple afin de s’ouvrir normalement avec Gatekeeper.
 
             Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
+
+      - name: Vérifier le bundle macOS signé et notarié
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="src-tauri/target/universal-apple-darwin/release/bundle"
+          app_path="$(find "$bundle_dir/macos" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          dmg_path="$(find "$bundle_dir/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          if [ -z "$app_path" ] || [ -z "$dmg_path" ]; then
+            echo "Bundle macOS ou DMG introuvable dans $bundle_dir" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=4 "$app_path"
+          codesign -dv --verbose=4 "$app_path" 2>&1 | grep -F "Authority=Developer ID Application"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          xcrun stapler validate "$dmg_path"
+          hdiutil verify "$dmg_path"
 
       - name: Checksums des bundles
         shell: bash
@@ -268,3 +317,11 @@ jobs:
             release-meta/SHA256SUMS.txt \
             release-meta/sbom-*.spdx.json \
             --clobber
+
+      - name: Publier la release après validation de tous les bundles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          gh release edit "v${VERSION}" --draft=false

@@ -21,7 +21,7 @@ Téléchargez la [dernière version](https://github.com/juleshrd/laminute/releas
 
 Installez, puis ouvrez **La Minute**.
 
-Les installateurs et le flux d’auto-update (`latest.json`) sont publiés sur GitHub Releases. Les artefacts d’update sont **signés Minisign** et vérifiés par l’application. En v0.1.0, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) : le système peut afficher un avertissement à la première ouverture (macOS : clic droit → **Ouvrir** ; Windows : SmartScreen).
+Les installateurs et le flux d’auto-update (`latest.json`) sont publiés sur GitHub Releases. Les artefacts d’update sont **signés Minisign** et vérifiés par l’application. Une release macOS stable est également signée avec un certificat Developer ID et notariée par Apple ; la publication échoue si ces garanties ne peuvent pas être vérifiées.
 
 Quand une nouvelle version est disponible, l’app vous propose la mise à jour. Si la vérification échoue (réseau, dépôt inaccessible), un message non bloquant s’affiche.
 
@@ -31,12 +31,14 @@ C’est le parcours le plus simple pour démarrer.
 
 1. Créez un compte (ou connectez-vous) sur [console.mistral.ai](https://console.mistral.ai/).
 2. Créez une **clé API**, puis copiez-la.
-3. Dans La Minute, ouvrez **Réglages**.
+3. Au premier lancement, laissez La Minute préparer les dossiers locaux et le microphone par défaut.
 4. Choisissez **Mistral AI**, collez la clé, enregistrez, puis **Validez**.
 
 Votre clé est stockée dans le trousseau de votre ordinateur (pas dans les exports de réunions).
 
 ## Premier usage
+
+Au premier lancement, l’assistant affiche les emplacements réellement utilisés, configure la conservation des audios, sélectionne le microphone système par défaut et connecte le fournisseur IA. Il peut être relancé depuis **Réglages**.
 
 1. Importez un fichier **MP3**, ou lancez un **enregistrement**.
 2. Donnez un titre à la réunion.

@@ -8,6 +8,7 @@ import {
   getLocalStorageInfo,
   type LocalStorageInfo,
 } from "../lib/privacy";
+import { setOnboardingDone } from "../lib/preferences";
 
 export function PrivacySettings() {
   const [storage, setStorage] = useState<LocalStorageInfo | null>(null);
@@ -57,6 +58,7 @@ export function PrivacySettings() {
     setError(null);
     try {
       await deleteAllLocalData();
+      setOnboardingDone(false);
       setStatusMessage("Toutes les données locales ont été supprimées.");
       setConfirmStep("idle");
       setConfirmText("");
