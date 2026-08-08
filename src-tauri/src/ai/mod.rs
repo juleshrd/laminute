@@ -6,6 +6,7 @@ pub mod http;
 pub mod limits;
 pub mod model_catalog;
 pub mod models;
+pub mod ollama_url;
 pub mod provider;
 pub mod providers;
 pub mod registry;

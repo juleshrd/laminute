@@ -43,6 +43,8 @@ pub struct AiSettings {
     pub has_api_key: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ollama_base_url: Option<String>,
+    /// Autorisation explicite d'un serveur Ollama hors loopback (LAN / distant).
+    pub ollama_allow_remote: bool,
     /// Diarisation locuteurs activée pour la transcription (si le fournisseur le permet).
     pub diarization_enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

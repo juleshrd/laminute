@@ -35,7 +35,8 @@ impl ProviderRegistry {
         ));
         let ollama = Arc::new(OllamaProvider::with_base_url(
             DEFAULT_OLLAMA_BASE.to_string(),
-            client,
+            false,
+            http::build_ollama_client(),
         ));
 
         let mut registry = Self {

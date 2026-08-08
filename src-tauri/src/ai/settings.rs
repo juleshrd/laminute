@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::ai::model_catalog;
 use crate::ai::models::ProviderModelPreferences;
+use crate::ai::ollama_url::{self, OllamaUrlError};
 use crate::ai::providers::ollama::DEFAULT_OLLAMA_BASE;
 
 #[derive(Debug, Error)]
@@ -19,6 +20,15 @@ pub enum SettingsError {
 
     #[error("erreur de sérialisation : {0}")]
     Serde(#[from] serde_json::Error),
+
+    #[error("{0}")]
+    Validation(String),
+}
+
+impl From<OllamaUrlError> for SettingsError {
+    fn from(value: OllamaUrlError) -> Self {
+        Self::Validation(value.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +37,8 @@ struct PersistedAiSettings {
     selected_provider_id: Option<String>,
     #[serde(default = "default_ollama_base_url")]
     ollama_base_url: String,
+    #[serde(default)]
+    ollama_allow_remote: bool,
     #[serde(default)]
     diarization_enabled: bool,
     #[serde(default)]
@@ -37,11 +49,24 @@ fn default_ollama_base_url() -> String {
     DEFAULT_OLLAMA_BASE.to_string()
 }
 
+fn sanitize_ollama_settings(data: &mut PersistedAiSettings) {
+    match ollama_url::normalize(&data.ollama_base_url, data.ollama_allow_remote) {
+        Ok(normalized) => {
+            data.ollama_base_url = normalized.into_string();
+        }
+        Err(_) => {
+            data.ollama_base_url = default_ollama_base_url();
+            data.ollama_allow_remote = false;
+        }
+    }
+}
+
 impl Default for PersistedAiSettings {
     fn default() -> Self {
         Self {
             selected_provider_id: None,
             ollama_base_url: default_ollama_base_url(),
+            ollama_allow_remote: false,
             diarization_enabled: false,
             provider_models: HashMap::new(),
         }
@@ -56,12 +81,13 @@ pub struct SettingsStore {
 impl SettingsStore {
     pub fn load(app_data_dir: PathBuf) -> Result<Self, SettingsError> {
         let path = app_data_dir.join("ai-settings.json");
-        let data = if path.exists() {
+        let mut data = if path.exists() {
             let raw = fs::read_to_string(&path)?;
             serde_json::from_str(&raw)?
         } else {
             PersistedAiSettings::default()
         };
+        sanitize_ollama_settings(&mut data);
 
         Ok(Self { path, data })
     }
@@ -72,6 +98,10 @@ impl SettingsStore {
 
     pub fn ollama_base_url(&self) -> &str {
         &self.data.ollama_base_url
+    }
+
+    pub fn ollama_allow_remote(&self) -> bool {
+        self.data.ollama_allow_remote
     }
 
     pub fn diarization_enabled(&self) -> bool {
@@ -86,14 +116,18 @@ impl SettingsStore {
         self.save()
     }
 
-    pub fn set_ollama_base_url(&mut self, base_url: String) -> Result<(), SettingsError> {
-        let trimmed = base_url.trim();
-        self.data.ollama_base_url = if trimmed.is_empty() {
-            default_ollama_base_url()
-        } else {
-            trimmed.to_string()
-        };
-        self.save()
+    /// Valide, normalise et persiste l'URL Ollama. Retourne la valeur normalisée
+    /// (identique en mémoire et sur disque).
+    pub fn set_ollama_base_url(
+        &mut self,
+        base_url: String,
+        allow_remote: bool,
+    ) -> Result<String, SettingsError> {
+        let normalized = ollama_url::normalize(&base_url, allow_remote)?;
+        self.data.ollama_base_url = normalized.as_str().to_string();
+        self.data.ollama_allow_remote = allow_remote;
+        self.save()?;
+        Ok(self.data.ollama_base_url.clone())
     }
 
     pub fn set_diarization_enabled(&mut self, enabled: bool) -> Result<(), SettingsError> {
@@ -200,5 +234,34 @@ mod tests {
             reloaded.summary_model_for("openai").as_deref(),
             Some("gpt-4o-mini")
         );
+    }
+
+    #[test]
+    fn set_ollama_base_url_persists_normalized_value() {
+        let dir = tempdir().expect("tempdir");
+        let mut store = SettingsStore::load(dir.path().to_path_buf()).expect("load");
+        let normalized = store
+            .set_ollama_base_url(" http://127.0.0.1:11434/ ".into(), false)
+            .expect("set url");
+        assert_eq!(normalized, "http://127.0.0.1:11434");
+        assert_eq!(store.ollama_base_url(), "http://127.0.0.1:11434");
+
+        let reloaded = SettingsStore::load(dir.path().to_path_buf()).expect("reload");
+        assert_eq!(reloaded.ollama_base_url(), "http://127.0.0.1:11434");
+        assert!(!reloaded.ollama_allow_remote());
+    }
+
+    #[test]
+    fn load_resets_invalid_or_remote_without_opt_in() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("ai-settings.json");
+        fs::write(
+            &path,
+            r#"{"ollamaBaseUrl":"http://192.168.1.10:11434","ollamaAllowRemote":false}"#,
+        )
+        .expect("write");
+        let store = SettingsStore::load(dir.path().to_path_buf()).expect("load");
+        assert_eq!(store.ollama_base_url(), DEFAULT_OLLAMA_BASE);
+        assert!(!store.ollama_allow_remote());
     }
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { deleteApiKey, saveApiKey, setOllamaBaseUrl, validateApiKey } from "../lib/ai/api";
+import { isOllamaLoopbackUrl } from "../lib/ai/ollamaUrl";
 import type { KeyValidationResult } from "../lib/ai/types";
 
 export interface ProviderCredentialsFormProps {
@@ -10,6 +11,8 @@ export interface ProviderCredentialsFormProps {
   onHasStoredKeyChange?: (hasKey: boolean) => void;
   ollamaBaseUrl: string;
   onOllamaBaseUrlChange: (url: string) => void;
+  ollamaAllowRemote?: boolean;
+  onOllamaAllowRemoteChange?: (allow: boolean) => void;
   showDelete?: boolean;
   idPrefix?: string;
 }
@@ -21,6 +24,8 @@ export function ProviderCredentialsForm({
   onHasStoredKeyChange,
   ollamaBaseUrl,
   onOllamaBaseUrlChange,
+  ollamaAllowRemote = false,
+  onOllamaAllowRemoteChange,
   showDelete = true,
   idPrefix = "cred",
 }: ProviderCredentialsFormProps) {
@@ -31,15 +36,23 @@ export function ProviderCredentialsForm({
   const [error, setError] = useState<string | null>(null);
 
   const ollamaInputId = `${idPrefix}-ollama-url`;
+  const ollamaRemoteId = `${idPrefix}-ollama-remote`;
   const apiKeyInputId = `${idPrefix}-api-key`;
+  const isLoopback = isOllamaLoopbackUrl(ollamaBaseUrl);
+  const looksRemote = Boolean(ollamaBaseUrl.trim()) && !isLoopback;
+  const canSaveOllama = Boolean(ollamaBaseUrl.trim()) && (!looksRemote || ollamaAllowRemote);
 
   async function handleSaveOllamaBaseUrl() {
     setBusy(true);
     setError(null);
     setStatusMessage(null);
     try {
-      await setOllamaBaseUrl(ollamaBaseUrl);
-      setStatusMessage("URL Ollama enregistrée.");
+      await setOllamaBaseUrl(ollamaBaseUrl, looksRemote ? ollamaAllowRemote : false);
+      setStatusMessage(
+        looksRemote
+          ? "URL Ollama distante enregistrée (opt-in activé)."
+          : "URL Ollama locale enregistrée.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
     } finally {
@@ -106,10 +119,36 @@ export function ProviderCredentialsForm({
             value={ollamaBaseUrl}
             disabled={busy}
             onChange={(event) => onOllamaBaseUrlChange(event.target.value)}
+            placeholder="http://127.0.0.1:11434"
           />
+          {isLoopback ? (
+            <p className="ai-settings__note" role="status">
+              Serveur local (loopback) — les transcriptions restent sur cette machine.
+            </p>
+          ) : null}
+          {looksRemote ? (
+            <>
+              <p className="ai-settings__note ai-settings__note--warn" role="status">
+                Serveur distant ou LAN détecté — les textes de réunion seront envoyés à cette
+                origine.
+              </p>
+              <div className="ai-settings__field ai-settings__field--checkbox">
+                <label htmlFor={ollamaRemoteId}>
+                  <input
+                    id={ollamaRemoteId}
+                    type="checkbox"
+                    checked={ollamaAllowRemote}
+                    disabled={busy}
+                    onChange={(event) => onOllamaAllowRemoteChange?.(event.target.checked)}
+                  />
+                  J&apos;autorise explicitement ce serveur Ollama hors de cette machine
+                </label>
+              </div>
+            </>
+          ) : null}
           <button
             type="button"
-            disabled={busy || !ollamaBaseUrl.trim()}
+            disabled={busy || !canSaveOllama}
             onClick={() => void handleSaveOllamaBaseUrl()}
           >
             Enregistrer l&apos;URL
