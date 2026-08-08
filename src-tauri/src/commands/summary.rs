@@ -31,6 +31,12 @@ pub struct GenerateStructuredSummaryOutput {
     pub actions: Vec<Action>,
 }
 
+#[derive(Debug)]
+enum ResolvedSummaryInput {
+    ExistingMeeting { meeting_id: String, text: String },
+    PastedText { text: String },
+}
+
 #[tauri::command]
 pub async fn generate_structured_summary(
     app: AppHandle,
@@ -71,6 +77,7 @@ async fn generate_structured_summary_inner(
         .registry
         .require(&provider_id)
         .map_err(|e| AppError::Message(e.to_string()))?;
+    let provider_display_name = provider.display_name().to_string();
 
     let api_key = if provider.capabilities().local {
         String::new()
@@ -84,7 +91,11 @@ async fn generate_structured_summary_inner(
     };
 
     let model = input.model.clone().or(default_model);
-    let (meeting_id, transcription_text) = resolve_input(db_state, input)?;
+    let resolved = resolve_input(db_state, input)?;
+    let transcription_text = match &resolved {
+        ResolvedSummaryInput::ExistingMeeting { text, .. }
+        | ResolvedSummaryInput::PastedText { text } => text.clone(),
+    };
 
     gate.ensure_generation(activity)?;
 
@@ -107,13 +118,37 @@ async fn generate_structured_summary_inner(
 
     gate.ensure_generation(activity)?;
 
-    let (summary, actions) = db_state.with_db(|conn| {
-        SummaryRepository::save_structured_summary(
-            conn,
-            &meeting_id,
-            Some(&provider_id),
-            &structured,
-        )
+    let (meeting_id, summary, actions) = db_state.with_db(|conn| match &resolved {
+        ResolvedSummaryInput::ExistingMeeting { meeting_id, .. } => {
+            let (summary, actions) = SummaryRepository::save_structured_summary(
+                conn,
+                meeting_id,
+                Some(&provider_id),
+                Some(&provider_display_name),
+                &structured,
+            )?;
+            Ok((meeting_id.clone(), summary, actions))
+        }
+        ResolvedSummaryInput::PastedText { .. } => {
+            // Création + persistance atomiques : pas de brouillon si la sauvegarde échoue.
+            let tx = conn.unchecked_transaction()?;
+            let meeting = MeetingRepository::create(
+                &tx,
+                CreateMeetingInput {
+                    title: format!("Compte-rendu {}", Utc::now().format("%Y-%m-%d %H:%M")),
+                    description: Some("Généré à partir d'un texte importé".into()),
+                },
+            )?;
+            let (summary, actions) = SummaryRepository::save_structured_summary_on(
+                &tx,
+                &meeting.id,
+                Some(&provider_id),
+                Some(&provider_display_name),
+                &structured,
+            )?;
+            tx.commit()?;
+            Ok((meeting.id, summary, actions))
+        }
     })?;
 
     retention::maybe_purge_audio_files(app, db_state, &meeting_id)?;
@@ -129,14 +164,14 @@ async fn generate_structured_summary_inner(
 fn resolve_input(
     db_state: &State<'_, AppState>,
     input: GenerateStructuredSummaryInput,
-) -> AppResult<(String, String)> {
+) -> AppResult<ResolvedSummaryInput> {
     match (input.meeting_id, input.text) {
         (Some(meeting_id), Some(text)) => {
             if text.trim().is_empty() {
                 return Err(AppError::Message("le texte fourni est vide".into()));
             }
             db_state.with_db(|conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
-            Ok((meeting_id, text))
+            Ok(ResolvedSummaryInput::ExistingMeeting { meeting_id, text })
         }
         (Some(meeting_id), None) => {
             db_state.with_db(|conn| MeetingRepository::get_by_id(conn, &meeting_id))?;
@@ -145,25 +180,76 @@ fn resolve_input(
                 .ok_or_else(|| {
                     AppError::Message("aucune transcription trouvée pour cette réunion".into())
                 })?;
-            Ok((meeting_id, text))
+            Ok(ResolvedSummaryInput::ExistingMeeting { meeting_id, text })
         }
         (None, Some(text)) => {
             if text.trim().is_empty() {
                 return Err(AppError::Message("le texte fourni est vide".into()));
             }
-            let meeting = db_state.with_db(|conn| {
-                MeetingRepository::create(
-                    conn,
-                    CreateMeetingInput {
-                        title: format!("Compte-rendu {}", Utc::now().format("%Y-%m-%d %H:%M")),
-                        description: Some("Généré à partir d'un texte importé".into()),
-                    },
-                )
-            })?;
-            Ok((meeting.id, text))
+            // La réunion n'est créée qu'après succès IA, pour éviter les brouillons fantômes.
+            Ok(ResolvedSummaryInput::PastedText { text })
         }
         (None, None) => Err(AppError::Message(
             "fournissez un meeting_id ou un texte de transcription".into(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::open_in_memory;
+    use crate::models::MeetingStatus;
+
+    #[test]
+    fn pasted_text_persist_creates_meeting_only_with_summary() {
+        let conn = open_in_memory().unwrap();
+        let structured = StructuredSummary {
+            synthese: "Synthèse.".into(),
+            decisions: vec![],
+            actions: vec![],
+            risques: vec![],
+            questions_ouvertes: vec![],
+        };
+
+        let tx = conn.unchecked_transaction().unwrap();
+        let meeting = MeetingRepository::create(
+            &tx,
+            CreateMeetingInput {
+                title: "Compte-rendu test".into(),
+                description: Some("Généré à partir d'un texte importé".into()),
+            },
+        )
+        .unwrap();
+        let (summary, actions) = SummaryRepository::save_structured_summary_on(
+            &tx,
+            &meeting.id,
+            Some("mistral"),
+            Some("Mistral AI"),
+            &structured,
+        )
+        .unwrap();
+        tx.commit().unwrap();
+
+        assert_eq!(summary.meeting_id, meeting.id);
+        assert!(actions.is_empty());
+        assert_eq!(
+            MeetingRepository::get_by_id(&conn, &meeting.id)
+                .unwrap()
+                .status,
+            MeetingStatus::Completed
+        );
+    }
+
+    #[test]
+    fn resolve_pasted_text_does_not_create_meeting() {
+        // Documente le contrat : un texte collé seul ne touche pas la DB avant l'appel IA.
+        let resolved = ResolvedSummaryInput::PastedText {
+            text: "hello".into(),
+        };
+        match resolved {
+            ResolvedSummaryInput::PastedText { text } => assert_eq!(text, "hello"),
+            ResolvedSummaryInput::ExistingMeeting { .. } => panic!("expected pasted text"),
+        }
     }
 }

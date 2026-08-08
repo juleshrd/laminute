@@ -4,7 +4,8 @@ use uuid::Uuid;
 
 use crate::ai::structured_summary::StructuredSummary;
 use crate::error::{AppError, AppResult};
-use crate::models::{Action, ActionStatus, Summary};
+use crate::models::{Action, ActionStatus, MeetingStatus, Summary};
+use crate::repository::MeetingRepository;
 
 pub struct SummaryRepository;
 
@@ -25,12 +26,42 @@ impl SummaryRepository {
         .map_err(Into::into)
     }
 
+    /// Persiste le résumé, les actions et le statut `completed` dans une transaction unique.
+    /// Si `provider_id` est fourni, garantit la ligne `ai_providers` (FK).
     pub fn save_structured_summary(
         conn: &Connection,
         meeting_id: &str,
         provider_id: Option<&str>,
+        provider_display_name: Option<&str>,
         structured: &StructuredSummary,
     ) -> AppResult<(Summary, Vec<Action>)> {
+        let tx = conn.unchecked_transaction()?;
+        let result = Self::save_structured_summary_on(
+            &tx,
+            meeting_id,
+            provider_id,
+            provider_display_name,
+            structured,
+        )?;
+        tx.commit()?;
+        Ok(result)
+    }
+
+    /// Variante sans transaction, à utiliser dans une transaction déjà ouverte par l'appelant.
+    pub(crate) fn save_structured_summary_on(
+        conn: &Connection,
+        meeting_id: &str,
+        provider_id: Option<&str>,
+        provider_display_name: Option<&str>,
+        structured: &StructuredSummary,
+    ) -> AppResult<(Summary, Vec<Action>)> {
+        MeetingRepository::get_by_id(conn, meeting_id)?;
+
+        if let Some(provider_id) = provider_id {
+            let name = provider_display_name.unwrap_or(provider_id);
+            MeetingRepository::ensure_ai_provider(conn, provider_id, name, provider_id)?;
+        }
+
         let now = Utc::now().to_rfc3339();
         let summary_id = Uuid::new_v4().to_string();
         let content = serde_json::to_string(structured).map_err(|error| {
@@ -75,6 +106,8 @@ impl SummaryRepository {
             });
         }
 
+        MeetingRepository::update_status(conn, meeting_id, MeetingStatus::Completed)?;
+
         let summary = Summary {
             id: summary_id,
             meeting_id: meeting_id.to_string(),
@@ -94,7 +127,6 @@ mod tests {
     use crate::ai::structured_summary::StructuredActionItem;
     use crate::db::open_in_memory;
     use crate::models::CreateMeetingInput;
-    use crate::repository::MeetingRepository;
 
     fn sample_structured() -> StructuredSummary {
         StructuredSummary {
@@ -109,6 +141,17 @@ mod tests {
             risques: vec!["Charge équipe".into()],
             questions_ouvertes: vec!["Budget ?".into()],
         }
+    }
+
+    fn sample_structured_two_actions() -> StructuredSummary {
+        let mut structured = sample_structured();
+        structured.actions.push(StructuredActionItem {
+            titre: "Envoyer le compte-rendu".into(),
+            description: None,
+            responsable: None,
+            echeance: None,
+        });
+        structured
     }
 
     #[test]
@@ -127,6 +170,7 @@ mod tests {
             &conn,
             &meeting.id,
             None,
+            None,
             &sample_structured(),
         )
         .unwrap();
@@ -139,6 +183,105 @@ mod tests {
         let detail = MeetingRepository::get_detail(&conn, &meeting.id).unwrap();
         assert_eq!(detail.summaries.len(), 1);
         assert_eq!(detail.actions.len(), 1);
+        assert_eq!(detail.meeting.status, MeetingStatus::Completed);
+    }
+
+    #[test]
+    fn save_structured_summary_ensures_provider_on_fresh_db() {
+        for (provider_id, display_name) in [
+            ("mistral", "Mistral AI"),
+            ("openai", "OpenAI"),
+            ("ollama", "Ollama"),
+        ] {
+            let conn = open_in_memory().unwrap();
+            let meeting = MeetingRepository::create(
+                &conn,
+                CreateMeetingInput {
+                    title: format!("CR {provider_id}"),
+                    description: None,
+                },
+            )
+            .unwrap();
+
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM ai_providers WHERE id = ?1",
+                    [provider_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "provider {provider_id} must be absent initially");
+
+            let (summary, _) = SummaryRepository::save_structured_summary(
+                &conn,
+                &meeting.id,
+                Some(provider_id),
+                Some(display_name),
+                &sample_structured(),
+            )
+            .unwrap();
+
+            assert_eq!(summary.provider_id.as_deref(), Some(provider_id));
+            let name: String = conn
+                .query_row(
+                    "SELECT name FROM ai_providers WHERE id = ?1",
+                    [provider_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(name, display_name);
+        }
+    }
+
+    #[test]
+    fn save_structured_summary_rolls_back_on_action_failure() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Rollback".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        conn.execute_batch(
+            "CREATE TRIGGER fail_second_action BEFORE INSERT ON actions
+             WHEN (SELECT COUNT(*) FROM actions WHERE meeting_id = NEW.meeting_id) >= 1
+             BEGIN
+               SELECT RAISE(ABORT, 'simulated action failure');
+             END;",
+        )
+        .unwrap();
+
+        let err = SummaryRepository::save_structured_summary(
+            &conn,
+            &meeting.id,
+            Some("mistral"),
+            Some("Mistral AI"),
+            &sample_structured_two_actions(),
+        )
+        .expect_err("second action insert must fail");
+        assert!(
+            err.to_string().contains("simulated action failure"),
+            "unexpected error: {err}"
+        );
+
+        let summaries: i64 = conn
+            .query_row("SELECT COUNT(*) FROM summaries", [], |row| row.get(0))
+            .unwrap();
+        let actions: i64 = conn
+            .query_row("SELECT COUNT(*) FROM actions", [], |row| row.get(0))
+            .unwrap();
+        let providers: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ai_providers", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(summaries, 0);
+        assert_eq!(actions, 0);
+        assert_eq!(providers, 0);
+
+        let meeting = MeetingRepository::get_by_id(&conn, &meeting.id).unwrap();
+        assert_eq!(meeting.status, MeetingStatus::Draft);
     }
 
     #[test]
