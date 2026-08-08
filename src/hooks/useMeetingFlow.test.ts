@@ -21,6 +21,7 @@ vi.mock("../lib/ai/api", () => ({
   getAiSettings: vi.fn().mockResolvedValue({
     hasApiKey: true,
     selectedProviderId: "mistral",
+    ollamaAllowRemote: false,
     diarizationEnabled: false,
     transcriptionModel: "voxtral-mini-latest",
     summaryModel: "mistral-small-latest",

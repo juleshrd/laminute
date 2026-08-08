@@ -21,8 +21,8 @@ export function setSelectedProvider(providerId: string): Promise<AiSettings> {
   return invoke<AiSettings>("set_selected_provider", { providerId });
 }
 
-export function setOllamaBaseUrl(baseUrl: string): Promise<AiSettings> {
-  return invoke<AiSettings>("set_ollama_base_url", { baseUrl });
+export function setOllamaBaseUrl(baseUrl: string, allowRemote = false): Promise<AiSettings> {
+  return invoke<AiSettings>("set_ollama_base_url", { baseUrl, allowRemote });
 }
 
 export function setModelPreferences(input: SetModelPreferencesInput): Promise<AiSettings> {

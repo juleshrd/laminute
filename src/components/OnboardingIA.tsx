@@ -36,6 +36,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
   const [selectedId, setSelectedId] = useState("mistral");
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState("http://127.0.0.1:11434");
+  const [ollamaAllowRemote, setOllamaAllowRemote] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credKey, setCredKey] = useState(0);
@@ -48,6 +49,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
         setSelectedId(settings.selectedProviderId ?? "mistral");
         setHasStoredKey(settings.hasApiKey);
         setOllamaBaseUrl(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
+        setOllamaAllowRemote(settings.ollamaAllowRemote);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Chargement impossible.");
       }
@@ -87,6 +89,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
       const settings = await setSelectedProvider(selectedId);
       setHasStoredKey(settings.hasApiKey);
       setOllamaBaseUrl(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
+      setOllamaAllowRemote(settings.ollamaAllowRemote);
       setCredKey((k) => k + 1);
       setStep("config");
     } catch (err) {
@@ -223,6 +226,8 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                 onHasStoredKeyChange={setHasStoredKey}
                 ollamaBaseUrl={ollamaBaseUrl}
                 onOllamaBaseUrlChange={setOllamaBaseUrl}
+                ollamaAllowRemote={ollamaAllowRemote}
+                onOllamaAllowRemoteChange={setOllamaAllowRemote}
                 showDelete={false}
                 idPrefix="onboarding"
               />

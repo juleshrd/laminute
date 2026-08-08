@@ -1,11 +1,18 @@
 use std::path::Path;
 use std::time::Duration;
 
+use reqwest::redirect;
 use reqwest::StatusCode;
 use serde::Deserialize;
+use thiserror::Error;
 
 use crate::ai::error::AiError;
 use crate::ai::models::TranscriptionOptions;
+use crate::ai::ollama_url;
+
+#[derive(Debug, Error)]
+#[error("redirection Ollama inter-origine ou vers une destination interdite")]
+struct OllamaRedirectDenied;
 
 /// Client HTTP partagé avec timeouts raisonnables pour les appels IA.
 pub fn build_client() -> reqwest::Client {
@@ -14,6 +21,27 @@ pub fn build_client() -> reqwest::Client {
         .connect_timeout(Duration::from_secs(30))
         .build()
         .expect("reqwest client")
+}
+
+/// Client Ollama : mêmes timeouts, redirections limitées à la même origine.
+pub fn build_ollama_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .connect_timeout(Duration::from_secs(30))
+        .redirect(redirect::Policy::custom(|attempt| {
+            let Some(original) = attempt.previous().first() else {
+                return attempt.follow();
+            };
+            if ollama_url::same_origin(original, attempt.url())
+                && ollama_url::is_allowed_redirect_target(attempt.url())
+            {
+                attempt.follow()
+            } else {
+                attempt.error(OllamaRedirectDenied)
+            }
+        }))
+        .build()
+        .expect("reqwest ollama client")
 }
 
 pub fn resolve_upload_name(options: &TranscriptionOptions) -> (String, &'static str) {

@@ -41,6 +41,7 @@ fn build_ai_settings(
         selected_provider_id: selected_provider_id.clone(),
         has_api_key,
         ollama_base_url: Some(settings.ollama_base_url().to_string()),
+        ollama_allow_remote: settings.ollama_allow_remote(),
         diarization_enabled: settings.diarization_enabled()
             && model_catalog::supports_diarization(provider_id),
         transcription_model: selected_provider_id
@@ -95,16 +96,17 @@ pub fn set_selected_provider(
 pub fn set_ollama_base_url(
     state: State<'_, AiAppState>,
     base_url: String,
+    allow_remote: bool,
 ) -> Result<AiSettings, String> {
     let mut settings = state
         .settings
         .lock()
         .map_err(|_| "verrou des réglages indisponible".to_string())?;
-    settings
-        .set_ollama_base_url(base_url.clone())
+    let normalized = settings
+        .set_ollama_base_url(base_url, allow_remote)
         .map_err(|e| e.to_string())?;
 
-    state.registry.ollama().set_base_url(base_url);
+    state.registry.ollama().configure(normalized, allow_remote);
 
     let selected_provider_id = settings.selected_provider_id().map(str::to_string);
     build_ai_settings(&settings, selected_provider_id)
@@ -239,9 +241,9 @@ pub fn init_settings(app: &AppHandle) -> Result<Mutex<SettingsStore>, crate::ai:
 
 pub fn sync_ollama_base_url(state: &AiAppState) {
     if let Ok(settings) = state.settings.lock() {
-        state
-            .registry
-            .ollama()
-            .set_base_url(settings.ollama_base_url().to_string());
+        state.registry.ollama().configure(
+            settings.ollama_base_url().to_string(),
+            settings.ollama_allow_remote(),
+        );
     }
 }

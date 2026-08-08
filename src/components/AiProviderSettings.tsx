@@ -17,6 +17,7 @@ function applySettings(
   setSelectedProviderId: (id: string) => void,
   setHasStoredKey: (v: boolean) => void,
   setOllamaBaseUrlState: (v: string) => void,
+  setOllamaAllowRemote: (v: boolean) => void,
   setDiarizationEnabled: (v: boolean) => void,
   setTranscriptionModel: (v: string) => void,
   setSummaryModel: (v: string) => void,
@@ -25,6 +26,7 @@ function applySettings(
   setSelectedProviderId(settings.selectedProviderId ?? "");
   setHasStoredKey(settings.hasApiKey);
   setOllamaBaseUrlState(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
+  setOllamaAllowRemote(settings.ollamaAllowRemote);
   setDiarizationEnabled(settings.diarizationEnabled);
   setTranscriptionModel(settings.transcriptionModel ?? "");
   setSummaryModel(settings.summaryModel ?? "");
@@ -35,6 +37,7 @@ export function AiProviderSettings() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [ollamaBaseUrl, setOllamaBaseUrlState] = useState("http://127.0.0.1:11434");
+  const [ollamaAllowRemote, setOllamaAllowRemote] = useState(false);
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [transcriptionModel, setTranscriptionModel] = useState("");
@@ -57,6 +60,7 @@ export function AiProviderSettings() {
         setSelectedProviderId,
         setHasStoredKey,
         setOllamaBaseUrlState,
+        setOllamaAllowRemote,
         setDiarizationEnabled,
         setTranscriptionModel,
         setSummaryModel,
@@ -94,6 +98,7 @@ export function AiProviderSettings() {
         setSelectedProviderId,
         setHasStoredKey,
         setOllamaBaseUrlState,
+        setOllamaAllowRemote,
         setDiarizationEnabled,
         setTranscriptionModel,
         setSummaryModel,
@@ -127,6 +132,7 @@ export function AiProviderSettings() {
         setSelectedProviderId,
         setHasStoredKey,
         setOllamaBaseUrlState,
+        setOllamaAllowRemote,
         setDiarizationEnabled,
         setTranscriptionModel,
         setSummaryModel,
@@ -201,6 +207,8 @@ export function AiProviderSettings() {
           onHasStoredKeyChange={setHasStoredKey}
           ollamaBaseUrl={ollamaBaseUrl}
           onOllamaBaseUrlChange={setOllamaBaseUrlState}
+          ollamaAllowRemote={ollamaAllowRemote}
+          onOllamaAllowRemoteChange={setOllamaAllowRemote}
           showDelete
           idPrefix="settings"
         />

@@ -8,6 +8,7 @@ use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
 use crate::ai::http;
 use crate::ai::models::{KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult};
+use crate::ai::ollama_url;
 use crate::ai::provider::AiProvider;
 use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
 use crate::ai::summary::SummaryProvider;
@@ -18,39 +19,59 @@ const DEFAULT_SUMMARY_MODEL: &str = "llama3.2";
 pub struct OllamaProvider {
     client: reqwest::Client,
     api_base: Arc<RwLock<String>>,
+    allow_remote: Arc<RwLock<bool>>,
 }
 
 impl OllamaProvider {
     pub fn new() -> Self {
-        Self::with_base_url(DEFAULT_OLLAMA_BASE.to_string(), http::build_client())
+        Self::with_base_url(
+            DEFAULT_OLLAMA_BASE.to_string(),
+            false,
+            http::build_ollama_client(),
+        )
     }
 
-    pub fn with_base_url(base_url: String, client: reqwest::Client) -> Self {
+    pub fn with_base_url(base_url: String, allow_remote: bool, client: reqwest::Client) -> Self {
         Self {
             client,
             api_base: Arc::new(RwLock::new(base_url)),
+            allow_remote: Arc::new(RwLock::new(allow_remote)),
         }
     }
 
-    pub fn set_base_url(&self, base_url: String) {
+    pub fn configure(&self, base_url: String, allow_remote: bool) {
         if let Ok(mut current) = self.api_base.write() {
             *current = base_url;
         }
+        if let Ok(mut current) = self.allow_remote.write() {
+            *current = allow_remote;
+        }
     }
 
-    fn base_url(&self) -> String {
+    fn allow_remote(&self) -> bool {
+        self.allow_remote.read().map(|flag| *flag).unwrap_or(false)
+    }
+
+    fn raw_base_url(&self) -> String {
         self.api_base
             .read()
             .map(|url| url.clone())
             .unwrap_or_else(|_| DEFAULT_OLLAMA_BASE.to_string())
     }
 
+    /// Valide la destination avant tout appel réseau (aucune donnée envoyée sinon).
+    fn validated_base_url(&self) -> Result<String, AiError> {
+        ollama_url::normalize(&self.raw_base_url(), self.allow_remote())
+            .map(|url| url.into_string())
+            .map_err(|err| AiError::Provider {
+                provider: self.id().to_string(),
+                message: err.to_string(),
+            })
+    }
+
     async fn fetch_models(&self) -> Result<Vec<ModelInfo>, AiError> {
-        let response = self
-            .client
-            .get(format!("{}/api/tags", self.base_url()))
-            .send()
-            .await?;
+        let base = self.validated_base_url()?;
+        let response = self.client.get(format!("{base}/api/tags")).send().await?;
 
         if !response.status().is_success() {
             return Err(AiError::Provider {
@@ -172,6 +193,7 @@ impl SummaryProvider for OllamaProvider {
         text: &str,
         options: SummaryOptions,
     ) -> Result<SummaryResult, AiError> {
+        let base = self.validated_base_url()?;
         let models = self.fetch_models().await.unwrap_or_default();
         let model = self.resolve_model(&options, &models);
 
@@ -192,7 +214,7 @@ impl SummaryProvider for OllamaProvider {
 
         let response = self
             .client
-            .post(format!("{}/api/chat", self.base_url()))
+            .post(format!("{base}/api/chat"))
             .json(&request)
             .send()
             .await?;
@@ -242,7 +264,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OllamaProvider::with_base_url(mock_server.uri(), http::build_client());
+        let provider =
+            OllamaProvider::with_base_url(mock_server.uri(), false, http::build_ollama_client());
         let result = provider.validate_key("").await.expect("validation");
         assert!(result.valid);
         assert!(result.message.contains("Connexion Ollama OK"));
@@ -270,7 +293,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let provider = OllamaProvider::with_base_url(mock_server.uri(), http::build_client());
+        let provider =
+            OllamaProvider::with_base_url(mock_server.uri(), false, http::build_ollama_client());
         let result = provider
             .summarize(
                 "",
@@ -285,5 +309,61 @@ mod tests {
 
         assert!(result.text.contains("synthese"));
         assert_eq!(result.model, "llama3.2");
+    }
+
+    #[tokio::test]
+    async fn summarize_rejects_invalid_base_url_before_sending() {
+        let provider = OllamaProvider::with_base_url(
+            "http://169.254.169.254".into(),
+            true,
+            http::build_ollama_client(),
+        );
+        let err = provider
+            .summarize(
+                "",
+                "secret transcript",
+                SummaryOptions {
+                    model: None,
+                    max_tokens: None,
+                },
+            )
+            .await
+            .expect_err("must reject");
+        assert!(err.to_string().contains("link-local") || err.to_string().contains("metadata"));
+    }
+
+    #[tokio::test]
+    async fn rejects_cross_origin_redirect() {
+        let victim = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/tags"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "models": [{ "name": "llama3.2:latest" }]
+            })))
+            .mount(&victim)
+            .await;
+
+        let gateway = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/tags"))
+            .respond_with(
+                ResponseTemplate::new(302).insert_header("Location", victim.uri() + "/api/tags"),
+            )
+            .mount(&gateway)
+            .await;
+
+        let provider =
+            OllamaProvider::with_base_url(gateway.uri(), false, http::build_ollama_client());
+        let err = provider
+            .validate_key("")
+            .await
+            .expect_err("cross-origin redirect must fail");
+        let message = err.to_string();
+        assert!(
+            message.contains("redirection")
+                || message.contains("error sending request")
+                || message.contains("redirect"),
+            "unexpected error: {message}"
+        );
     }
 }

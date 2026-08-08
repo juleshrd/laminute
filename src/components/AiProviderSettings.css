@@ -19,6 +19,11 @@
   opacity: 0.8;
 }
 
+.ai-settings__note--warn {
+  opacity: 1;
+  color: var(--lm-red, #b42318);
+}
+
 .ai-settings__actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

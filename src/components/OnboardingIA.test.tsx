@@ -64,6 +64,7 @@ describe("OnboardingIA", () => {
       selectedProviderId: "mistral",
       hasApiKey: false,
       ollamaBaseUrl: "http://127.0.0.1:11434",
+      ollamaAllowRemote: false,
       diarizationEnabled: false,
       transcriptionModel: "voxtral-mini-latest",
       summaryModel: "mistral-small-latest",
@@ -74,6 +75,7 @@ describe("OnboardingIA", () => {
       selectedProviderId: id,
       hasApiKey: false,
       ollamaBaseUrl: "http://127.0.0.1:11434",
+      ollamaAllowRemote: false,
       diarizationEnabled: false,
       transcriptionModels: [],
       summaryModels: [],
@@ -144,5 +146,14 @@ describe("OnboardingIA", () => {
 
     expect(await screen.findByLabelText("URL du serveur Ollama")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tester la connexion" })).toBeInTheDocument();
+    expect(screen.getByText(/Serveur local \(loopback\)/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("URL du serveur Ollama"), {
+      target: { value: "http://192.168.1.10:11434" },
+    });
+    expect(screen.getByText(/Serveur distant ou LAN détecté/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/J'autorise explicitement ce serveur Ollama/i),
+    ).toBeInTheDocument();
   });
 });

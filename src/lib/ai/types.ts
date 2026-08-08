@@ -28,6 +28,7 @@ export interface AiSettings {
   selectedProviderId?: string;
   hasApiKey: boolean;
   ollamaBaseUrl?: string;
+  ollamaAllowRemote: boolean;
   diarizationEnabled: boolean;
   transcriptionModel?: string;
   summaryModel?: string;
