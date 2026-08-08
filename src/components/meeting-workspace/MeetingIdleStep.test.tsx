@@ -28,7 +28,7 @@ describe("MeetingIdleStep", () => {
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Choisir un fichier MP3" })).toBeInTheDocument();
     expect(
-      screen.getByText(/import 500 Mo max · transcription cloud 100 Mo max/i),
+      screen.getByText(/100 Mo max \(limite transcription cloud\)/i),
     ).toBeInTheDocument();
   });
 

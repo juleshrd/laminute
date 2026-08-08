@@ -132,6 +132,14 @@ pub fn run() {
             let audio_state = AudioState::initialize(app.handle())?;
             app.manage(audio_state);
 
+            // Nettoyage best-effort des imports interrompus (JUL-184).
+            let roots = audio::ManagedAudioRoots::from_app_data_dir(app_data_dir);
+            if let Err(err) = roots.ensure_dirs() {
+                eprintln!("[startup] impossible de créer les dossiers audio : {err}");
+            } else if let Err(err) = audio::import::cleanup_staging(&roots.imports_dir) {
+                eprintln!("[startup] nettoyage staging imports : {err}");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
