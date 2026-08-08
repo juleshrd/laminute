@@ -97,6 +97,12 @@ describe("OnboardingIA", () => {
       screen.getByText(/Les réunions restent stockées sur votre ordinateur/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Tout reste sur votre ordinateur/i)).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Fournisseurs IA disponibles" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[data-provider="mistral"]')).toBeTruthy();
+    expect(document.querySelector('img[data-provider="openai"]')).toBeTruthy();
+    expect(document.querySelector('img[data-provider="ollama"]')).toBeTruthy();
   });
 
   it("met Mistral en avant à l'étape de choix", async () => {
@@ -110,6 +116,20 @@ describe("OnboardingIA", () => {
     const mistral = screen.getByRole("button", { name: /Mistral AI/i });
     expect(mistral).toHaveClass("is-featured");
     expect(mistral).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("affiche le logo de chaque fournisseur à l'étape de choix", async () => {
+    render(<OnboardingIA onComplete={vi.fn()} onSkip={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Commencer" }));
+    await screen.findByRole("heading", { name: "Choisir l'IA" });
+
+    for (const id of ["mistral", "openai", "ollama"]) {
+      const logo = document.querySelector(`img[data-provider="${id}"]`);
+      expect(logo).toBeTruthy();
+      const src = (logo as HTMLImageElement).getAttribute("src") ?? "";
+      expect(src).toMatch(/(\.svg|image\/svg\+xml)/);
+    }
   });
 
   it("permet d'entrer dans l'app sans valider de clé", async () => {

@@ -445,6 +445,24 @@ button:disabled {
   line-height: 1.45;
 }
 
+.lm-provider-logo-row {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  max-width: 28rem;
+}
+
+.lm-provider-logo-row__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--lm-muted);
+  font-size: 0.8rem;
+}
+
 .lm-provider-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -487,11 +505,33 @@ button:disabled {
   height: 1.75rem;
   border-radius: 0.35rem;
   flex-shrink: 0;
+  object-fit: cover;
+}
+
+.lm-provider-logo--sm {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.lm-provider-logo--md {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.lm-provider-logo--lg {
+  width: 2.25rem;
+  height: 2.25rem;
 }
 
 .lm-provider-logo--fallback {
   background: var(--lm-line);
   display: inline-block;
+}
+
+.lm-config-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .lm-provider-title {
