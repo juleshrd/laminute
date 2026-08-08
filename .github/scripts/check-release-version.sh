@@ -33,10 +33,18 @@ if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
     exit 1
   fi
 
-  git fetch --no-tags origin main
-  if ! git merge-base --is-ancestor HEAD origin/main; then
-    echo "Le commit taggé n'est pas un ancêtre de origin/main." >&2
-    exit 1
-  fi
-  echo "Tag $TAG_NAME sur main OK."
+  COMMIT_SHA="$(git rev-parse HEAD)"
+  # Évite git fetch (persist-credentials:false) : compare via l'API avec GITHUB_TOKEN.
+  COMPARE_STATUS="$(
+    gh api "repos/${GITHUB_REPOSITORY}/compare/main...${COMMIT_SHA}" --jq .status
+  )"
+  case "$COMPARE_STATUS" in
+    identical | behind)
+      echo "Tag $TAG_NAME sur main OK (compare=$COMPARE_STATUS)."
+      ;;
+    *)
+      echo "Le commit taggé n'est pas sur main (compare main...${COMMIT_SHA} = ${COMPARE_STATUS})." >&2
+      exit 1
+      ;;
+  esac
 fi
