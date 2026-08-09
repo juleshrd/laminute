@@ -108,7 +108,7 @@ describe("MeetingHistory", () => {
     await flushSearchDebounce();
     expect(screen.getByRole("heading", { name: "Comité produit" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("Rechercher une réunion…"), {
+    fireEvent.change(screen.getByPlaceholderText("Rechercher dans toutes les réunions"), {
       target: { value: "Dufour" },
     });
     await flushSearchDebounce();
@@ -137,7 +137,7 @@ describe("MeetingHistory", () => {
     await flushSearchDebounce();
     expect(screen.getByRole("heading", { name: "Comité produit" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("Rechercher une réunion…"), {
+    fireEvent.change(screen.getByPlaceholderText("Rechercher dans toutes les réunions"), {
       target: { value: "inexistant" },
     });
     await flushSearchDebounce();
@@ -170,9 +170,11 @@ describe("MeetingHistory", () => {
     fireEvent.click(itemButton);
 
     await waitFor(() => {
-      expect(screen.getByText("← Retour à la liste")).toBeInTheDocument();
-      expect(screen.getByText("Bonjour")).toBeInTheDocument();
+      expect(screen.getByText("‹ Historique")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Comité produit" })).toBeInTheDocument();
     });
+    fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
+    expect(screen.getByText("Bonjour")).toBeInTheDocument();
   });
 
   it("charge la page suivante sans dupliquer les réunions déjà affichées", async () => {
@@ -235,11 +237,11 @@ describe("MeetingHistory", () => {
       expect(invokeMock).toHaveBeenCalledWith("search_meetings", { filters: {} }),
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Rechercher une réunion…"), {
+    fireEvent.change(screen.getByPlaceholderText("Rechercher dans toutes les réunions"), {
       target: { value: "ancien" },
     });
     await flushSearchDebounce();
-    fireEvent.change(screen.getByPlaceholderText("Rechercher une réunion…"), {
+    fireEvent.change(screen.getByPlaceholderText("Rechercher dans toutes les réunions"), {
       target: { value: "nouveau" },
     });
     await flushSearchDebounce();
@@ -314,7 +316,9 @@ describe("MeetingHistory", () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText("Contenu B")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Réunion B" })).toBeInTheDocument();
     expect(screen.queryByText("Contenu A")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
+    expect(screen.getByText("Contenu B")).toBeInTheDocument();
   });
 });

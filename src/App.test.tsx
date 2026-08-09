@@ -107,6 +107,8 @@ function setupInvoke(options?: { recording?: boolean; durationSecs?: number }) {
           durationSecs: recording ? durationSecs : null,
           error: null,
         });
+      case "search_meetings":
+        return Promise.resolve({ items: [], nextCursor: null });
       default:
         return Promise.resolve(null);
     }
@@ -155,26 +157,25 @@ describe("App navigation + enregistrement", () => {
     await startRecordingFromUi();
     expect(screen.getByLabelText("Durée de l'enregistrement")).toHaveTextContent("0:12");
     expect(screen.getByRole("button", { name: /Micro actif/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Arrêter" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Historique" }));
     expect(screen.getByText("Historique des réunions")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Terminer la réunion" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Micro actif/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Arrêter" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Réunion courante" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aujourd’hui" }));
     expect(await screen.findByRole("button", { name: "Terminer la réunion" })).toBeInTheDocument();
     expect(screen.getByLabelText("Durée de l'enregistrement")).toHaveTextContent("0:12");
   });
 
-  it("arrête effectivement l'enregistrement après un aller-retour", async () => {
+  it("arrête l'enregistrement depuis n'importe quel écran", async () => {
     render(<App />);
 
     await startRecordingFromUi();
     fireEvent.click(screen.getByRole("button", { name: "Historique" }));
-    fireEvent.click(screen.getByRole("button", { name: /Micro actif/i }));
-
-    expect(await screen.findByRole("button", { name: "Terminer la réunion" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Terminer la réunion" }));
+    fireEvent.click(screen.getByRole("button", { name: "Arrêter" }));
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("stop_microphone_recording");
@@ -182,7 +183,7 @@ describe("App navigation + enregistrement", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /Micro actif/i })).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: "Terminer la réunion" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Arrêter" })).not.toBeInTheDocument();
   });
 
   it("restaure un traitement IA actif sans second job après navigation", async () => {
@@ -200,7 +201,7 @@ describe("App navigation + enregistrement", () => {
     vi.mocked(transcribeAudioFile).mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "Historique" }));
-    fireEvent.click(screen.getByRole("button", { name: "Réunion courante" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aujourd’hui" }));
 
     expect(await screen.findByText(/Transcription en cours/i)).toBeInTheDocument();
     expect(transcribeAudioFile).not.toHaveBeenCalled();

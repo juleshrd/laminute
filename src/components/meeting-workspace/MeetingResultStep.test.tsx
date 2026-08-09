@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MeetingResultStep } from "./MeetingResultStep";
 
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => path,
+}));
+
 describe("MeetingResultStep", () => {
-  it("affiche la transcription et le compte-rendu structuré", () => {
+  it("priorise l'essentiel puis expose transcription et audio", () => {
     render(
       <MeetingResultStep
+        title="Comité produit"
         transcription={{
           id: "tx-1",
           meetingId: "meeting-1",
@@ -14,6 +19,7 @@ describe("MeetingResultStep", () => {
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
         }}
+        audioPath="/tmp/rec.wav"
         summary={{
           jobId: "summary-1",
           meetingId: "meeting-1",
@@ -42,12 +48,18 @@ describe("MeetingResultStep", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Transcription" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Essentiel" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("En une phrase").closest("article")).toHaveTextContent(
+      "Réunion productive.",
+    );
+    expect(screen.getAllByText("Valider le MVP").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Préparer la démo").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
     expect(screen.getByText("Bonjour à tous.")).toBeInTheDocument();
     expect(screen.getByText(/Langue détectée : fr/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Compte-rendu structuré" })).toBeInTheDocument();
-    expect(screen.getByText("Réunion productive.")).toBeInTheDocument();
-    expect(screen.getByText("Valider le MVP")).toBeInTheDocument();
-    expect(screen.getByText("Préparer la démo")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Audio" }));
+    expect(document.querySelector("audio")).not.toBeNull();
   });
 });
