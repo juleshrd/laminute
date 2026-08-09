@@ -123,7 +123,7 @@ Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) 
 2. **build** (environnement GitHub `release`) — installateurs Linux / macOS / Windows, `latest.json`, signature **Minisign** obligatoire (`TAURI_SIGNING_PRIVATE_KEY`)
 3. **publish-meta** — `SHA256SUMS` + SBOM joints à la release
 
-La signature code OS (notarisation Apple, Authenticode) n’est pas encore exigée en v0.1.0.
+La publication macOS exige la signature Developer ID et la notarisation Apple (`APPLE_*` dans l’environnement `release`). Authenticode Windows n’est pas encore exigé.
 
 ## Style et portée
 

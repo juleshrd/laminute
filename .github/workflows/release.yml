@@ -187,15 +187,25 @@ jobs:
           tagName: v__VERSION__
           releaseName: La Minute v__VERSION__
           releaseBody: |
-            Installateurs La Minute v0.1.0 :
+            ## La Minute v0.1.1
+
+            Patch UI / onboarding / marque depuis la v0.1.0.
+
+            ### Nouveautés et correctifs
+
+            - **Parcours Apple Concept** (#61, JUL-193) — shell Aujourd’hui / Historique, barre micro globale, fiche réunion et résultat recentrés
+            - **Premier lancement macOS** (#62) — onboarding first-run, lancement et chaîne de release macOS signée / notariée
+            - **Marque** (#60) — icône horloge La Minute (remplace l’icône Tauri par défaut)
+            - **Accueil idle** (#59) — polish de l’écran « Réunion courante »
+            - **Onboarding IA** (#58) — logos officiels Mistral, OpenAI et Ollama
+
+            ### Installateurs
 
             - **Windows** : fichier `.exe` (NSIS)
-            - **macOS** : fichier `.dmg`
+            - **macOS** : fichier `.dmg` (Developer ID + notarisation Apple)
             - **Linux** : fichier `.AppImage`
 
             Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
-            L’application macOS est signée Developer ID, utilise le runtime renforcé et est
-            notariée par Apple afin de s’ouvrir normalement avec Gatekeeper.
 
             Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
           releaseDraft: true

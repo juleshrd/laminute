@@ -1,6 +1,6 @@
 [package]
 name = "laminute"
-version = "0.1.0"
+version = "0.1.1"
 description = "La Minute — application desktop"
 authors = ["La Minute"]
 license = "GPL-3.0-only"
