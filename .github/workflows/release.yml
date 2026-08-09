@@ -31,6 +31,30 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  RELEASE_BODY: |
+    ## La Minute v0.1.1
+
+    Patch UI / onboarding / marque depuis la v0.1.0.
+
+    ### Nouveautés et correctifs
+
+    - **Parcours Apple Concept** (#61, JUL-193) — shell Aujourd’hui / Historique, barre micro globale, fiche réunion et résultat recentrés
+    - **Premier lancement macOS** (#62) — onboarding first-run et fiabilisation du lancement
+    - **Marque** (#60) — icône horloge La Minute (remplace l’icône Tauri par défaut)
+    - **Accueil idle** (#59) — polish de l’écran « Réunion courante »
+    - **Onboarding IA** (#58) — logos officiels Mistral, OpenAI et Ollama
+
+    ### Installateurs
+
+    - **Windows** : fichier `.exe` (NSIS)
+    - **macOS** : fichier `.dmg`
+    - **Linux** : fichier `.AppImage`
+
+    Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
+    En v0.1.1, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) ;
+    le système peut afficher un avertissement à la première ouverture.
+
+    Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
 
 jobs:
   validate:
@@ -176,7 +200,25 @@ jobs:
           chmod +x .github/scripts/retry.sh
           .github/scripts/retry.sh 3 npm ci
 
+      # Ne pas injecter APPLE_* vides : Tauri tente alors un `security import` et échoue.
       - name: Build and publish
+        if: matrix.platform != 'macos-latest' || steps.apple_signing.outputs.enabled != 'true'
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: La Minute v__VERSION__
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          args: ${{ matrix.args }}
+
+      - name: Build and publish (macOS notarié)
+        if: matrix.platform == 'macos-latest' && steps.apple_signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -191,30 +233,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: La Minute v__VERSION__
-          releaseBody: |
-            ## La Minute v0.1.1
-
-            Patch UI / onboarding / marque depuis la v0.1.0.
-
-            ### Nouveautés et correctifs
-
-            - **Parcours Apple Concept** (#61, JUL-193) — shell Aujourd’hui / Historique, barre micro globale, fiche réunion et résultat recentrés
-            - **Premier lancement macOS** (#62) — onboarding first-run et fiabilisation du lancement
-            - **Marque** (#60) — icône horloge La Minute (remplace l’icône Tauri par défaut)
-            - **Accueil idle** (#59) — polish de l’écran « Réunion courante »
-            - **Onboarding IA** (#58) — logos officiels Mistral, OpenAI et Ollama
-
-            ### Installateurs
-
-            - **Windows** : fichier `.exe` (NSIS)
-            - **macOS** : fichier `.dmg`
-            - **Linux** : fichier `.AppImage`
-
-            Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
-            En v0.1.1, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) ;
-            le système peut afficher un avertissement à la première ouverture.
-
-            Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
+          releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
