@@ -5,6 +5,8 @@
 # Secrets obligatoires (environnement GitHub `release`, ou secrets dépôt) :
 #   TAURI_SIGNING_PRIVATE_KEY          — clé privée Minisign updater
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — mot de passe (chaîne vide si aucune)
+#
+# Secrets optionnels macOS (si tous présents : signature Developer ID + notarisation) :
 #   APPLE_CERTIFICATE                  — certificat Developer ID Application (.p12, base64)
 #   APPLE_CERTIFICATE_PASSWORD         — mot de passe du certificat
 #   APPLE_ID / APPLE_PASSWORD          — compte Apple + mot de passe spécifique à l'app
@@ -120,7 +122,8 @@ jobs:
           fi
         shell: bash
 
-      - name: Exiger signature et notarisation Apple
+      - name: Détecter signature et notarisation Apple
+        id: apple_signing
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -138,8 +141,10 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "Publication macOS refusée : une release stable doit être signée et notariée." >&2
-            exit 1
+            echo "Secrets Apple incomplets : build macOS sans notarisation (avertissement Gatekeeper possible)." >&2
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -194,7 +199,7 @@ jobs:
             ### Nouveautés et correctifs
 
             - **Parcours Apple Concept** (#61, JUL-193) — shell Aujourd’hui / Historique, barre micro globale, fiche réunion et résultat recentrés
-            - **Premier lancement macOS** (#62) — onboarding first-run, lancement et chaîne de release macOS signée / notariée
+            - **Premier lancement macOS** (#62) — onboarding first-run et fiabilisation du lancement
             - **Marque** (#60) — icône horloge La Minute (remplace l’icône Tauri par défaut)
             - **Accueil idle** (#59) — polish de l’écran « Réunion courante »
             - **Onboarding IA** (#58) — logos officiels Mistral, OpenAI et Ollama
@@ -202,10 +207,12 @@ jobs:
             ### Installateurs
 
             - **Windows** : fichier `.exe` (NSIS)
-            - **macOS** : fichier `.dmg` (Developer ID + notarisation Apple)
+            - **macOS** : fichier `.dmg`
             - **Linux** : fichier `.AppImage`
 
             Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
+            En v0.1.1, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) ;
+            le système peut afficher un avertissement à la première ouverture.
 
             Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
           releaseDraft: true
@@ -214,7 +221,7 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Vérifier le bundle macOS signé et notarié
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && steps.apple_signing.outputs.enabled == 'true'
         shell: bash
         run: |
           set -euo pipefail
