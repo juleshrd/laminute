@@ -64,13 +64,20 @@ impl AudioState {
             }
         }
 
-        Ok(Self {
+        let state = Self {
             selected_device_id: Mutex::new(selected_device_id),
             keep_audio_files: Mutex::new(keep_audio_files),
             recording: RecordingService::spawn(),
             settings_path,
             recordings_dir,
-        })
+        };
+
+        // Un profil vierge doit pouvoir enregistrer immédiatement. La détection
+        // reste best-effort : une permission refusée ou l'absence de micro ne
+        // doit jamais empêcher le démarrage de l'application.
+        let _ = state.ensure_default_device_selected();
+
+        Ok(state)
     }
 
     pub fn list_devices(&self) -> Result<Vec<AudioInputDevice>, AudioError> {
@@ -106,6 +113,22 @@ impl AudioState {
         self.persist_settings()?;
 
         Ok(device)
+    }
+
+    /// Persiste le périphérique système par défaut (ou le premier disponible)
+    /// lorsqu'aucun choix valide n'existe encore.
+    pub fn ensure_default_device_selected(&self) -> Result<Option<AudioInputDevice>, AudioError> {
+        if let Some(selected) = self.get_selected_device()? {
+            return Ok(Some(selected));
+        }
+
+        let devices = list_input_devices()?;
+        let Some(device) = pick_default_device(&devices) else {
+            return Ok(None);
+        };
+
+        self.set_selected_device(device.id.clone())?;
+        Ok(Some(device))
     }
 
     pub fn keep_audio_files(&self) -> Result<bool, AudioError> {
@@ -210,6 +233,14 @@ fn resolve_selected_device(device_id: &str) -> Result<AudioInputDevice, AudioErr
         .ok_or_else(|| AudioError::DeviceNotFound(device_id.to_string()))
 }
 
+fn pick_default_device(devices: &[AudioInputDevice]) -> Option<AudioInputDevice> {
+    devices
+        .iter()
+        .find(|device| device.is_default)
+        .or_else(|| devices.first())
+        .cloned()
+}
+
 fn load_settings(path: &PathBuf) -> PersistedSettings {
     fs::read_to_string(path)
         .ok()
@@ -254,5 +285,30 @@ mod tests {
     fn keep_audio_files_defaults_to_true() {
         let loaded: PersistedSettings = serde_json::from_str("{}").expect("empty defaults");
         assert!(loaded.keep_audio_files);
+    }
+
+    #[test]
+    fn picks_system_default_then_falls_back_to_first_device() {
+        let devices = vec![
+            AudioInputDevice {
+                id: "input-0".into(),
+                name: "USB".into(),
+                is_default: false,
+            },
+            AudioInputDevice {
+                id: "input-1".into(),
+                name: "Micro intégré".into(),
+                is_default: true,
+            },
+        ];
+        assert_eq!(pick_default_device(&devices).unwrap().id, "input-1");
+
+        let fallback = vec![AudioInputDevice {
+            id: "input-0".into(),
+            name: "USB".into(),
+            is_default: false,
+        }];
+        assert_eq!(pick_default_device(&fallback).unwrap().id, "input-0");
+        assert!(pick_default_device(&[]).is_none());
     }
 }

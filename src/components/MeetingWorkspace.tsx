@@ -93,7 +93,7 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
       )}
 
       {flow.error &&
-      !(flow.flowPhase === "idle" && /périphérique/i.test(flow.error)) ? (
+      !(flow.flowPhase === "idle" && /(périphérique|micro)/i.test(flow.error)) ? (
         <p className="error" role="alert">
           {flow.error}
         </p>

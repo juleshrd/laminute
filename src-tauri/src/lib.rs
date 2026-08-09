@@ -65,6 +65,13 @@ fn set_selected_audio_input_device(
 }
 
 #[tauri::command]
+fn ensure_default_audio_input_device(
+    state: tauri::State<'_, AudioState>,
+) -> Result<Option<AudioInputDevice>, AudioError> {
+    state.ensure_default_device_selected()
+}
+
+#[tauri::command]
 fn start_microphone_recording(
     state: tauri::State<'_, AudioState>,
     gate: tauri::State<'_, LocalActivityGate>,
@@ -165,6 +172,7 @@ pub fn run() {
             list_audio_input_devices,
             get_selected_audio_input_device,
             set_selected_audio_input_device,
+            ensure_default_audio_input_device,
             start_microphone_recording,
             stop_microphone_recording,
             get_recording_status,

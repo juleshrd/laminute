@@ -61,7 +61,9 @@ export function MeetingIdleStep({
 
         <div className="record-card__source">
           {!hasDevices ? (
-            <span className="warning">Aucun périphérique d&apos;entrée audio détecté</span>
+            <span className="warning">
+              Aucun micro détecté — vous pouvez quand même importer un MP3.
+            </span>
           ) : (
             <>
               <span className="record-card__source-dot" aria-hidden="true" />

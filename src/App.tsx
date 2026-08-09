@@ -81,6 +81,11 @@ function App() {
     setActiveScreen("meeting");
   }
 
+  function dismissOnboardingForThisSession() {
+    setShowOnboarding(false);
+    setActiveScreen("meeting");
+  }
+
   const updateModal =
     pendingUpdate != null ? (
       <UpdateAvailableModal
@@ -115,7 +120,7 @@ function App() {
     return (
       <div className="lm-root">
         {updateCheckBanner}
-        <OnboardingIA onComplete={finishOnboarding} onSkip={finishOnboarding} />
+        <OnboardingIA onComplete={finishOnboarding} onSkip={dismissOnboardingForThisSession} />
         {updateModal}
       </div>
     );
