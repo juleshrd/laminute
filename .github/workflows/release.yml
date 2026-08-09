@@ -6,7 +6,7 @@
 #   TAURI_SIGNING_PRIVATE_KEY          — clé privée Minisign updater
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — mot de passe (chaîne vide si aucune)
 #
-# Secrets optionnels macOS (si tous présents : signature Developer ID + notarisation) :
+# Secrets macOS optionnels (si tous présents : signature Developer ID + notarisation) :
 #   APPLE_CERTIFICATE                  — certificat Developer ID Application (.p12, base64)
 #   APPLE_CERTIFICATE_PASSWORD         — mot de passe du certificat
 #   APPLE_ID / APPLE_PASSWORD          — compte Apple + mot de passe spécifique à l'app
@@ -32,17 +32,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RELEASE_BODY: |
-    ## La Minute v0.1.1
-
-    Patch UI / onboarding / marque depuis la v0.1.0.
-
-    ### Nouveautés et correctifs
-
-    - **Parcours Apple Concept** (#61, JUL-193) — shell Aujourd’hui / Historique, barre micro globale, fiche réunion et résultat recentrés
-    - **Premier lancement macOS** (#62) — onboarding first-run et fiabilisation du lancement
-    - **Marque** (#60) — icône horloge La Minute (remplace l’icône Tauri par défaut)
-    - **Accueil idle** (#59) — polish de l’écran « Réunion courante »
-    - **Onboarding IA** (#58) — logos officiels Mistral, OpenAI et Ollama
+    ## La Minute
 
     ### Installateurs
 
@@ -51,8 +41,10 @@ env:
     - **Linux** : fichier `.AppImage`
 
     Les artefacts updater sont signés avec Minisign (vérifiés par l’application).
-    En v0.1.1, les installateurs ne sont pas encore notariés (Apple) ni signés Authenticode (Windows) ;
-    le système peut afficher un avertissement à la première ouverture.
+    Le DMG macOS est publié même sans identifiants Apple. Dans ce cas, il n’est ni signé
+    Developer ID ni notarié et macOS affiche normalement un avertissement Gatekeeper.
+    L’installateur Windows n’est pas signé avec Authenticode : un avertissement SmartScreen
+    peut apparaître à la première exécution.
 
     Après installation, ouvrez **Réglages** et renseignez votre clé API (Mistral recommandé).
 
@@ -146,7 +138,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Détecter signature et notarisation Apple
+      - name: Déterminer le mode de distribution macOS
         id: apple_signing
         if: matrix.platform == 'macos-latest'
         env:
@@ -157,18 +149,34 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          missing=0
+          present=0
+          missing=()
           for secret_name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!secret_name:-}" ]; then
-              echo "Secret GitHub manquant : ${secret_name}" >&2
-              missing=1
+              missing+=("$secret_name")
+            else
+              present=$((present + 1))
             fi
           done
-          if [ "$missing" -ne 0 ]; then
-            echo "Secrets Apple incomplets : build macOS sans notarisation (avertissement Gatekeeper possible)." >&2
+
+          if [ "$present" -eq 0 ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "mode=unsigned" >> "$GITHUB_OUTPUT"
+            echo "::warning::DMG macOS publié sans signature Developer ID ni notarisation."
+            {
+              echo "### Distribution macOS"
+              echo "⚠️ Mode \`unsigned\` : avertissement Gatekeeper attendu."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$present" -ne 5 ]; then
+            printf 'Secrets Apple partiels ; configuration refusée. Manquants : %s\n' "${missing[*]}" >&2
+            exit 1
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "mode=signed-notarized" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Distribution macOS"
+              echo "✅ Mode \`signed-notarized\` : contrôles Developer ID, Gatekeeper et stapler activés."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
         shell: bash
 
@@ -202,7 +210,7 @@ jobs:
 
       # Ne pas injecter APPLE_* vides : Tauri tente alors un `security import` et échoue.
       - name: Build and publish
-        if: matrix.platform != 'macos-latest' || steps.apple_signing.outputs.enabled != 'true'
+        if: matrix.platform != 'macos-latest'
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -226,10 +234,25 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: v__VERSION__
+          releaseName: La Minute v__VERSION__
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          args: ${{ matrix.args }}
+
+      - name: Build and publish (macOS non signé)
+        if: matrix.platform == 'macos-latest' && steps.apple_signing.outputs.enabled != 'true'
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: La Minute v__VERSION__
@@ -253,10 +276,44 @@ jobs:
           fi
           codesign --verify --deep --strict --verbose=4 "$app_path"
           codesign -dv --verbose=4 "$app_path" 2>&1 | grep -F "Authority=Developer ID Application"
+          codesign -d --entitlements :- "$app_path" 2>/dev/null \
+            | plutil -extract com.apple.security.device.audio-input raw -o - - \
+            | grep -Fx "true"
           spctl --assess --type execute --verbose=4 "$app_path"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg_path"
           xcrun stapler validate "$app_path"
           xcrun stapler validate "$dmg_path"
           hdiutil verify "$dmg_path"
+
+      - name: Signaler le bundle macOS non signé
+        if: matrix.platform == 'macos-latest' && steps.apple_signing.outputs.enabled != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="src-tauri/target/universal-apple-darwin/release/bundle"
+          dmg_path="$(find "$bundle_dir/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          if [ -z "$dmg_path" ]; then
+            echo "DMG macOS introuvable dans $bundle_dir" >&2
+            exit 1
+          fi
+          hdiutil verify "$dmg_path"
+          echo "::warning file=$dmg_path::DMG non signé Developer ID et non notarié ; avertissement Gatekeeper attendu."
+
+      - name: Signaler le statut Authenticode Windows
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter *.exe | Select-Object -First 1
+          if (-not $installer) {
+            throw "Installateur NSIS introuvable"
+          }
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -eq "Valid") {
+            "### Distribution Windows`n✅ Signature Authenticode valide." | Add-Content $env:GITHUB_STEP_SUMMARY
+          } else {
+            Write-Warning "Installateur Windows non signé avec Authenticode ; avertissement SmartScreen possible."
+            "### Distribution Windows`n⚠️ Installateur non signé Authenticode ; avertissement SmartScreen possible." | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
 
       - name: Checksums des bundles
         shell: bash

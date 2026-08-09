@@ -123,7 +123,7 @@ Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) 
 2. **build** (environnement GitHub `release`) — installateurs Linux / macOS / Windows, `latest.json`, signature **Minisign** obligatoire (`TAURI_SIGNING_PRIVATE_KEY`)
 3. **publish-meta** — `SHA256SUMS` + SBOM joints à la release
 
-La signature / notarisation Apple (`APPLE_*` dans l’environnement `release`) est optionnelle : si les secrets sont présents, le DMG est vérifié notarié ; sinon le build macOS est publié sans notarisation. Authenticode Windows n’est pas encore exigé.
+La signature / notarisation Apple (`APPLE_*` dans l’environnement `release`) est optionnelle : avec les cinq secrets, le DMG est signé et contrôlé ; sans aucun secret Apple, il reste publiable mais est marqué non signé/non notarié. Une configuration Apple partielle fait échouer le job pour éviter une signature ambiguë. Voir [docs/release-macos.md](docs/release-macos.md). Authenticode Windows n’est pas encore exigé ; voir [docs/release-windows.md](docs/release-windows.md).
 
 ## Style et portée
 

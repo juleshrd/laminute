@@ -19,4 +19,4 @@ La Minute est une application desktop locale (Tauri). Les clés API BYOK sont st
 
 Les artefacts d’auto-update sont signés Minisign. Vérifiez toujours que vous téléchargez depuis les [releases officielles](https://github.com/juleshrd/laminute/releases).
 
-Les bundles macOS stables sont signés Developer ID, exécutés avec le runtime renforcé et notariés par Apple. La CI contrôle la signature, l’évaluation Gatekeeper et le ticket de notarisation avant de rendre une release publique.
+La CI publie les bundles macOS même sans identifiants Apple. Lorsqu’ils sont configurés, elle contrôle la signature Developer ID, l’évaluation Gatekeeper et le ticket de notarisation. Sans eux, le DMG est explicitement publié non signé et non notarié. L’installateur Windows est également publié sans Authenticode pour le moment ; SmartScreen peut donc afficher un avertissement.

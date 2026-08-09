@@ -192,7 +192,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             <p className="lm-subtle lm-onboarding-lead">{onboardingWelcomeLead()}</p>
             <ul className="lm-onboarding-benefits">
               <li>Dossiers locaux préparés et vérifiés</li>
-              <li>Microphone par défaut configuré automatiquement</li>
+              <li>Microphone demandé seulement au premier enregistrement</li>
               <li>Fournisseur IA modifiable à tout moment</li>
             </ul>
             {ordered.length > 0 ? (
@@ -264,20 +264,12 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                   </div>
                 </div>
                 <div className="lm-setup-row">
-                  <span
-                    className={`lm-setup-icon${setupStatus.selectedDevice ? "" : " is-muted"}`}
-                    aria-hidden="true"
-                  >
-                    {setupStatus.selectedDevice ? "✓" : "—"}
+                  <span className="lm-setup-icon is-muted" aria-hidden="true">
+                    ○
                   </span>
                   <div>
                     <strong>Microphone</strong>
-                    <span>
-                      {setupStatus.selectedDevice?.name ??
-                        (setupStatus.deviceCount === 0
-                          ? "Aucun micro détecté — l’import MP3 reste disponible"
-                          : "À sélectionner dans les réglages")}
-                    </span>
+                    <span>Autorisation demandée au premier enregistrement</span>
                   </div>
                 </div>
               </div>
@@ -477,11 +469,11 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                 </p>
               </div>
               <div>
-                <span aria-hidden="true">{setupStatus?.selectedDevice ? "✓" : "—"}</span>
+                <span aria-hidden="true">○</span>
                 <p>
                   <strong>Enregistrement</strong>
                   <br />
-                  {setupStatus?.selectedDevice?.name ?? "Import MP3 disponible"}
+                  Micro demandé à la première utilisation
                 </p>
               </div>
               <div>

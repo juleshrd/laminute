@@ -21,7 +21,9 @@ Téléchargez la [dernière version](https://github.com/juleshrd/laminute/releas
 
 Installez, puis ouvrez **La Minute**.
 
-Les installateurs et le flux d’auto-update (`latest.json`) sont publiés sur GitHub Releases. Les artefacts d’update sont **signés Minisign** et vérifiés par l’application. Une release macOS stable est également signée avec un certificat Developer ID et notariée par Apple ; la publication échoue si ces garanties ne peuvent pas être vérifiées.
+Les installateurs et le flux d’auto-update (`latest.json`) sont publiés sur GitHub Releases. Les artefacts d’update sont **signés Minisign** et vérifiés par l’application.
+
+> **Avertissements système :** sans identifiants Apple, le DMG macOS est publié sans signature Developer ID ni notarisation et Gatekeeper affiche normalement un avertissement. L’installateur Windows est actuellement non signé Authenticode et SmartScreen peut afficher « Windows a protégé votre ordinateur ». Minisign protège les mises à jour mais ne remplace pas les signatures reconnues par macOS ou Windows.
 
 Quand une nouvelle version est disponible, l’app vous propose la mise à jour. Si la vérification échoue (réseau, dépôt inaccessible), un message non bloquant s’affiche.
 
@@ -31,14 +33,14 @@ C’est le parcours le plus simple pour démarrer.
 
 1. Créez un compte (ou connectez-vous) sur [console.mistral.ai](https://console.mistral.ai/).
 2. Créez une **clé API**, puis copiez-la.
-3. Au premier lancement, laissez La Minute préparer les dossiers locaux et le microphone par défaut.
+3. Au premier lancement, laissez La Minute préparer les dossiers locaux. macOS demandera l’accès au microphone seulement lorsque vous démarrerez votre premier enregistrement.
 4. Choisissez **Mistral AI**, collez la clé, enregistrez, puis **Validez**.
 
 Votre clé est stockée dans le trousseau de votre ordinateur (pas dans les exports de réunions).
 
 ## Premier usage
 
-Au premier lancement, l’assistant affiche les emplacements réellement utilisés, configure la conservation des audios, sélectionne le microphone système par défaut et connecte le fournisseur IA. Il peut être relancé depuis **Réglages**.
+Au premier lancement, l’assistant affiche les emplacements réellement utilisés, configure la conservation des audios et connecte le fournisseur IA. Le microphone système est demandé et sélectionné au premier enregistrement. L’assistant peut être relancé depuis **Réglages**.
 
 1. Importez un fichier **MP3**, ou lancez un **enregistrement**.
 2. Donnez un titre à la réunion.

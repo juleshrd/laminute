@@ -76,6 +76,11 @@ function setupInvoke(options?: { recording?: boolean; durationSecs?: number }) {
 
   invokeMock.mockImplementation((command: string) => {
     switch (command) {
+      case "prepare_audio_input":
+        return Promise.resolve({
+          devices: [{ id: "mic-1", name: "Micro intégré", isDefault: true }],
+          selectedDevice: { id: "mic-1", name: "Micro intégré", isDefault: true },
+        });
       case "list_audio_input_devices":
         return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
       case "get_selected_audio_input_device":

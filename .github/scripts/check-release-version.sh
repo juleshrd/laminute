@@ -3,19 +3,23 @@
 set -euo pipefail
 
 PKG_VERSION="$(node -p "require('./package.json').version")"
+PKG_LOCK_VERSION="$(node -p "require('./package-lock.json').version")"
 TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
 CARGO_VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
+CARGO_LOCK_VERSION="$(awk '$0 == "name = \"laminute\"" { getline; gsub(/^version = \"|\"$/, ""); print; exit }' src-tauri/Cargo.lock)"
 
-if [[ -z "$PKG_VERSION" || -z "$TAURI_VERSION" || -z "$CARGO_VERSION" ]]; then
+if [[ -z "$PKG_VERSION" || -z "$PKG_LOCK_VERSION" || -z "$TAURI_VERSION" || -z "$CARGO_VERSION" || -z "$CARGO_LOCK_VERSION" ]]; then
   echo "Impossible de lire les versions du projet." >&2
   exit 1
 fi
 
-if [[ "$PKG_VERSION" != "$TAURI_VERSION" || "$PKG_VERSION" != "$CARGO_VERSION" ]]; then
+if [[ "$PKG_VERSION" != "$PKG_LOCK_VERSION" || "$PKG_VERSION" != "$TAURI_VERSION" || "$PKG_VERSION" != "$CARGO_VERSION" || "$PKG_VERSION" != "$CARGO_LOCK_VERSION" ]]; then
   echo "Versions désalignées :" >&2
   echo "  package.json          = $PKG_VERSION" >&2
+  echo "  package-lock.json     = $PKG_LOCK_VERSION" >&2
   echo "  tauri.conf.json       = $TAURI_VERSION" >&2
   echo "  src-tauri/Cargo.toml  = $CARGO_VERSION" >&2
+  echo "  src-tauri/Cargo.lock  = $CARGO_LOCK_VERSION" >&2
   exit 1
 fi
 
