@@ -36,9 +36,7 @@ describe("MeetingIdleStep", () => {
 
     expect(screen.getByRole("heading", { name: "Bonjour." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: /Importer un enregistrement/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Importer un enregistrement/i })).toBeInTheDocument();
     expect(screen.getByText(/MP3, M4A ou WAV/i)).toBeInTheDocument();
   });
 

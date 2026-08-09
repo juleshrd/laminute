@@ -17,7 +17,9 @@ export function MeetingRecordingStep({
         <div>
           <p className="lm-kicker">ENREGISTREMENT</p>
           <h2>Je vous écoute.</h2>
-          <p className="today-view__lead">L&apos;état du micro reste visible partout dans l&apos;app.</p>
+          <p className="today-view__lead">
+            L&apos;état du micro reste visible partout dans l&apos;app.
+          </p>
         </div>
         <span className="lm-badge-local">⌁ Stockage local</span>
       </div>

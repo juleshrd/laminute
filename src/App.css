@@ -43,8 +43,7 @@ body {
   margin: 0;
   background:
     radial-gradient(circle at 20% 0, #ded8ff 0, transparent 27%),
-    radial-gradient(circle at 90% 10%, #d7edff 0, transparent 28%),
-    var(--lm-cream);
+    radial-gradient(circle at 90% 10%, #d7edff 0, transparent 28%), var(--lm-cream);
 }
 
 .lm-root {
@@ -1949,8 +1948,7 @@ textarea:focus-visible,
   body {
     background:
       radial-gradient(circle at 20% 0, #2a2450 0, transparent 30%),
-      radial-gradient(circle at 90% 10%, #1d2d40 0, transparent 30%),
-      var(--lm-cream);
+      radial-gradient(circle at 90% 10%, #1d2d40 0, transparent 30%), var(--lm-cream);
   }
 
   .lm-chrome,

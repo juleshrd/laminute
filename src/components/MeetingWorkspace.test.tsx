@@ -108,9 +108,7 @@ describe("MeetingWorkspace", () => {
 
     expect(await screen.findByRole("heading", { name: "Bonjour." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Importer un enregistrement/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Importer un enregistrement/i })).toBeInTheDocument();
   });
 
   it("demande le consentement avant de démarrer l'enregistrement", async () => {

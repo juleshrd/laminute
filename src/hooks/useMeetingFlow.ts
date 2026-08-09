@@ -586,8 +586,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     flowPhase === "processing" ||
     (transcriptionProgress != null && isTranscriptionBusy(transcriptionProgress.phase));
   const canStartRecording = Boolean(selectedDeviceId) && devices.length > 0;
-  const selectedDeviceName =
-    devices.find((device) => device.id === selectedDeviceId)?.name ?? null;
+  const selectedDeviceName = devices.find((device) => device.id === selectedDeviceId)?.name ?? null;
 
   const selectDevice = useCallback(async (deviceId: string) => {
     setError(null);
