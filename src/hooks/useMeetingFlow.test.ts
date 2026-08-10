@@ -58,6 +58,11 @@ vi.mock("../lib/transcription", async () => {
 function setupDefaultInvoke() {
   invokeMock.mockImplementation((command: string) => {
     switch (command) {
+      case "prepare_audio_input":
+        return Promise.resolve({
+          devices: [{ id: "mic-1", name: "Micro intégré", isDefault: true }],
+          selectedDevice: { id: "mic-1", name: "Micro intégré", isDefault: true },
+        });
       case "list_audio_input_devices":
         return Promise.resolve([{ id: "mic-1", name: "Micro intégré", isDefault: true }]);
       case "get_selected_audio_input_device":
@@ -85,8 +90,8 @@ describe("useMeetingFlow", () => {
     vi.mocked(getTranscriptionProgress).mockResolvedValue(null);
   });
 
-  it("initialise en phase idle avec les périphériques audio", async () => {
-    const { result } = renderHook(() => useMeetingFlow());
+  it("n'accède pas aux périphériques audio au lancement", async () => {
+    const { result } = renderHook(() => useMeetingFlow(), { reactStrictMode: true });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -94,12 +99,15 @@ describe("useMeetingFlow", () => {
 
     expect(result.current.flowPhase).toBe("idle");
     expect(result.current.canStartRecording).toBe(true);
-    expect(result.current.devices).toHaveLength(1);
+    expect(result.current.audioInputInitialized).toBe(false);
+    expect(result.current.devices).toHaveLength(0);
+    expect(invokeMock).not.toHaveBeenCalledWith("prepare_audio_input");
+    expect(invokeMock).not.toHaveBeenCalledWith("list_audio_input_devices");
   });
 
-  it("traite l'absence de micro comme un état idle sans erreur bloquante", async () => {
+  it("traite l'absence de micro après la demande d'enregistrement", async () => {
     invokeMock.mockImplementation((command: string) => {
-      if (command === "list_audio_input_devices") {
+      if (command === "prepare_audio_input") {
         return Promise.reject({
           code: "no_input_device",
           message: "aucun périphérique d'entrée audio détecté",
@@ -123,10 +131,16 @@ describe("useMeetingFlow", () => {
       expect(result.current.loading).toBe(false);
     });
 
+    expect(result.current.canStartRecording).toBe(true);
+    await act(async () => {
+      await result.current.handleStartRecording();
+    });
+
     expect(result.current.flowPhase).toBe("idle");
+    expect(result.current.audioInputInitialized).toBe(true);
     expect(result.current.devices).toHaveLength(0);
     expect(result.current.canStartRecording).toBe(false);
-    expect(result.current.error).toBeNull();
+    expect(result.current.error).toMatch(/aucun périphérique/i);
   });
 
   it("passe en phase ready après import MP3", async () => {
@@ -196,6 +210,12 @@ describe("useMeetingFlow", () => {
 
   it("passe en phase recording après démarrage", async () => {
     invokeMock.mockImplementation((command: string) => {
+      if (command === "prepare_audio_input") {
+        return Promise.resolve({
+          devices: [{ id: "mic-1", name: "Micro intégré", isDefault: true }],
+          selectedDevice: { id: "mic-1", name: "Micro intégré", isDefault: true },
+        });
+      }
       if (command === "start_microphone_recording") {
         return Promise.resolve({
           phase: "recording",
@@ -235,6 +255,8 @@ describe("useMeetingFlow", () => {
 
     expect(result.current.flowPhase).toBe("recording");
     expect(result.current.isRecording).toBe(true);
+    expect(invokeMock).toHaveBeenCalledWith("prepare_audio_input");
+    expect(invokeMock).not.toHaveBeenCalledWith("list_audio_input_devices");
   });
 
   it("reprend la phase recording depuis le statut natif", async () => {

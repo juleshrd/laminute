@@ -9,4 +9,4 @@ pub use devices::AudioInputDevice;
 pub use error::AudioError;
 pub use paths::ManagedAudioRoots;
 pub use recording::RecordingStatus;
-pub use state::AudioState;
+pub use state::{AudioInputSetup, AudioState};

@@ -22,7 +22,7 @@ use std::sync::Mutex;
 
 use tauri::Manager;
 
-use audio::{AudioError, AudioInputDevice, AudioState, RecordingStatus};
+use audio::{AudioError, AudioInputDevice, AudioInputSetup, AudioState, RecordingStatus};
 use commands::{
     create_meeting, delete_all_local_data, delete_meeting, export_meeting,
     generate_structured_summary, get_local_storage_info, get_meeting, import_mp3_meeting,
@@ -43,20 +43,6 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn list_audio_input_devices(
-    state: tauri::State<'_, AudioState>,
-) -> Result<Vec<AudioInputDevice>, AudioError> {
-    state.list_devices()
-}
-
-#[tauri::command]
-fn get_selected_audio_input_device(
-    state: tauri::State<'_, AudioState>,
-) -> Result<Option<AudioInputDevice>, AudioError> {
-    state.get_selected_device()
-}
-
-#[tauri::command]
 fn set_selected_audio_input_device(
     state: tauri::State<'_, AudioState>,
     device_id: String,
@@ -65,10 +51,8 @@ fn set_selected_audio_input_device(
 }
 
 #[tauri::command]
-fn ensure_default_audio_input_device(
-    state: tauri::State<'_, AudioState>,
-) -> Result<Option<AudioInputDevice>, AudioError> {
-    state.ensure_default_device_selected()
+fn prepare_audio_input(state: tauri::State<'_, AudioState>) -> Result<AudioInputSetup, AudioError> {
+    state.prepare_input()
 }
 
 #[tauri::command]
@@ -169,10 +153,8 @@ pub fn run() {
             ai::commands::transcription::transcribe_audio_file,
             ai::commands::transcription::get_transcription_progress,
             ai::commands::transcription::cancel_ai_job,
-            list_audio_input_devices,
-            get_selected_audio_input_device,
             set_selected_audio_input_device,
-            ensure_default_audio_input_device,
+            prepare_audio_input,
             start_microphone_recording,
             stop_microphone_recording,
             get_recording_status,

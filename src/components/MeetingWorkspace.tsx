@@ -31,6 +31,7 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
           {flow.flowPhase === "idle" && (
             <MeetingIdleStep
               canStartRecording={flow.canStartRecording}
+              audioInputInitialized={flow.audioInputInitialized}
               hasDevices={flow.devices.length > 0}
               importing={flow.importing}
               dragOver={flow.dragOver}

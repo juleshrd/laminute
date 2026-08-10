@@ -128,7 +128,9 @@ describe("OnboardingIA", () => {
     render(<OnboardingIA onComplete={vi.fn()} onSkip={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Configurer l’app" }));
-    expect(await screen.findByText("Micro du Mac")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Autorisation demandée au premier enregistrement/i),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
 
     expect(await screen.findByRole("heading", { name: "Choisir l'IA" })).toBeInTheDocument();
@@ -232,7 +234,9 @@ describe("OnboardingIA", () => {
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
-    expect(await screen.findByText(/Aucun micro détecté/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Autorisation demandée au premier enregistrement/i),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continuer" })).toBeEnabled();
   });
 });

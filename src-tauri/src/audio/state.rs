@@ -37,6 +37,13 @@ pub struct AudioState {
     recordings_dir: PathBuf,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioInputSetup {
+    pub devices: Vec<AudioInputDevice>,
+    pub selected_device: AudioInputDevice,
+}
+
 impl AudioState {
     pub fn initialize(app: &AppHandle) -> Result<Self, AudioError> {
         let app_data_dir = app
@@ -48,55 +55,16 @@ impl AudioState {
         let recordings_dir = app_data_dir.join("recordings");
 
         let persisted = load_settings(&settings_path);
-        let mut selected_device_id = persisted.selected_device_id;
+        let selected_device_id = persisted.selected_device_id;
         let keep_audio_files = persisted.keep_audio_files;
 
-        if let Some(device_id) = &selected_device_id {
-            if resolve_selected_device(device_id).is_err() {
-                selected_device_id = None;
-                let _ = save_settings(
-                    &settings_path,
-                    &PersistedSettings {
-                        selected_device_id: None,
-                        keep_audio_files,
-                    },
-                );
-            }
-        }
-
-        let state = Self {
+        Ok(Self {
             selected_device_id: Mutex::new(selected_device_id),
             keep_audio_files: Mutex::new(keep_audio_files),
             recording: RecordingService::spawn(),
             settings_path,
             recordings_dir,
-        };
-
-        // Un profil vierge doit pouvoir enregistrer immédiatement. La détection
-        // reste best-effort : une permission refusée ou l'absence de micro ne
-        // doit jamais empêcher le démarrage de l'application.
-        let _ = state.ensure_default_device_selected();
-
-        Ok(state)
-    }
-
-    pub fn list_devices(&self) -> Result<Vec<AudioInputDevice>, AudioError> {
-        list_input_devices()
-    }
-
-    pub fn get_selected_device(&self) -> Result<Option<AudioInputDevice>, AudioError> {
-        let selected_id = self
-            .selected_device_id
-            .lock()
-            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
-            .clone();
-
-        let Some(device_id) = selected_id else {
-            return Ok(None);
-        };
-
-        let devices = list_input_devices()?;
-        Ok(devices.into_iter().find(|device| device.id == device_id))
+        })
     }
 
     pub fn set_selected_device(&self, device_id: String) -> Result<AudioInputDevice, AudioError> {
@@ -115,20 +83,34 @@ impl AudioState {
         Ok(device)
     }
 
-    /// Persiste le périphérique système par défaut (ou le premier disponible)
-    /// lorsqu'aucun choix valide n'existe encore.
-    pub fn ensure_default_device_selected(&self) -> Result<Option<AudioInputDevice>, AudioError> {
-        if let Some(selected) = self.get_selected_device()? {
-            return Ok(Some(selected));
+    /// Énumère les entrées une seule fois, uniquement après une action utilisateur,
+    /// puis conserve le choix existant s'il est encore disponible.
+    pub fn prepare_input(&self) -> Result<AudioInputSetup, AudioError> {
+        let devices = list_input_devices()?;
+        let persisted_id = self
+            .selected_device_id
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
+            .clone();
+
+        let selected_device = pick_prepared_device(&devices, persisted_id.as_deref())
+            .ok_or(AudioError::NoInputDevice)?;
+
+        if persisted_id.as_deref() != Some(selected_device.id.as_str()) {
+            {
+                let mut selected = self
+                    .selected_device_id
+                    .lock()
+                    .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?;
+                *selected = Some(selected_device.id.clone());
+            }
+            self.persist_settings()?;
         }
 
-        let devices = list_input_devices()?;
-        let Some(device) = pick_default_device(&devices) else {
-            return Ok(None);
-        };
-
-        self.set_selected_device(device.id.clone())?;
-        Ok(Some(device))
+        Ok(AudioInputSetup {
+            devices,
+            selected_device,
+        })
     }
 
     pub fn keep_audio_files(&self) -> Result<bool, AudioError> {
@@ -176,16 +158,22 @@ impl AudioState {
     }
 
     pub fn start_recording(&self) -> Result<RecordingStatus, AudioError> {
-        let device_id = self
+        let mut device_id = self
             .selected_device_id
             .lock()
             .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
-            .clone()
-            .ok_or(AudioError::DeviceNotFound(
-                "aucun périphérique sélectionné".into(),
-            ))?;
+            .clone();
 
-        self.recording.start(&device_id, &self.recordings_dir)
+        if device_id.is_none() {
+            device_id = Some(self.prepare_input()?.selected_device.id);
+        }
+
+        self.recording.start(
+            device_id.as_deref().ok_or_else(|| {
+                AudioError::DeviceNotFound("aucun périphérique sélectionné".into())
+            })?,
+            &self.recordings_dir,
+        )
     }
 
     pub fn stop_recording(&self) -> Result<RecordingStatus, AudioError> {
@@ -239,6 +227,16 @@ fn pick_default_device(devices: &[AudioInputDevice]) -> Option<AudioInputDevice>
         .find(|device| device.is_default)
         .or_else(|| devices.first())
         .cloned()
+}
+
+fn pick_prepared_device(
+    devices: &[AudioInputDevice],
+    persisted_id: Option<&str>,
+) -> Option<AudioInputDevice> {
+    persisted_id
+        .and_then(|id| devices.iter().find(|device| device.id == id))
+        .cloned()
+        .or_else(|| pick_default_device(devices))
 }
 
 fn load_settings(path: &PathBuf) -> PersistedSettings {
@@ -310,5 +308,34 @@ mod tests {
         }];
         assert_eq!(pick_default_device(&fallback).unwrap().id, "input-0");
         assert!(pick_default_device(&[]).is_none());
+    }
+
+    #[test]
+    fn keeps_a_valid_choice_and_replaces_a_stale_one_from_the_same_snapshot() {
+        let devices = vec![
+            AudioInputDevice {
+                id: "input-0".into(),
+                name: "USB".into(),
+                is_default: false,
+            },
+            AudioInputDevice {
+                id: "input-1".into(),
+                name: "Micro intégré".into(),
+                is_default: true,
+            },
+        ];
+
+        assert_eq!(
+            pick_prepared_device(&devices, Some("input-0"))
+                .expect("valid persisted device")
+                .id,
+            "input-0"
+        );
+        assert_eq!(
+            pick_prepared_device(&devices, Some("input-99"))
+                .expect("system default")
+                .id,
+            "input-1"
+        );
     }
 }

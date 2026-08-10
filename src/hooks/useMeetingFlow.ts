@@ -32,6 +32,7 @@ export interface UseMeetingFlowResult {
   importing: boolean;
   dragOver: boolean;
   showRecordingConsent: boolean;
+  audioInputInitialized: boolean;
   devices: AudioInputDevice[];
   selectedDeviceId: string;
   selectedDeviceName: string | null;
@@ -74,6 +75,11 @@ export interface UseMeetingFlowResult {
   runSummarizeFromText: () => Promise<void>;
 }
 
+interface AudioInputSetup {
+  devices: AudioInputDevice[];
+  selectedDevice: AudioInputDevice;
+}
+
 function createAiJobId(prefix: "transcription" | "summary"): string {
   if (globalThis.crypto?.randomUUID) {
     return `${prefix}-${globalThis.crypto.randomUUID()}`;
@@ -110,36 +116,13 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [showRecordingConsent, setShowRecordingConsent] = useState(false);
+  const [audioInputInitialized, setAudioInputInitialized] = useState(false);
   const [providerName, setProviderName] = useState("Mistral");
   const [selectedProvider, setSelectedProvider] = useState<ProviderInfo | null>(null);
   const [pastedText, setPastedText] = useState("");
   const activeTranscriptionJobIdRef = useRef<string | null>(null);
   const processingPromiseRef = useRef<Promise<void> | null>(null);
-
-  const refreshDevices = useCallback(async () => {
-    try {
-      const listed = await invoke<AudioInputDevice[]>("list_audio_input_devices");
-      setDevices(listed);
-
-      const selected = await invoke<AudioInputDevice | null>("get_selected_audio_input_device");
-      if (selected) {
-        setSelectedDeviceId(selected.id);
-      } else if (listed.length > 0) {
-        const fallback = await invoke<AudioInputDevice | null>("ensure_default_audio_input_device");
-        setSelectedDeviceId(fallback?.id ?? "");
-      } else {
-        setSelectedDeviceId("");
-      }
-    } catch (err) {
-      // Absence de micro = état attendu (import MP3 toujours possible), pas une erreur bloquante.
-      if (isNoInputDeviceError(err)) {
-        setDevices([]);
-        setSelectedDeviceId("");
-        return;
-      }
-      setError(formatMeetingError(err));
-    }
-  }, []);
+  const startingRecordingPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshRecordingStatus = useCallback(async () => {
     try {
@@ -175,8 +158,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
 
     void (async () => {
       setLoading(true);
-      const [, recordingStatusResult] = await Promise.all([
-        refreshDevices(),
+      const [recordingStatusResult] = await Promise.all([
         refreshRecordingStatus(),
         refreshAiSettings(),
       ]);
@@ -224,7 +206,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     return () => {
       cancelled = true;
     };
-  }, [refreshAiSettings, refreshDevices, refreshRecordingStatus]);
+  }, [refreshAiSettings, refreshRecordingStatus]);
 
   useEffect(() => {
     if (flowPhase !== "recording") {
@@ -332,21 +314,46 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   }, [flowPhase, importMp3, importing]);
 
   const handleStartRecording = useCallback(async () => {
-    setError(null);
-    try {
-      const status = await invoke<RecordingStatus>("start_microphone_recording");
-      setRecordingStatus(status);
-      setMeetingId(null);
-      setFilePath(null);
-      setDurationSecs(null);
-      setTitle(defaultRecordingTitle());
-      setTranscription(null);
-      setSummary(null);
-      setFlowPhase("recording");
+    if (startingRecordingPromiseRef.current) {
+      return startingRecordingPromiseRef.current;
+    }
+
+    const promise = (async () => {
+      setError(null);
       setShowRecordingConsent(false);
-    } catch (err) {
-      setError(formatMeetingError(err));
-      await refreshRecordingStatus();
+      try {
+        const setup = await invoke<AudioInputSetup>("prepare_audio_input");
+        setDevices(setup.devices);
+        setSelectedDeviceId(setup.selectedDevice.id);
+        setAudioInputInitialized(true);
+
+        const status = await invoke<RecordingStatus>("start_microphone_recording");
+        setRecordingStatus(status);
+        setMeetingId(null);
+        setFilePath(null);
+        setDurationSecs(null);
+        setTitle(defaultRecordingTitle());
+        setTranscription(null);
+        setSummary(null);
+        setFlowPhase("recording");
+      } catch (err) {
+        setAudioInputInitialized(true);
+        if (isNoInputDeviceError(err)) {
+          setDevices([]);
+          setSelectedDeviceId("");
+        }
+        setError(formatMeetingError(err));
+        await refreshRecordingStatus();
+      }
+    })();
+
+    startingRecordingPromiseRef.current = promise;
+    try {
+      await promise;
+    } finally {
+      if (startingRecordingPromiseRef.current === promise) {
+        startingRecordingPromiseRef.current = null;
+      }
     }
   }, [refreshRecordingStatus]);
 
@@ -585,7 +592,8 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   const isBusy =
     flowPhase === "processing" ||
     (transcriptionProgress != null && isTranscriptionBusy(transcriptionProgress.phase));
-  const canStartRecording = Boolean(selectedDeviceId) && devices.length > 0;
+  const canStartRecording =
+    !audioInputInitialized || (Boolean(selectedDeviceId) && devices.length > 0);
   const selectedDeviceName = devices.find((device) => device.id === selectedDeviceId)?.name ?? null;
 
   const selectDevice = useCallback(async (deviceId: string) => {
@@ -605,6 +613,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     importing,
     dragOver,
     showRecordingConsent,
+    audioInputInitialized,
     devices,
     selectedDeviceId,
     selectedDeviceName,

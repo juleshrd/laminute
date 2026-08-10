@@ -1,5 +1,6 @@
 interface MeetingIdleStepProps {
   canStartRecording: boolean;
+  audioInputInitialized: boolean;
   hasDevices: boolean;
   importing: boolean;
   dragOver: boolean;
@@ -21,6 +22,7 @@ function todayKicker(): string {
 
 export function MeetingIdleStep({
   canStartRecording,
+  audioInputInitialized,
   hasDevices,
   importing,
   dragOver,
@@ -60,7 +62,9 @@ export function MeetingIdleStep({
         <p>Un clic. Aucun formulaire.</p>
 
         <div className="record-card__source">
-          {!hasDevices ? (
+          {!audioInputInitialized ? (
+            <span className="lm-subtle">Autorisation demandée au premier enregistrement.</span>
+          ) : !hasDevices ? (
             <span className="warning">
               Aucun micro détecté — vous pouvez quand même importer un MP3.
             </span>

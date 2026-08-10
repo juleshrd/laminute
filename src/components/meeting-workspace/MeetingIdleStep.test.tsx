@@ -4,6 +4,7 @@ import { MeetingIdleStep } from "./MeetingIdleStep";
 
 const baseProps = {
   canStartRecording: true,
+  audioInputInitialized: true,
   hasDevices: true,
   importing: false,
   dragOver: false,
@@ -55,6 +56,24 @@ describe("MeetingIdleStep", () => {
     expect(screen.getByText(/Aucun micro détecté/i)).toBeInTheDocument();
     expect(screen.getByText(/importer un MP3/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeDisabled();
+  });
+
+  it("n'accède pas au micro avant le premier enregistrement", () => {
+    render(
+      <MeetingIdleStep
+        {...baseProps}
+        audioInputInitialized={false}
+        hasDevices={false}
+        deviceName={null}
+        devices={[]}
+        selectedDeviceId=""
+      />,
+    );
+
+    expect(
+      screen.getByText(/Autorisation demandée au premier enregistrement/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
   });
 
   it("déclenche l'import au clic", () => {
