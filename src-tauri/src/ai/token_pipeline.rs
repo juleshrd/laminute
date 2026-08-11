@@ -343,6 +343,20 @@ fn dedup_strings_ordered(values: Vec<String>) -> Vec<String> {
     out
 }
 
+fn dedup_decisions_ordered(values: Vec<crate::ai::structured_summary::DecisionEntry>) -> Vec<crate::ai::structured_summary::DecisionEntry> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for value in values {
+        let key = normalize_key(value.text());
+        if key.is_empty() || seen.contains(&key) {
+            continue;
+        }
+        seen.insert(key);
+        out.push(value);
+    }
+    out
+}
+
 fn dedup_actions_ordered(actions: Vec<StructuredActionItem>) -> Vec<StructuredActionItem> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
@@ -380,7 +394,7 @@ pub fn merge_partial_summaries(partials: &[StructuredSummary]) -> StructuredSumm
         .collect::<Vec<_>>()
         .join(" ");
 
-    let decisions = dedup_strings_ordered(
+    let decisions = dedup_decisions_ordered(
         partials
             .iter()
             .flat_map(|p| p.decisions.clone())
@@ -499,9 +513,7 @@ mod tests {
             decisions: vec!["Valider Q4".into(), "Reporter budget".into()],
             actions: vec![StructuredActionItem {
                 titre: "Envoyer devis".into(),
-                description: None,
-                responsable: None,
-                echeance: None,
+                ..Default::default()
             }],
             risques: vec![],
             questions_ouvertes: vec![],
@@ -514,13 +526,14 @@ mod tests {
                 description: None,
                 responsable: Some("Marie".into()),
                 echeance: None,
+                ..Default::default()
             }],
             risques: vec!["Retard".into()],
             questions_ouvertes: vec![],
         };
         let merged = merge_partial_summaries(&[a, b]);
         assert_eq!(merged.decisions.len(), 3);
-        assert_eq!(merged.decisions[0], "Valider Q4");
+        assert_eq!(merged.decisions[0].text(), "Valider Q4");
         assert_eq!(merged.actions.len(), 1);
         assert!(merged.synthese.contains("Partie A."));
         assert!(merged.synthese.contains("Partie B."));

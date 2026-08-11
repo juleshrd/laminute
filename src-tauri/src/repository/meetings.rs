@@ -97,7 +97,7 @@ impl MeetingRepository {
     pub fn latest_summary(conn: &Connection, meeting_id: &str) -> AppResult<Option<Summary>> {
         Self::get_by_id(conn, meeting_id)?;
         conn.query_row(
-            "SELECT id, meeting_id, provider_id, content, created_at, updated_at
+            "SELECT id, meeting_id, provider_id, content, model, validation_state, validated_at, created_at, updated_at
              FROM summaries WHERE meeting_id = ?1 ORDER BY created_at DESC, id DESC LIMIT 1",
             [meeting_id],
             map_summary_row,
@@ -507,7 +507,7 @@ impl MeetingRepository {
 
     fn list_summaries(conn: &Connection, meeting_id: &str) -> AppResult<Vec<Summary>> {
         let mut stmt = conn.prepare(
-            "SELECT id, meeting_id, provider_id, content, created_at, updated_at
+            "SELECT id, meeting_id, provider_id, content, model, validation_state, validated_at, created_at, updated_at
              FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
@@ -543,16 +543,23 @@ impl MeetingRepository {
         meeting_id: &str,
     ) -> AppResult<Vec<SummaryMetadata>> {
         let mut stmt = conn.prepare(
-            "SELECT id, meeting_id, provider_id, created_at, updated_at
+            "SELECT id, meeting_id, provider_id, model, validation_state, validated_at, created_at, updated_at
              FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
         let rows = stmt.query_map([meeting_id], |row| {
+            let validation_str: String = row.get(4)?;
             Ok(SummaryMetadata {
                 id: row.get(0)?,
                 meeting_id: row.get(1)?,
                 provider_id: row.get(2)?,
-                created_at: row.get(3)?,
-                updated_at: row.get(4)?,
+                model: row.get(3)?,
+                validation_state: crate::ai::structured_summary::SummaryValidationState::from_str(
+                    &validation_str,
+                )
+                .unwrap_or_default(),
+                validated_at: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
@@ -560,12 +567,19 @@ impl MeetingRepository {
 
     fn list_actions(conn: &Connection, meeting_id: &str) -> AppResult<Vec<Action>> {
         let mut stmt = conn.prepare(
-            "SELECT id, meeting_id, title, description, assignee, due_date, status, created_at, updated_at
+            "SELECT id, meeting_id, title, description, assignee, due_date, status,
+                    item_key, sources_json, origin, created_at, updated_at
              FROM actions WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
         let rows = stmt.query_map([meeting_id], |row| {
             let status_str: String = row.get(6)?;
+            let sources_json: Option<String> = row.get(8)?;
+            let origin_str: String = row.get(9)?;
+            let sources = sources_json
+                .as_deref()
+                .and_then(|json| serde_json::from_str(json).ok())
+                .unwrap_or_default();
             Ok(Action {
                 id: row.get(0)?,
                 meeting_id: row.get(1)?,
@@ -574,8 +588,12 @@ impl MeetingRepository {
                 assignee: row.get(4)?,
                 due_date: row.get(5)?,
                 status: ActionStatus::from_str(&status_str).unwrap_or(ActionStatus::Pending),
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                item_key: row.get(7)?,
+                sources,
+                origin: crate::ai::structured_summary::ItemOrigin::from_str(&origin_str)
+                    .unwrap_or_default(),
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
             })
         })?;
 
@@ -636,13 +654,20 @@ fn parse_speaker_map_json(raw: Option<String>) -> Option<HashMap<String, String>
 }
 
 fn map_summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
+    let validation_str: String = row.get(5)?;
     Ok(Summary {
         id: row.get(0)?,
         meeting_id: row.get(1)?,
         provider_id: row.get(2)?,
         content: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
+        model: row.get(4)?,
+        validation_state: crate::ai::structured_summary::SummaryValidationState::from_str(
+            &validation_str,
+        )
+        .unwrap_or_default(),
+        validated_at: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
     })
 }
 

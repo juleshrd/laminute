@@ -60,7 +60,9 @@ pub fn apply_speaker_map_to_structured(summary: &mut StructuredSummary, map: &Sp
 
     summary.synthese = substitute_in_text(&summary.synthese, map);
     for decision in &mut summary.decisions {
-        *decision = substitute_in_text(decision, map);
+        let mut item = decision.as_item();
+        item.texte = substitute_in_text(&item.texte, map);
+        *decision = crate::ai::structured_summary::DecisionEntry::Item(item);
     }
     for action in &mut summary.actions {
         if let Some(ref responsable) = action.responsable {
@@ -117,6 +119,7 @@ mod tests {
                 description: None,
                 responsable: Some("SPEAKER_00".into()),
                 echeance: None,
+                ..Default::default()
             }],
             risques: vec![],
             questions_ouvertes: vec![],

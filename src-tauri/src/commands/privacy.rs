@@ -110,6 +110,9 @@ pub struct ExportSummary {
     pub provider_id: Option<String>,
     pub content: String,
     pub structured: Option<serde_json::Value>,
+    pub model: Option<String>,
+    pub validation_state: String,
+    pub validated_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -278,24 +281,32 @@ fn build_export_bytes(
             Ok(json.into_bytes())
         }
         ExportFormat::Markdown => {
-            let (meeting, summary, duration_ms) = load_structured_export(state, id)?;
+            let (meeting, summary_record, summary, duration_ms) = load_structured_export(state, id)?;
             let md = build_meeting_report_markdown(MeetingReportMarkdownInput {
                 title: &meeting.title,
                 status: meeting.status,
                 display_date: &format_display_date(&meeting),
                 duration_label: &format_duration_ms(duration_ms),
                 summary: &summary,
+                provider_id: summary_record.provider_id.as_deref(),
+                model: summary_record.model.as_deref(),
+                generated_at: Some(summary_record.created_at.as_str()),
+                validation_state: Some(summary_record.validation_state.as_str()),
             });
             Ok(md.into_bytes())
         }
         ExportFormat::Pdf => {
-            let (meeting, summary, duration_ms) = load_structured_export(state, id)?;
+            let (meeting, summary_record, summary, duration_ms) = load_structured_export(state, id)?;
             build_meeting_report_pdf(MeetingReportPdfInput {
                 title: &meeting.title,
                 status: meeting.status,
                 display_date: &format_display_date(&meeting),
                 duration_label: &format_duration_ms(duration_ms),
                 summary: &summary,
+                provider_id: summary_record.provider_id.as_deref(),
+                model: summary_record.model.as_deref(),
+                generated_at: Some(summary_record.created_at.as_str()),
+                validation_state: Some(summary_record.validation_state.as_str()),
             })
         }
     }
@@ -307,6 +318,7 @@ fn load_structured_export(
 ) -> Result<
     (
         Meeting,
+        crate::models::Summary,
         crate::ai::structured_summary::StructuredSummary,
         Option<i64>,
     ),
@@ -317,6 +329,7 @@ fn load_structured_export(
         let summary_record = detail
             .summaries
             .last()
+            .cloned()
             .ok_or_else(|| AppError::Message("aucun compte-rendu structuré à exporter".into()))?;
         let structured = parse_structured_summary(&summary_record.content)
             .map_err(|err| AppError::Message(err.to_string()))?;
@@ -325,7 +338,7 @@ fn load_structured_export(
             .first()
             .and_then(|audio| audio.duration_ms)
             .or_else(|| duration_from_range(&detail.meeting));
-        Ok((detail.meeting, structured, duration_ms))
+        Ok((detail.meeting, summary_record, structured, duration_ms))
     })
     .map_err(|err| err.to_string())
 }
@@ -418,6 +431,9 @@ fn map_export_summary(summary: Summary) -> ExportSummary {
         provider_id: summary.provider_id,
         content: summary.content,
         structured,
+        model: summary.model,
+        validation_state: summary.validation_state.as_str().to_string(),
+        validated_at: summary.validated_at,
         created_at: summary.created_at,
         updated_at: summary.updated_at,
     }
@@ -601,7 +617,12 @@ mod tests {
             display_date: "01/01/2026",
             duration_label: "1:00",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .unwrap();
         assert!(bytes.starts_with(b"%PDF"));
     }
@@ -624,7 +645,12 @@ mod tests {
             display_date: &format_display_date(&detail.meeting),
             duration_label: &format_duration_ms(None),
             summary: &summary,
-        });
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            });
         assert!(md.contains("# Comité produit"));
         assert!(md.contains("Point d'avancement"));
 
@@ -634,7 +660,12 @@ mod tests {
             display_date: &format_display_date(&detail.meeting),
             duration_label: &format_duration_ms(None),
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .unwrap();
         assert!(pdf.starts_with(b"%PDF"));
     }
