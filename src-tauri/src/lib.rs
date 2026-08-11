@@ -3,6 +3,7 @@ mod audio;
 mod commands;
 mod db;
 mod error;
+pub mod eval;
 mod export_write;
 mod local_activity;
 mod models;
@@ -13,6 +14,9 @@ mod repository;
 mod retention;
 mod storage;
 
+pub use ai::structured_summary::{
+    parse_structured_summary, StructuredActionItem, StructuredSummary,
+};
 pub use db::open_in_memory;
 pub use models::MeetingSearchFilters;
 pub use repository::MeetingRepository;

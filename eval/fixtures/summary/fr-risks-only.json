@@ -1,0 +1,12 @@
+{
+  "id": "fr-risks-only",
+  "hypothesisSummary": {
+    "synthese": "Alerte sur une hausse tarifaire potentielle du fournisseur cloud.",
+    "decisions": [],
+    "actions": [],
+    "risques": [
+      "Hausse tarifaire potentielle du fournisseur cloud"
+    ],
+    "questionsOuvertes": []
+  }
+}

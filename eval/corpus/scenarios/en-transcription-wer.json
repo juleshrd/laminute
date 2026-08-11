@@ -1,0 +1,27 @@
+{
+  "id": "en-transcription-wer",
+  "tags": [
+    "en",
+    "short"
+  ],
+  "transcription": "The team approved the migration schedule for next Tuesday.",
+  "gold": {
+    "synthese": "Migration schedule approved for next Tuesday.",
+    "decisions": [
+      "Approved the migration schedule for next Tuesday"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "transcriptionHypothesis": "The team approved migration schedule for next Tuesday",
+  "hypothesisSummary": {
+    "synthese": "Migration schedule approved for next Tuesday.",
+    "decisions": [
+      "Approved the migration schedule for next Tuesday"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

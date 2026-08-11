@@ -1,0 +1,8 @@
+{
+  "schemaOkRate": 1.0,
+  "criticalHallucinationRate": 0.0,
+  "minDecisionRecall": 0.75,
+  "minActionRecall": 0.75,
+  "minDecisionPrecision": 0.75,
+  "minActionPrecision": 0.75
+}

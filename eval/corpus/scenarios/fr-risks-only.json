@@ -1,0 +1,26 @@
+{
+  "id": "fr-risks-only",
+  "tags": [
+    "short",
+    "fr"
+  ],
+  "transcription": "Alerte : le fournisseur cloud pourrait augmenter ses tarifs. Pas d'action immédiate.",
+  "gold": {
+    "synthese": "Alerte sur une hausse tarifaire potentielle du fournisseur cloud.",
+    "decisions": [],
+    "actions": [],
+    "risques": [
+      "Hausse tarifaire potentielle du fournisseur cloud"
+    ],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Alerte sur une hausse tarifaire potentielle du fournisseur cloud.",
+    "decisions": [],
+    "actions": [],
+    "risques": [
+      "Hausse tarifaire potentielle du fournisseur cloud"
+    ],
+    "questionsOuvertes": []
+  }
+}

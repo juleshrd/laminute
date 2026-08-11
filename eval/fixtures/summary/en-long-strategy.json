@@ -1,0 +1,19 @@
+{
+  "id": "en-long-strategy",
+  "hypothesisSummary": {
+    "synthese": "Strategy session prioritizing EU compliance.",
+    "decisions": [
+      "Prioritize EU compliance before US launch"
+    ],
+    "actions": [
+      {
+        "titre": "Draft updated privacy policy",
+        "description": null,
+        "responsable": "legal team",
+        "echeance": "end of week"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

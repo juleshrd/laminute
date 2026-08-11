@@ -1,0 +1,40 @@
+{
+  "id": "multi-participants",
+  "tags": [
+    "multi",
+    "fr"
+  ],
+  "transcription": "Paul : je propose qu'on lance le pilote. Léa : d'accord si on limite à dix utilisateurs. Marc : je m'occupe du suivi client.",
+  "gold": {
+    "synthese": "Accord pour un pilote limité à dix utilisateurs.",
+    "decisions": [
+      "Lancer le pilote limité à dix utilisateurs"
+    ],
+    "actions": [
+      {
+        "titre": "Assurer le suivi client",
+        "description": null,
+        "responsable": "Marc",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Accord pour un pilote limité à dix utilisateurs.",
+    "decisions": [
+      "Lancer le pilote limité à dix utilisateurs"
+    ],
+    "actions": [
+      {
+        "titre": "Assurer le suivi client",
+        "description": null,
+        "responsable": "Marc",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

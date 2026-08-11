@@ -1,0 +1,23 @@
+{
+  "id": "long-fr-product-review",
+  "hypothesisSummary": {
+    "synthese": "Revue produit approfondie avec report de la V3.",
+    "decisions": [
+      "Reporter la V3 au trimestre prochain"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer le document de spécifications",
+        "description": null,
+        "responsable": "Thomas",
+        "echeance": "fin du mois"
+      }
+    ],
+    "risques": [
+      "Dette technique sur le module d'export"
+    ],
+    "questionsOuvertes": [
+      "Faut-il externaliser la transcription ?"
+    ]
+  }
+}

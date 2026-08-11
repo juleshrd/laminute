@@ -1,0 +1,19 @@
+{
+  "id": "bilingual-fr-en",
+  "hypothesisSummary": {
+    "synthese": "Réunion bilingue : conservation de la doc API en anglais.",
+    "decisions": [
+      "Keep the English docs for the API"
+    ],
+    "actions": [
+      {
+        "titre": "Update the README",
+        "description": null,
+        "responsable": "Sophie",
+        "echeance": "next Monday"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

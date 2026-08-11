@@ -1,0 +1,42 @@
+{
+  "id": "bilingual-fr-en",
+  "tags": [
+    "bilingual",
+    "fr",
+    "en",
+    "multi"
+  ],
+  "transcription": "On commence en français. Decision: we keep the English docs for the API. Sophie will update the README by next Monday.",
+  "gold": {
+    "synthese": "Réunion bilingue : conservation de la doc API en anglais.",
+    "decisions": [
+      "Keep the English docs for the API"
+    ],
+    "actions": [
+      {
+        "titre": "Update the README",
+        "description": null,
+        "responsable": "Sophie",
+        "echeance": "next Monday"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Réunion bilingue : conservation de la doc API en anglais.",
+    "decisions": [
+      "Keep the English docs for the API"
+    ],
+    "actions": [
+      {
+        "titre": "Update the README",
+        "description": null,
+        "responsable": "Sophie",
+        "echeance": "next Monday"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

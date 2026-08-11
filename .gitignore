@@ -13,6 +13,10 @@ dist-ssr
 *.local
 src-tauri/target
 
+# Rapports d'eval générés à l'exécution (baseline versionnée conservée)
+reports/eval/latest.json
+reports/eval/latest.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

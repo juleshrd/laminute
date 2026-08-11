@@ -1,0 +1,36 @@
+{
+  "id": "noise-en-standup",
+  "tags": [
+    "noise",
+    "en"
+  ],
+  "transcription": "Um... yeah so... like... we need to ship the patch... uh... today. Mike owns it.",
+  "gold": {
+    "synthese": "Patch to ship today, owned by Mike.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Ship the patch",
+        "description": null,
+        "responsable": "Mike",
+        "echeance": "today"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Patch to ship today, owned by Mike.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Ship the patch",
+        "description": null,
+        "responsable": "Mike",
+        "echeance": "today"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

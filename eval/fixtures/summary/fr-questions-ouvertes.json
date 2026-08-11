@@ -1,0 +1,13 @@
+{
+  "id": "fr-questions-ouvertes",
+  "hypothesisSummary": {
+    "synthese": "Sujets de facturation et logistique restent ouverts.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": [
+      "Quel modèle de facturation ?",
+      "Quel partenaire logistique ?"
+    ]
+  }
+}

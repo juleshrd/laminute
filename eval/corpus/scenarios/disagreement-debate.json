@@ -1,0 +1,27 @@
+{
+  "id": "disagreement-debate",
+  "tags": [
+    "disagreement",
+    "fr",
+    "multi"
+  ],
+  "transcription": "Débat sur le pricing. Ahmed veut baisser les tarifs, Claire s'y oppose. Pas de décision finale. On reprend le sujet mardi.",
+  "gold": {
+    "synthese": "Désaccord sur le pricing, report à mardi.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": [
+      "Quel pricing adopter ?"
+    ]
+  },
+  "hypothesisSummary": {
+    "synthese": "Désaccord sur le pricing, report à mardi.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": [
+      "Quel pricing adopter ?"
+    ]
+  }
+}

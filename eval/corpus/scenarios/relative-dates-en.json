@@ -1,0 +1,40 @@
+{
+  "id": "relative-dates-en",
+  "tags": [
+    "relative_dates",
+    "en"
+  ],
+  "transcription": "We agreed to revisit pricing next week. Sarah sends the competitive analysis by Friday afternoon.",
+  "gold": {
+    "synthese": "Pricing revisit next week; competitive analysis due Friday.",
+    "decisions": [
+      "Revisit pricing next week"
+    ],
+    "actions": [
+      {
+        "titre": "Send competitive analysis",
+        "description": null,
+        "responsable": "Sarah",
+        "echeance": "Friday afternoon"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Pricing revisit next week; competitive analysis due Friday.",
+    "decisions": [
+      "Revisit pricing next week"
+    ],
+    "actions": [
+      {
+        "titre": "Send competitive analysis",
+        "description": null,
+        "responsable": "Sarah",
+        "echeance": "Friday afternoon"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "multi-en-fr-noise",
+  "hypothesisSummary": {
+    "synthese": "Scope minimal, release notes et tests lundi.",
+    "decisions": [
+      "Garder le scope minimal"
+    ],
+    "actions": [
+      {
+        "titre": "Write the release notes",
+        "description": null,
+        "responsable": "Peter",
+        "echeance": null
+      },
+      {
+        "titre": "Tester",
+        "description": null,
+        "responsable": null,
+        "echeance": "lundi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

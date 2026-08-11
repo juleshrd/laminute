@@ -1,0 +1,29 @@
+{
+  "id": "fr-actions-multiples",
+  "hypothesisSummary": {
+    "synthese": "Trois actions opérationnelles assignées.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Mettre à jour le tableau de bord",
+        "description": null,
+        "responsable": "Nina",
+        "echeance": null
+      },
+      {
+        "titre": "Corriger les exports PDF",
+        "description": null,
+        "responsable": "Hugo",
+        "echeance": null
+      },
+      {
+        "titre": "Relancer la campagne de tests",
+        "description": null,
+        "responsable": "équipe QA",
+        "echeance": "jeudi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

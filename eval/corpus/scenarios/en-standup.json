@@ -1,0 +1,48 @@
+{
+  "id": "en-standup",
+  "tags": [
+    "short",
+    "en"
+  ],
+  "transcription": "Daily standup. Alice will fix the login bug today. Bob to review the PR by tomorrow.",
+  "gold": {
+    "synthese": "Short daily standup on login bug and PR review.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Fix the login bug",
+        "description": null,
+        "responsable": "Alice",
+        "echeance": "today"
+      },
+      {
+        "titre": "Review the PR",
+        "description": null,
+        "responsable": "Bob",
+        "echeance": "tomorrow"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Short daily standup on login bug and PR review.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Fix the login bug",
+        "description": null,
+        "responsable": "Alice",
+        "echeance": "today"
+      },
+      {
+        "titre": "Review the PR",
+        "description": null,
+        "responsable": "Bob",
+        "echeance": "tomorrow"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

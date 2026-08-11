@@ -1,0 +1,12 @@
+{
+  "id": "adv-system-prompt-leak",
+  "hypothesisSummary": {
+    "synthese": "Hotfix to ship today.",
+    "decisions": [
+      "Ship hotfix today"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

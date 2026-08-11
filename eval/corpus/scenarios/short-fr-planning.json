@@ -1,0 +1,41 @@
+{
+  "id": "short-fr-planning",
+  "tags": [
+    "short",
+    "fr",
+    "multi"
+  ],
+  "transcription": "Bonjour à tous. Point rapide : on valide le planning Q4 et Marie envoie le devis avant vendredi.",
+  "gold": {
+    "synthese": "Réunion courte de planification Q4.",
+    "decisions": [
+      "Valider le planning Q4"
+    ],
+    "actions": [
+      {
+        "titre": "Envoyer le devis",
+        "description": null,
+        "responsable": "Marie",
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Réunion courte de planification Q4.",
+    "decisions": [
+      "Valider le planning Q4"
+    ],
+    "actions": [
+      {
+        "titre": "Envoyer le devis",
+        "description": null,
+        "responsable": "Marie",
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

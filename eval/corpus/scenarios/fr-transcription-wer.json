@@ -1,0 +1,27 @@
+{
+  "id": "fr-transcription-wer",
+  "tags": [
+    "fr",
+    "short"
+  ],
+  "transcription": "Bonjour, nous validons le contrat avec Dufour avant vendredi.",
+  "gold": {
+    "synthese": "Validation du contrat Dufour avant vendredi.",
+    "decisions": [
+      "Valider le contrat avec Dufour avant vendredi"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "transcriptionHypothesis": "Bonjour nous validons le contrat avec Dufour avant vendredi",
+  "hypothesisSummary": {
+    "synthese": "Validation du contrat Dufour avant vendredi.",
+    "decisions": [
+      "Valider le contrat avec Dufour avant vendredi"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "noise-hesitations",
+  "tags": [
+    "noise",
+    "fr"
+  ],
+  "transcription": "Euh... bon alors... on va dire que... euh... on valide le budget formation. Voilà. Euh Julie contacte le prestataire.",
+  "gold": {
+    "synthese": "Validation du budget formation malgré hésitations dans la transcription.",
+    "decisions": [
+      "Valider le budget formation"
+    ],
+    "actions": [
+      {
+        "titre": "Contacter le prestataire",
+        "description": null,
+        "responsable": "Julie",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Validation du budget formation malgré hésitations dans la transcription.",
+    "decisions": [
+      "Valider le budget formation"
+    ],
+    "actions": [
+      {
+        "titre": "Contacter le prestataire",
+        "description": null,
+        "responsable": "Julie",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

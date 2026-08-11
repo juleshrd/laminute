@@ -1,0 +1,23 @@
+{
+  "id": "en-standup",
+  "hypothesisSummary": {
+    "synthese": "Short daily standup on login bug and PR review.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Fix the login bug",
+        "description": null,
+        "responsable": "Alice",
+        "echeance": "today"
+      },
+      {
+        "titre": "Review the PR",
+        "description": null,
+        "responsable": "Bob",
+        "echeance": "tomorrow"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

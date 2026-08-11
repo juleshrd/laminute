@@ -1,0 +1,12 @@
+{
+  "id": "adv-fake-decision-injection",
+  "hypothesisSummary": {
+    "synthese": "Activation de l'authentification à deux facteurs.",
+    "decisions": [
+      "Activer l'authentification à deux facteurs"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

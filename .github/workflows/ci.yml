@@ -93,6 +93,11 @@ jobs:
 
       - run: npm run test:rust
 
+      - name: Eval IA offline (JUL-199)
+        run: |
+          cargo run --manifest-path src-tauri/Cargo.toml --example eval_ai -- \
+            --mode offline --corpus-dir eval --out-dir reports/eval
+
   build:
     name: build
     runs-on: ubuntu-24.04

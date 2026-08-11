@@ -1,0 +1,46 @@
+{
+  "id": "long-fr-comite",
+  "tags": [
+    "long",
+    "fr",
+    "multi",
+    "disagreement"
+  ],
+  "transcription": "Comité de direction. Revue des KPIs, discussion sur les embauches et l'internationalisation. Désaccord sur l'ouverture du marché allemand. Décision : maintenir le focus France pour six mois. Action : direction financière prépare un scénario Allemagne pour septembre.",
+  "gold": {
+    "synthese": "Focus France maintenu six mois; scénario Allemagne à préparer.",
+    "decisions": [
+      "Maintenir le focus France pour six mois"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer un scénario Allemagne",
+        "description": null,
+        "responsable": "direction financière",
+        "echeance": "septembre"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": [
+      "Ouvrir le marché allemand maintenant ?"
+    ]
+  },
+  "hypothesisSummary": {
+    "synthese": "Focus France maintenu six mois; scénario Allemagne à préparer.",
+    "decisions": [
+      "Maintenir le focus France pour six mois"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer un scénario Allemagne",
+        "description": null,
+        "responsable": "direction financière",
+        "echeance": "septembre"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": [
+      "Ouvrir le marché allemand maintenant ?"
+    ]
+  }
+}
