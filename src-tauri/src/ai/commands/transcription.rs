@@ -777,4 +777,33 @@ mod tests {
         assert_eq!(inner.terminal_count, 1);
         assert_eq!(inner.latest_job_id.as_deref(), Some("u3"));
     }
+
+    #[test]
+    fn evicts_terminal_transcription_entries_under_synthetic_load_10k() {
+        TEST_NOW_MS.store(0, Ordering::SeqCst);
+        let cap = 1000;
+        let state = TranscriptionState::new_with_limits(test_now_ms, u64::MAX / 2, cap);
+
+        for i in 0..10_000 {
+            state.store_progress(TranscriptionProgress {
+                job_id: format!("t-{i}"),
+                phase: TranscriptionPhase::Completed,
+                message: "ok".into(),
+                meeting_id: Some(format!("m-{i}")),
+            });
+        }
+
+        let inner = state.inner.lock().expect("lock");
+        assert!(
+            inner.terminal_count <= cap,
+            "terminal_count = {}",
+            inner.terminal_count
+        );
+        assert!(
+            inner.progress_by_job.len() <= cap,
+            "progress_by_job len = {}",
+            inner.progress_by_job.len()
+        );
+        assert_eq!(inner.latest_job_id.as_deref(), Some("t-9999"));
+    }
 }

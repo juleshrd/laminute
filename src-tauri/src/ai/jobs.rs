@@ -531,4 +531,35 @@ mod tests {
 
         drop(running_guard);
     }
+
+    #[test]
+    fn evicts_terminal_jobs_under_synthetic_load_10k() {
+        TEST_NOW_MS.store(0, Ordering::SeqCst);
+        let cap = 1000;
+        let state = AiJobState::new_with_limits(test_now_ms, u64::MAX / 2, cap);
+
+        for i in 0..10_000 {
+            let job_id = format!("job-{i}");
+            let guard = state
+                .begin(
+                    job_id,
+                    AiJobKind::Summary,
+                    meeting_job_key(&format!("meeting-{i}")),
+                )
+                .expect("begin");
+            guard.finish_completed();
+        }
+
+        let registry = state.registry.lock().expect("lock");
+        assert!(
+            registry.terminal_count <= cap,
+            "terminal_count = {}",
+            registry.terminal_count
+        );
+        assert!(
+            registry.jobs.len() <= cap,
+            "jobs len = {}",
+            registry.jobs.len()
+        );
+    }
 }
