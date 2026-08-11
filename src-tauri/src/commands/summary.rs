@@ -58,7 +58,7 @@ pub async fn generate_structured_summary(
 ) -> Result<GenerateStructuredSummaryOutput, String> {
     generate_structured_summary_inner(&app, &db_state, &ai_state, &jobs, &gate, input)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| crate::diagnostics::capture_app_error(&e, "summary"))
 }
 
 async fn generate_structured_summary_inner(

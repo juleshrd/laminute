@@ -15,6 +15,10 @@ Nous accuserons réception dès que possible et travaillerons à un correctif av
 
 La Minute est une application desktop locale (Tauri). Les clés API BYOK sont stockées dans le trousseau du système. Les réunions et fichiers audio restent sur la machine de l’utilisateur, sauf envoi volontaire vers le fournisseur IA choisi (transcription / compte-rendu).
 
+## Journaux et support
+
+Les journaux locaux sous `logs/` et le bundle de support volontaire (Réglages → Diagnostic) sont conçus pour le dépannage **sans** y inclure de secrets ni de contenu de réunion. Les messages sont expurgés (clés API, jetons Bearer, chemins utilisateur sensibles, corps de transcription). Signalez toute fuite observée dans ces artefacts comme une vulnérabilité de confidentialité.
+
 ## Mises à jour
 
 Les artefacts d’auto-update sont signés Minisign. Vérifiez toujours que vous téléchargez depuis les [releases officielles](https://github.com/juleshrd/laminute/releases).

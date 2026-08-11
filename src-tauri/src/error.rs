@@ -14,12 +14,34 @@ pub enum AppError {
     Message(String),
 }
 
+impl AppError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Database(_) => "db_error",
+            Self::Migration(_) => "migration_error",
+            Self::Io(_) => "io_error",
+            Self::MeetingNotFound { .. } => "meeting_not_found",
+            Self::Message(_) => "message",
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct AppErrorPayload {
+    pub code: String,
+    pub message: String,
+}
+
 impl serde::Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.to_string().as_ref())
+        AppErrorPayload {
+            code: self.code().to_string(),
+            message: self.to_string(),
+        }
+        .serialize(serializer)
     }
 }
 

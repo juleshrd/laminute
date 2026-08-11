@@ -29,3 +29,33 @@ pub enum AiError {
     #[error("{0}")]
     Other(String),
 }
+
+impl AiError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::UnknownProvider(_) => "unknown_provider",
+            Self::NotImplemented(_) => "not_implemented",
+            Self::Network(_) => "network_error",
+            Self::Provider { .. } => "provider_error",
+            Self::Secret(_) => "secret_error",
+            Self::Settings(_) => "settings_error",
+            Self::Cancelled => "cancelled",
+            Self::Other(_) => "other",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_error_codes_are_stable() {
+        assert_eq!(AiError::Cancelled.code(), "cancelled");
+        assert_eq!(AiError::Other("x".into()).code(), "other");
+        assert_eq!(
+            AiError::UnknownProvider("x".into()).code(),
+            "unknown_provider"
+        );
+    }
+}

@@ -2213,3 +2213,72 @@ textarea:focus-visible,
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+.error-boundary {
+  max-width: 36rem;
+  margin: 4rem auto;
+  padding: 1.5rem;
+}
+
+.error-boundary__detail {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--lm-line);
+  border-radius: 0.4rem;
+  background: var(--lm-wash);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-panel__header p {
+  margin: 0.25rem 0 0;
+  color: var(--lm-muted);
+  font-size: 0.9rem;
+}
+
+.diagnostics-panel__grid {
+  margin-top: 1rem;
+}
+
+.diagnostics-panel__errors {
+  margin-top: 1rem;
+}
+
+.diagnostics-panel__errors ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.diagnostics-panel__actions {
+  margin-top: 1rem;
+}
+
+.diagnostics-panel__preview {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.diagnostics-panel__files {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.diagnostics-panel__preview-text {
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--lm-line);
+  border-radius: 0.4rem;
+  background: var(--lm-wash);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-panel__status {
+  margin: 0.75rem 0 0;
+  color: #027a48;
+  font-size: 0.9rem;
+}
