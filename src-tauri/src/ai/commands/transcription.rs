@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
@@ -25,7 +26,16 @@ use crate::AiAppState;
 
 const DEFAULT_PROVIDER_ID: &str = "mistral";
 const TRANSCRIPTION_PROGRESS_EVENT: &str = "transcription-progress";
+const DEFAULT_FINISHED_LRU_CAP: usize = 1000;
+// 10 minutes. Compatible avec l'objectif : garder un historique court côté RAM.
+const DEFAULT_FINISHED_TTL_MS: u64 = 10 * 60 * 1000;
 
+fn system_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TranscriptionPhase {
@@ -66,28 +76,124 @@ pub struct TranscribeAudioOutput {
 }
 
 pub struct TranscriptionState {
-    pub progress_by_job: Mutex<HashMap<String, TranscriptionProgress>>,
-    pub latest_job_id: Mutex<Option<String>>,
+    inner: Mutex<TranscriptionStateInner>,
+}
+
+struct TranscriptionProgressRecord {
+    progress: TranscriptionProgress,
+    finished_at_ms: Option<u64>,
+}
+
+struct TranscriptionStateInner {
+    progress_by_job: HashMap<String, TranscriptionProgressRecord>,
+    latest_job_id: Option<String>,
+    terminal_queue: VecDeque<String>,
+    terminal_count: usize,
+    finished_lru_cap: usize,
+    finished_ttl_ms: u64,
+    now_ms_fn: fn() -> u64,
+
+    #[cfg(test)]
+    evicted_lru_count: usize,
+    #[cfg(test)]
+    evicted_ttl_count: usize,
 }
 
 impl TranscriptionState {
     pub fn new() -> Self {
         Self {
-            progress_by_job: Mutex::new(HashMap::new()),
-            latest_job_id: Mutex::new(None),
+            inner: Mutex::new(TranscriptionStateInner {
+                progress_by_job: HashMap::new(),
+                latest_job_id: None,
+                terminal_queue: VecDeque::new(),
+                terminal_count: 0,
+                finished_lru_cap: DEFAULT_FINISHED_LRU_CAP,
+                finished_ttl_ms: DEFAULT_FINISHED_TTL_MS,
+                now_ms_fn: system_now_ms,
+                #[cfg(test)]
+                evicted_lru_count: 0,
+                #[cfg(test)]
+                evicted_ttl_count: 0,
+            }),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_limits(
+        now_ms_fn: fn() -> u64,
+        finished_ttl_ms: u64,
+        finished_lru_cap: usize,
+    ) -> Self {
+        Self {
+            inner: Mutex::new(TranscriptionStateInner {
+                progress_by_job: HashMap::new(),
+                latest_job_id: None,
+                terminal_queue: VecDeque::new(),
+                terminal_count: 0,
+                finished_lru_cap,
+                finished_ttl_ms,
+                now_ms_fn,
+                #[cfg(test)]
+                evicted_lru_count: 0,
+                #[cfg(test)]
+                evicted_ttl_count: 0,
+            }),
         }
     }
 
     pub fn reset(&self) -> Result<(), String> {
-        self.progress_by_job
+        let mut inner = self
+            .inner
             .lock()
-            .map_err(|_| "verrou transcription indisponible".to_string())?
-            .clear();
-        *self
-            .latest_job_id
-            .lock()
-            .map_err(|_| "verrou transcription indisponible".to_string())? = None;
+            .map_err(|_| "verrou transcription indisponible".to_string())?;
+        inner.progress_by_job.clear();
+        inner.latest_job_id = None;
+        inner.terminal_queue.clear();
+        inner.terminal_count = 0;
         Ok(())
+    }
+
+    fn is_terminal_phase(phase: &TranscriptionPhase) -> bool {
+        matches!(phase, TranscriptionPhase::Completed | TranscriptionPhase::Failed)
+    }
+
+    fn store_progress(&self, progress: TranscriptionProgress) {
+        if let Ok(mut inner) = self.inner.lock() {
+            let job_id = progress.job_id.clone();
+            let now = (inner.now_ms_fn)();
+
+            if let Some(existing) = inner.progress_by_job.get_mut(&job_id) {
+                existing.progress = progress.clone();
+                if Self::is_terminal_phase(&progress.phase) && existing.finished_at_ms.is_none() {
+                    existing.finished_at_ms = Some(now);
+                    inner.terminal_queue.push_back(job_id.clone());
+                    inner.terminal_count += 1;
+                }
+            } else {
+                let finished_at_ms = if Self::is_terminal_phase(&progress.phase) {
+                    Some(now)
+                } else {
+                    None
+                };
+                inner.progress_by_job.insert(
+                    job_id.clone(),
+                    TranscriptionProgressRecord {
+                        progress: progress.clone(),
+                        finished_at_ms,
+                    },
+                );
+                if finished_at_ms.is_some() {
+                    inner.terminal_queue.push_back(job_id.clone());
+                    inner.terminal_count += 1;
+                }
+            }
+
+            inner.latest_job_id = Some(job_id);
+
+            if Self::is_terminal_phase(&progress.phase) {
+                inner.evict_if_needed_locked();
+            }
+        }
     }
 }
 
@@ -96,6 +202,7 @@ impl Default for TranscriptionState {
         Self::new()
     }
 }
+
 
 fn emit_progress(
     app: &AppHandle,
@@ -106,12 +213,7 @@ fn emit_progress(
     if let Some(db_state) = db_state {
         persist_job_phase(db_state, &progress.job_id, &progress.phase);
     }
-    if let Ok(mut by_job) = transcription_state.progress_by_job.lock() {
-        by_job.insert(progress.job_id.clone(), progress.clone());
-    }
-    if let Ok(mut latest_job_id) = transcription_state.latest_job_id.lock() {
-        *latest_job_id = Some(progress.job_id.clone());
-    }
+    transcription_state.store_progress(progress.clone());
     let _ = app.emit(TRANSCRIPTION_PROGRESS_EVENT, &progress);
 }
 
@@ -161,23 +263,78 @@ fn get_transcription_progress_for_job(
     state: &TranscriptionState,
     job_id: Option<String>,
 ) -> Result<Option<TranscriptionProgress>, String> {
-    let progress_by_job = state
-        .progress_by_job
+    let inner = state
+        .inner
         .lock()
         .map_err(|_| "verrou transcription indisponible".to_string())?;
 
     if let Some(job_id) = job_id {
-        return Ok(progress_by_job.get(&job_id).cloned());
+        return Ok(inner
+            .progress_by_job
+            .get(&job_id)
+            .map(|r| r.progress.clone()));
     }
 
-    let latest_job_id = state
+    Ok(inner
         .latest_job_id
-        .lock()
-        .map_err(|_| "verrou transcription indisponible".to_string())?;
-    Ok(latest_job_id
         .as_deref()
-        .and_then(|id| progress_by_job.get(id))
-        .cloned())
+        .and_then(|id| inner.progress_by_job.get(id))
+        .map(|r| r.progress.clone()))
+}
+
+impl TranscriptionStateInner {
+    fn evict_if_needed_locked(&mut self) {
+        let now = (self.now_ms_fn)();
+
+        // 1) TTL : suppression des entrées terminales trop anciennes.
+        while let Some(front_job_id) = self.terminal_queue.front().cloned() {
+            let finished_at_ms = self
+                .progress_by_job
+                .get(&front_job_id)
+                .and_then(|r| r.finished_at_ms);
+
+            match finished_at_ms {
+                None => {
+                    self.terminal_queue.pop_front();
+                }
+                Some(at_ms) => {
+                    if now.saturating_sub(at_ms) > self.finished_ttl_ms {
+                        self.terminal_queue.pop_front();
+                        if self.progress_by_job.remove(&front_job_id).is_some() {
+                            self.terminal_count = self.terminal_count.saturating_sub(1);
+                            #[cfg(test)]
+                            {
+                                self.evicted_ttl_count += 1;
+                            }
+                        }
+                        if self.latest_job_id.as_deref() == Some(&front_job_id) {
+                            self.latest_job_id = None;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 2) LRU plafonné : suppression des plus anciens terminés.
+        while self.terminal_count > self.finished_lru_cap {
+            let Some(front_job_id) = self.terminal_queue.pop_front() else {
+                break;
+            };
+            let removed = self.progress_by_job.remove(&front_job_id);
+            if removed.is_some() {
+                self.terminal_count = self.terminal_count.saturating_sub(1);
+                #[cfg(test)]
+                {
+                    self.evicted_lru_count += 1;
+                }
+                if self.latest_job_id.as_deref() == Some(&front_job_id) {
+                    self.latest_job_id = None;
+                }
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -582,6 +739,13 @@ pub async fn transcribe_audio_file(
 mod tests {
     use super::*;
     use crate::db::open_in_memory;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_NOW_MS: AtomicU64 = AtomicU64::new(0);
+
+    fn test_now_ms() -> u64 {
+        TEST_NOW_MS.load(Ordering::SeqCst)
+    }
 
     #[test]
     fn default_progress_is_idle() {
@@ -626,5 +790,100 @@ mod tests {
         let detail = MeetingRepository::get_detail(&conn, &meeting.id).expect("detail");
         assert_eq!(detail.transcriptions.len(), 1);
         assert_eq!(detail.audio_files.len(), 1);
+    }
+
+    #[test]
+    fn evicts_terminal_transcription_entries_lru_bounded() {
+        TEST_NOW_MS.store(0, Ordering::SeqCst);
+        let state = TranscriptionState::new_with_limits(test_now_ms, u64::MAX / 2, 2);
+
+        state.store_progress(TranscriptionProgress {
+            job_id: "t1".into(),
+            phase: TranscriptionPhase::Completed,
+            message: "ok".into(),
+            meeting_id: Some("m1".into()),
+        });
+        state.store_progress(TranscriptionProgress {
+            job_id: "t2".into(),
+            phase: TranscriptionPhase::Completed,
+            message: "ok".into(),
+            meeting_id: Some("m2".into()),
+        });
+        state.store_progress(TranscriptionProgress {
+            job_id: "t3".into(),
+            phase: TranscriptionPhase::Completed,
+            message: "ok".into(),
+            meeting_id: Some("m3".into()),
+        });
+
+        let inner = state.inner.lock().expect("lock");
+        assert!(inner.progress_by_job.contains_key("t2"));
+        assert!(inner.progress_by_job.contains_key("t3"));
+        assert!(!inner.progress_by_job.contains_key("t1"));
+        assert_eq!(inner.latest_job_id.as_deref(), Some("t3"));
+        assert!(inner.terminal_count <= 2);
+    }
+
+    #[test]
+    fn evicts_terminal_transcription_entries_ttl_expired() {
+        TEST_NOW_MS.store(0, Ordering::SeqCst);
+        let state = TranscriptionState::new_with_limits(test_now_ms, 1000, 1000);
+
+        state.store_progress(TranscriptionProgress {
+            job_id: "u1".into(),
+            phase: TranscriptionPhase::Failed,
+            message: "failed".into(),
+            meeting_id: None,
+        });
+        state.store_progress(TranscriptionProgress {
+            job_id: "u2".into(),
+            phase: TranscriptionPhase::Failed,
+            message: "failed".into(),
+            meeting_id: None,
+        });
+
+        TEST_NOW_MS.store(2000, Ordering::SeqCst);
+        state.store_progress(TranscriptionProgress {
+            job_id: "u3".into(),
+            phase: TranscriptionPhase::Completed,
+            message: "ok".into(),
+            meeting_id: None,
+        });
+
+        let inner = state.inner.lock().expect("lock");
+        assert!(inner.progress_by_job.contains_key("u3"));
+        assert!(!inner.progress_by_job.contains_key("u1"));
+        assert!(!inner.progress_by_job.contains_key("u2"));
+        assert_eq!(inner.terminal_count, 1);
+        assert_eq!(inner.latest_job_id.as_deref(), Some("u3"));
+    }
+
+    #[test]
+    fn evicts_terminal_transcription_entries_under_synthetic_load_10k() {
+        TEST_NOW_MS.store(0, Ordering::SeqCst);
+        let cap = 1000;
+        let state = TranscriptionState::new_with_limits(test_now_ms, u64::MAX / 2, cap);
+
+        for i in 0..10_000 {
+            state.store_progress(TranscriptionProgress {
+                job_id: format!("t-{i}"),
+                phase: TranscriptionPhase::Completed,
+                message: "ok".into(),
+                meeting_id: Some(format!("m-{i}")),
+            });
+        }
+
+        let inner = state.inner.lock().expect("lock");
+        assert!(
+            inner.terminal_count <= cap,
+            "terminal_count = {}",
+            inner.terminal_count
+        );
+        assert!(
+            inner.progress_by_job.len() <= cap,
+            "progress_by_job len = {}",
+            inner.progress_by_job.len()
+        );
+        assert_eq!(inner.latest_job_id.as_deref(), Some("t-9999"));
     }
 }
