@@ -12,7 +12,7 @@ use crate::ai::models::{
     TranscriptionResult,
 };
 use crate::ai::provider::AiProvider;
-use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
+use crate::ai::structured_summary;
 use crate::ai::summary::SummaryProvider;
 use crate::ai::transcription::TranscriptionProvider;
 
@@ -290,16 +290,17 @@ impl SummaryProvider for MistralProvider {
                 .to_string()
         });
 
+        let prompt_mode = options.prompt_mode;
         let request = ChatCompletionRequest {
             model: model.clone(),
             messages: vec![
                 ChatMessage {
                     role: "system".to_string(),
-                    content: SYSTEM_PROMPT.to_string(),
+                    content: structured_summary::system_prompt_for(prompt_mode).to_string(),
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: structured_summary::build_user_prompt(text),
+                    content: structured_summary::build_user_prompt_for(prompt_mode, text),
                 },
             ],
             max_tokens: options.max_tokens,
@@ -570,6 +571,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &no_cancel(),
             )
@@ -603,6 +605,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &no_cancel(),
             )
@@ -641,6 +644,7 @@ mod tests {
                     SummaryOptions {
                         model: None,
                         max_tokens: None,
+                        ..Default::default()
                     },
                     &cancel_clone,
                 )

@@ -6,9 +6,10 @@ use crate::ai::error::AiError;
 use crate::ai::jobs::{meeting_job_key, summary_fallback_key, AiJobKind, AiJobState, AiJobStatus};
 use crate::ai::limits::validate_summary_input_text;
 use crate::ai::model_catalog;
-use crate::ai::models::SummaryOptions;
+use crate::ai::summary_pipeline::run_structured_summary;
+use crate::ai::token_pipeline::SummaryPipelineMeta;
 use crate::ai::secrets;
-use crate::ai::structured_summary::{self, StructuredSummary};
+use crate::ai::structured_summary::StructuredSummary;
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::local_activity::LocalActivityGate;
@@ -35,6 +36,8 @@ pub struct GenerateStructuredSummaryOutput {
     pub summary: Summary,
     pub structured: StructuredSummary,
     pub actions: Vec<Action>,
+    #[serde(default)]
+    pub meta: SummaryPipelineMeta,
 }
 
 #[derive(Debug)]
@@ -142,31 +145,30 @@ async fn generate_structured_summary_inner(
         .map_err(AppError::Message)?;
     gate.ensure_generation(activity)?;
 
-    let summary_result = ai_state
-        .registry
-        .summarize_text(
-            &provider_id,
-            &api_key,
-            &transcription_text,
-            SummaryOptions {
-                model,
-                max_tokens: Some(4096),
-            },
-            &cancel,
-        )
-        .await
-        .map_err(|err| {
-            if matches!(err, AiError::Cancelled) {
-                let _ = db_state.with_db(|conn| {
-                    AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled)
-                });
-            } else {
-                let _ = db_state.with_db(|conn| {
-                    AiJobRepository::update_status(conn, &job_id, AiJobStatus::Failed)
-                });
-            }
-            AppError::Message(err.to_string())
-        })?;
+    let summary_run = run_structured_summary(
+        &ai_state.registry,
+        &provider_id,
+        &api_key,
+        &transcription_text,
+        model,
+        &cancel,
+        Some(jobs),
+        Some(job.job_id()),
+        None,
+    )
+    .await
+    .map_err(|err| {
+        if matches!(err, AiError::Cancelled) {
+            let _ = db_state.with_db(|conn| {
+                AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled)
+            });
+        } else {
+            let _ = db_state.with_db(|conn| {
+                AiJobRepository::update_status(conn, &job_id, AiJobStatus::Failed)
+            });
+        }
+        AppError::Message(err.to_string())
+    })?;
 
     jobs.ensure_not_cancelled(job.job_id()).map_err(|err| {
         let _ = db_state
@@ -174,8 +176,8 @@ async fn generate_structured_summary_inner(
         AppError::Message(err)
     })?;
 
-    let structured = structured_summary::parse_structured_summary(&summary_result.text)
-        .map_err(|e| AppError::Message(e.to_string()))?;
+    let structured = summary_run.structured;
+    let pipeline_meta = summary_run.meta;
 
     gate.ensure_generation(activity)?;
 
@@ -224,6 +226,7 @@ async fn generate_structured_summary_inner(
         summary,
         structured,
         actions,
+        meta: pipeline_meta,
     })
 }
 
