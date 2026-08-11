@@ -60,6 +60,9 @@ describe("MeetingHistory", () => {
       if (command === "search_meetings") {
         return Promise.resolve(searchPage([meeting()]));
       }
+      if (command === "get_latest_summary" || command === "get_latest_transcription") {
+        return Promise.resolve(null);
+      }
       return Promise.resolve([]);
     });
   });
@@ -152,15 +155,18 @@ describe("MeetingHistory", () => {
         return Promise.resolve(searchPage([meeting()]));
       }
       if (command === "get_meeting") {
-        return Promise.resolve(
-          detail({
-            transcriptions: [
-              { id: "t-1", meetingId: "m-1", content: "Bonjour", createdAt: "", updatedAt: "" },
-            ],
-          }),
-        );
+        return Promise.resolve(detail());
       }
-      return Promise.resolve([]);
+      if (command === "get_latest_transcription") {
+        return Promise.resolve({
+          id: "t-1",
+          meetingId: "m-1",
+          content: "Bonjour",
+          createdAt: "",
+          updatedAt: "",
+        });
+      }
+      return Promise.resolve(null);
     });
 
     render(<MeetingHistory />);
@@ -173,8 +179,17 @@ describe("MeetingHistory", () => {
       expect(screen.getByText("‹ Historique")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Comité produit" })).toBeInTheDocument();
     });
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("get_latest_summary", { id: "m-1" }),
+    );
+    expect(invokeMock).not.toHaveBeenCalledWith("get_latest_transcription", { id: "m-1" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Audio" }));
+    expect(invokeMock).not.toHaveBeenCalledWith("get_latest_transcription", { id: "m-1" });
+
     fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
-    expect(screen.getByText("Bonjour")).toBeInTheDocument();
+    expect(await screen.findByText("Bonjour")).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("get_latest_transcription", { id: "m-1" });
   });
 
   it("charge la page suivante sans dupliquer les réunions déjà affichées", async () => {
@@ -213,6 +228,63 @@ describe("MeetingHistory", () => {
     });
     expect(await screen.findByRole("heading", { name: "Réunion 3" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
+  });
+
+  it("ignore un contenu d’onglet qui se résout après un changement d’onglet", async () => {
+    const summary = deferred<{
+      id: string;
+      meetingId: string;
+      content: string;
+      createdAt: string;
+      updatedAt: string;
+    } | null>();
+    const transcription = deferred<{
+      id: string;
+      meetingId: string;
+      content: string;
+      createdAt: string;
+      updatedAt: string;
+    } | null>();
+
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "search_meetings") return Promise.resolve(searchPage([meeting()]));
+      if (command === "get_meeting") return Promise.resolve(detail());
+      if (command === "get_latest_summary") return summary.promise;
+      if (command === "get_latest_transcription") return transcription.promise;
+      return Promise.resolve(null);
+    });
+
+    render(<MeetingHistory />);
+    await flushSearchDebounce();
+    fireEvent.click(screen.getByRole("button", { name: /Comité produit/ }));
+    expect(await screen.findByText("‹ Historique")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
+    await act(async () => {
+      transcription.resolve({
+        id: "tx-1",
+        meetingId: "m-1",
+        content: "Texte récent",
+        createdAt: "",
+        updatedAt: "",
+      });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText("Texte récent")).toBeInTheDocument();
+
+    await act(async () => {
+      summary.resolve({
+        id: "sum-1",
+        meetingId: "m-1",
+        content:
+          '{"synthese":"Résumé obsolète","decisions":[],"actions":[],"risques":[],"questionsOuvertes":[]}',
+        createdAt: "",
+        updatedAt: "",
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Texte récent")).toBeInTheDocument();
+    expect(screen.queryByText("Résumé obsolète")).not.toBeInTheDocument();
   });
 
   it("ignore une ancienne recherche qui se résout après la dernière intention", async () => {
@@ -278,7 +350,17 @@ describe("MeetingHistory", () => {
       if (command === "get_meeting") {
         return args?.id === "a" ? meetingA.promise : meetingB.promise;
       }
-      return Promise.resolve([]);
+      if (command === "get_latest_summary") return Promise.resolve(null);
+      if (command === "get_latest_transcription") {
+        return Promise.resolve({
+          id: `t-${args?.id}`,
+          meetingId: args?.id,
+          content: args?.id === "b" ? "Contenu B" : "Contenu A",
+          createdAt: "",
+          updatedAt: "",
+        });
+      }
+      return Promise.resolve(null);
     });
 
     render(<MeetingHistory />);
@@ -292,9 +374,6 @@ describe("MeetingHistory", () => {
         detail({
           id: "a",
           title: "Réunion A",
-          transcriptions: [
-            { id: "ta", meetingId: "a", content: "Contenu A", createdAt: "", updatedAt: "" },
-          ],
         }),
       );
       await Promise.resolve();
@@ -308,9 +387,6 @@ describe("MeetingHistory", () => {
         detail({
           id: "b",
           title: "Réunion B",
-          transcriptions: [
-            { id: "tb", meetingId: "b", content: "Contenu B", createdAt: "", updatedAt: "" },
-          ],
         }),
       );
       await Promise.resolve();
@@ -319,6 +395,6 @@ describe("MeetingHistory", () => {
     expect(await screen.findByRole("heading", { name: "Réunion B" })).toBeInTheDocument();
     expect(screen.queryByText("Contenu A")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Transcription" }));
-    expect(screen.getByText("Contenu B")).toBeInTheDocument();
+    expect(await screen.findByText("Contenu B")).toBeInTheDocument();
   });
 });

@@ -92,6 +92,17 @@ pub struct MeetingDetail {
     #[serde(flatten)]
     pub meeting: Meeting,
     pub audio_files: Vec<super::AudioFile>,
+    pub transcriptions: Vec<super::TranscriptionMetadata>,
+    pub summaries: Vec<super::SummaryMetadata>,
+    pub actions: Vec<super::Action>,
+}
+
+/// Full database representation used by exports and server-side workflows.
+/// It must never be returned by the meeting detail IPC command.
+#[derive(Debug, Clone)]
+pub struct MeetingFullDetail {
+    pub meeting: Meeting,
+    pub audio_files: Vec<super::AudioFile>,
     pub transcriptions: Vec<super::Transcription>,
     pub summaries: Vec<super::Summary>,
     pub actions: Vec<super::Action>,

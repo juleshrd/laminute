@@ -7,11 +7,11 @@ mod transcription;
 pub use action::{Action, ActionStatus};
 pub use audio::AudioFile;
 pub use meeting::{
-    CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem, MeetingSearchFilters,
-    MeetingSearchPage, MeetingStatus, MeetingSummary,
+    CreateMeetingInput, Meeting, MeetingDetail, MeetingFullDetail, MeetingListItem,
+    MeetingSearchFilters, MeetingSearchPage, MeetingStatus, MeetingSummary,
 };
-pub use summary::Summary;
-pub use transcription::Transcription;
+pub use summary::{Summary, SummaryMetadata};
+pub use transcription::{Transcription, TranscriptionMetadata};
 
 pub mod ai_provider;
 pub mod setting;
