@@ -25,7 +25,7 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "mul
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tokio-util = "0.7"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.33", features = ["bundled"] }
 refinery = { version = "0.8", features = ["rusqlite"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
