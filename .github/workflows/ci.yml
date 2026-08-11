@@ -190,6 +190,38 @@ jobs:
             exit 1
           fi
 
+  ram_budget:
+    name: ram_budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: ./.github/actions/install-tauri-deps
+
+      - name: Mesurer budgets RAM (processus natif)
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path src-tauri/Cargo.toml --example bench_ram -- --check --baseline reports/perf/baseline.json
+
+      - name: Publier mesures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ram-budget-latest
+          path: reports/perf/latest.json
+          if-no-files-found: warn
+
   audits:
     name: audits
     runs-on: ubuntu-24.04
@@ -227,6 +259,7 @@ jobs:
       - test_rust
       - build
       - size_budget
+      - ram_budget
       - audits
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -238,6 +271,7 @@ jobs:
           TEST_RUST: ${{ needs.test_rust.result }}
           BUILD: ${{ needs.build.result }}
           SIZE_BUDGET: ${{ needs.size_budget.result }}
+          RAM_BUDGET: ${{ needs.ram_budget.result }}
           AUDITS: ${{ needs.audits.result }}
         run: |
           set -euo pipefail
@@ -278,6 +312,7 @@ jobs:
           classify test_rust "$TEST_RUST"
           classify build "$BUILD"
           classify size_budget "$SIZE_BUDGET"
+          classify ram_budget "$RAM_BUDGET"
           classify audits "$AUDITS"
 
           {
