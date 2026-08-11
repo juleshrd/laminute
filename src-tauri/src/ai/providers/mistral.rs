@@ -249,6 +249,8 @@ struct ChatCompletionRequest {
     model: String,
     messages: Vec<ChatMessage>,
     max_tokens: Option<u32>,
+    /// JSON mode natif — les modèles Mistral legacy très anciens peuvent rejeter ce champ.
+    response_format: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -301,6 +303,7 @@ impl SummaryProvider for MistralProvider {
                 },
             ],
             max_tokens: options.max_tokens,
+            response_format: structured_summary::openai_style_json_response_format(),
         };
 
         let response = http::send_cancellable(
@@ -355,7 +358,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use std::time::Duration;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_partial_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn no_cancel() -> CancellationToken {
@@ -535,6 +538,45 @@ mod tests {
             .unwrap_err();
 
         assert!(error.to_string().contains("Limite de requêtes"));
+    }
+
+    #[tokio::test]
+    async fn summarize_sends_json_response_format() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({
+                "response_format": { "type": "json_object" }
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "model": "mistral-small-latest",
+                "choices": [{
+                    "message": {
+                        "content": "{\"synthese\":\"Résumé\",\"decisions\":[],\"actions\":[]}"
+                    }
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let provider = MistralProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
+        let result = provider
+            .summarize(
+                "sk-test",
+                "Texte de réunion",
+                SummaryOptions {
+                    model: None,
+                    max_tokens: None,
+                },
+                &no_cancel(),
+            )
+            .await
+            .expect("summary");
+
+        assert!(result.text.contains("synthese"));
     }
 
     #[tokio::test]
