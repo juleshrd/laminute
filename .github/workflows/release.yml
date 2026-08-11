@@ -379,9 +379,42 @@ jobs:
             release-meta/SHA256SUMS.txt
             release-meta/sbom-${{ matrix.platform }}.spdx.json
 
+  bundle_smoke:
+    name: bundle_smoke
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-24.04
+          - platform: macos-latest
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Smoke E2E natif post-bundle (garde release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path src-tauri/Cargo.toml --example e2e_smoke
+
   publish-meta:
     name: publish-meta
-    needs: build
+    needs:
+      - build
+      - bundle_smoke
     environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 15

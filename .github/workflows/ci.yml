@@ -250,6 +250,30 @@ jobs:
       - name: npm audit (high severity)
         run: npm run audit:npm
 
+  e2e_smoke:
+    name: e2e_smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: ./.github/actions/install-tauri-deps
+
+      - name: Smoke E2E natif (JUL-204)
+        run: |
+          chmod +x e2e/smoke-linux.sh
+          npm run test:e2e
+
   summary:
     name: summary
     if: always()
@@ -260,6 +284,7 @@ jobs:
       - build
       - size_budget
       - ram_budget
+      - e2e_smoke
       - audits
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -272,6 +297,7 @@ jobs:
           BUILD: ${{ needs.build.result }}
           SIZE_BUDGET: ${{ needs.size_budget.result }}
           RAM_BUDGET: ${{ needs.ram_budget.result }}
+          E2E_SMOKE: ${{ needs.e2e_smoke.result }}
           AUDITS: ${{ needs.audits.result }}
         run: |
           set -euo pipefail
@@ -313,6 +339,7 @@ jobs:
           classify build "$BUILD"
           classify size_budget "$SIZE_BUDGET"
           classify ram_budget "$RAM_BUDGET"
+          classify e2e_smoke "$E2E_SMOKE"
           classify audits "$AUDITS"
 
           {

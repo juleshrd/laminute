@@ -52,6 +52,10 @@ name = "bench_ram"
 path = "examples/bench_ram.rs"
 
 [[example]]
+name = "e2e_smoke"
+path = "examples/e2e_smoke.rs"
+
+[[example]]
 name = "eval_ai"
 path = "examples/eval_ai.rs"
 
