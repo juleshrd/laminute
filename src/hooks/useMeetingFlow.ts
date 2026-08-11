@@ -6,7 +6,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { generateStructuredSummary, getAiSettings, listAiProviders } from "../lib/ai/api";
 import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../lib/ai/types";
 import { isAudioError, type AudioInputDevice, type RecordingStatus } from "../lib/audio";
-import { type MeetingDetail, updateMeetingTitle } from "../lib/meetings";
+import { type MeetingDetail, updateMeetingTitle, updateMeetingSpeakerMap } from "../lib/meetings";
+import type { SpeakerMap } from "../lib/speakerMap";
 import {
   type MeetingFlowPhase,
   defaultRecordingTitle,
@@ -51,6 +52,8 @@ export interface UseMeetingFlowResult {
   providerName: string;
   selectedProvider: ProviderInfo | null;
   pastedText: string;
+  speakerMap: SpeakerMap;
+  speakerMapBusy: boolean;
   isRecording: boolean;
   showReadyControls: boolean;
   progressMessage: string | null;
@@ -73,6 +76,7 @@ export interface UseMeetingFlowResult {
     meetingTitle?: string;
   }) => Promise<void>;
   runSummarizeFromText: () => Promise<void>;
+  handleSpeakerMapChange: (next: SpeakerMap) => void;
 }
 
 interface AudioInputSetup {
@@ -120,6 +124,9 @@ export function useMeetingFlow(): UseMeetingFlowResult {
   const [providerName, setProviderName] = useState("Mistral");
   const [selectedProvider, setSelectedProvider] = useState<ProviderInfo | null>(null);
   const [pastedText, setPastedText] = useState("");
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
+  const [speakerMap, setSpeakerMap] = useState<SpeakerMap>({});
+  const [speakerMapBusy, setSpeakerMapBusy] = useState(false);
   const activeTranscriptionJobIdRef = useRef<string | null>(null);
   const processingPromiseRef = useRef<Promise<void> | null>(null);
   const startingRecordingPromiseRef = useRef<Promise<void> | null>(null);
@@ -148,6 +155,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       const selected = providers.find((provider) => provider.id === settings.selectedProviderId);
       setSelectedProvider(selected ?? providers[0] ?? null);
       setProviderName(selected?.displayName ?? providers[0]?.displayName ?? "Mistral");
+      setTranscriptionLanguage(settings.transcriptionLanguage ?? "auto");
     } catch (err) {
       setError(formatMeetingError(err));
     }
@@ -273,6 +281,7 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       setTitle(detail.title);
       setTranscription(null);
       setSummary(null);
+      setSpeakerMap({});
       setFlowPhase("ready");
     } catch (err) {
       setError(formatMeetingError(err));
@@ -397,7 +406,8 @@ export function useMeetingFlow(): UseMeetingFlowResult {
               filePath: activeFilePath,
               meetingId: meetingId ?? undefined,
               meetingTitle: meetingId ? undefined : activeTitle.trim() || undefined,
-              language: "fr",
+              language:
+                transcriptionLanguage !== "auto" ? transcriptionLanguage : undefined,
               durationMs:
                 activeDurationSecs != null ? Math.round(activeDurationSecs * 1000) : undefined,
             });
@@ -460,7 +470,28 @@ export function useMeetingFlow(): UseMeetingFlowResult {
       selectedProvider?.capabilities.transcription,
       title,
       transcription,
+      transcriptionLanguage,
     ],
+  );
+
+  const handleSpeakerMapChange = useCallback(
+    (next: SpeakerMap) => {
+      setSpeakerMap(next);
+      const activeMeetingId = meetingId ?? transcription?.meetingId;
+      if (!activeMeetingId) {
+        return;
+      }
+      setSpeakerMapBusy(true);
+      void updateMeetingSpeakerMap(activeMeetingId, next)
+        .then((meeting) => {
+          if (meeting.speakerMap) {
+            setSpeakerMap(meeting.speakerMap);
+          }
+        })
+        .catch((err) => setError(formatMeetingError(err)))
+        .finally(() => setSpeakerMapBusy(false));
+    },
+    [meetingId, transcription?.meetingId],
   );
 
   const handleStopRecording = useCallback(async () => {
@@ -632,6 +663,8 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     providerName,
     selectedProvider,
     pastedText,
+    speakerMap,
+    speakerMapBusy,
     isRecording,
     showReadyControls,
     progressMessage,
@@ -650,5 +683,6 @@ export function useMeetingFlow(): UseMeetingFlowResult {
     persistTitleIfNeeded,
     runProcessing,
     runSummarizeFromText,
+    handleSpeakerMapChange,
   };
 }

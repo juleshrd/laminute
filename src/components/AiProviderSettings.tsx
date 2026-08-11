@@ -19,6 +19,7 @@ function applySettings(
   setOllamaBaseUrlState: (v: string) => void,
   setOllamaAllowRemote: (v: boolean) => void,
   setDiarizationEnabled: (v: boolean) => void,
+  setTranscriptionLanguage: (v: string) => void,
   setTranscriptionModel: (v: string) => void,
   setSummaryModel: (v: string) => void,
   setAiSettings: (s: AiSettings) => void,
@@ -28,6 +29,7 @@ function applySettings(
   setOllamaBaseUrlState(settings.ollamaBaseUrl ?? "http://127.0.0.1:11434");
   setOllamaAllowRemote(settings.ollamaAllowRemote);
   setDiarizationEnabled(settings.diarizationEnabled);
+  setTranscriptionLanguage(settings.transcriptionLanguage ?? "auto");
   setTranscriptionModel(settings.transcriptionModel ?? "");
   setSummaryModel(settings.summaryModel ?? "");
   setAiSettings(settings);
@@ -43,6 +45,7 @@ export function AiProviderSettings() {
   const [transcriptionModel, setTranscriptionModel] = useState("");
   const [summaryModel, setSummaryModel] = useState("");
   const [diarizationEnabled, setDiarizationEnabled] = useState(false);
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,7 @@ export function AiProviderSettings() {
         setOllamaBaseUrlState,
         setOllamaAllowRemote,
         setDiarizationEnabled,
+        setTranscriptionLanguage,
         setTranscriptionModel,
         setSummaryModel,
         setAiSettings,
@@ -100,6 +104,7 @@ export function AiProviderSettings() {
         setOllamaBaseUrlState,
         setOllamaAllowRemote,
         setDiarizationEnabled,
+        setTranscriptionLanguage,
         setTranscriptionModel,
         setSummaryModel,
         setAiSettings,
@@ -116,6 +121,7 @@ export function AiProviderSettings() {
     transcriptionModel?: string;
     summaryModel?: string;
     diarizationEnabled?: boolean;
+    transcriptionLanguage?: string;
   }) {
     if (!selectedProviderId) return;
     setBusy(true);
@@ -134,6 +140,7 @@ export function AiProviderSettings() {
         setOllamaBaseUrlState,
         setOllamaAllowRemote,
         setDiarizationEnabled,
+        setTranscriptionLanguage,
         setTranscriptionModel,
         setSummaryModel,
         setAiSettings,
@@ -220,6 +227,30 @@ export function AiProviderSettings() {
           showDelete
           idPrefix="settings"
         />
+      ) : null}
+
+      {hasTranscription && transcriptionModels.length > 0 ? (
+        <div className="ai-settings__field">
+          <label htmlFor="transcription-language-select">Langue de transcription</label>
+          <select
+            id="transcription-language-select"
+            value={transcriptionLanguage}
+            disabled={busy}
+            onChange={(event) => {
+              const next = event.target.value;
+              setTranscriptionLanguage(next);
+              void persistModelPrefs({ transcriptionLanguage: next });
+            }}
+          >
+            <option value="auto">Auto (détection)</option>
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
+          <p className="ai-settings__note" role="note">
+            En mode Auto, la langue est détectée par le fournisseur lorsqu&apos;il la renvoie.
+            Avec la diarisation Mistral/OpenAI, la langue n&apos;est en général pas forcée.
+          </p>
+        </div>
       ) : null}
 
       {hasTranscription && transcriptionModels.length > 0 ? (

@@ -13,6 +13,7 @@ pub mod providers;
 pub mod reconcile;
 pub mod registry;
 pub mod secrets;
+pub mod speaker;
 pub mod settings;
 pub mod structured_summary;
 pub mod summary;

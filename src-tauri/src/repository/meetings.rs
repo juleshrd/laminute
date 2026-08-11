@@ -1,6 +1,9 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
+use std::collections::HashMap;
 use uuid::Uuid;
+
+use crate::ai::models::TranscriptionSegment;
 
 use crate::audio::import::ImportedAudio;
 use crate::error::{AppError, AppResult};
@@ -43,7 +46,7 @@ impl MeetingRepository {
 
     pub fn get_by_id(conn: &Connection, id: &str) -> AppResult<Meeting> {
         conn.query_row(
-            "SELECT id, title, description, status, started_at, ended_at, created_at, updated_at
+            "SELECT id, title, description, status, started_at, ended_at, created_at, updated_at, speaker_map_json
              FROM meetings WHERE id = ?1",
             [id],
             map_meeting_row,
@@ -82,7 +85,7 @@ impl MeetingRepository {
     ) -> AppResult<Option<Transcription>> {
         Self::get_by_id(conn, meeting_id)?;
         conn.query_row(
-            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at
+            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, segments_json, created_at, updated_at
              FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at DESC, id DESC LIMIT 1",
             [meeting_id],
             map_transcription_row,
@@ -367,16 +370,18 @@ impl MeetingRepository {
         provider_display_name: &str,
         content: &str,
         language: Option<&str>,
+        segments: Option<&[TranscriptionSegment]>,
     ) -> AppResult<Transcription> {
         Self::get_by_id(conn, meeting_id)?;
         Self::ensure_ai_provider(conn, provider_id, provider_display_name, provider_id)?;
 
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
+        let segments_json = serialize_segments_json(segments)?;
 
         conn.execute(
-            "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+            "INSERT INTO transcriptions (id, meeting_id, audio_file_id, provider_id, content, language, segments_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)",
             params![
                 id,
                 meeting_id,
@@ -384,6 +389,7 @@ impl MeetingRepository {
                 provider_id,
                 content,
                 language,
+                segments_json,
                 now,
             ],
         )?;
@@ -395,9 +401,38 @@ impl MeetingRepository {
             provider_id: Some(provider_id.to_string()),
             content: content.to_string(),
             language: language.map(str::to_string),
+            segments: segments.map(|items| items.to_vec()),
             created_at: now.clone(),
             updated_at: now,
         })
+    }
+
+    pub fn update_speaker_map(
+        conn: &Connection,
+        meeting_id: &str,
+        speaker_map: &HashMap<String, String>,
+    ) -> AppResult<Meeting> {
+        let now = Utc::now().to_rfc3339();
+        let speaker_map_json = if speaker_map.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(speaker_map).map_err(|error| {
+                AppError::Message(format!("sérialisation speaker_map : {error}"))
+            })?)
+        };
+
+        let updated = conn.execute(
+            "UPDATE meetings SET speaker_map_json = ?1, updated_at = ?2 WHERE id = ?3",
+            params![speaker_map_json, now, meeting_id],
+        )?;
+
+        if updated == 0 {
+            return Err(AppError::MeetingNotFound {
+                id: meeting_id.to_string(),
+            });
+        }
+
+        Self::get_by_id(conn, meeting_id)
     }
 
     pub fn update_title(conn: &Connection, id: &str, title: &str) -> AppResult<Meeting> {
@@ -461,7 +496,7 @@ impl MeetingRepository {
 
     fn list_transcriptions(conn: &Connection, meeting_id: &str) -> AppResult<Vec<Transcription>> {
         let mut stmt = conn.prepare(
-            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at
+            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, segments_json, created_at, updated_at
              FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
@@ -550,6 +585,7 @@ impl MeetingRepository {
 
 fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
     let status_str: String = row.get(3)?;
+    let speaker_map_json: Option<String> = row.get(8)?;
     Ok(Meeting {
         id: row.get(0)?,
         title: row.get(1)?,
@@ -559,10 +595,12 @@ fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         ended_at: row.get(5)?,
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
+        speaker_map: parse_speaker_map_json(speaker_map_json),
     })
 }
 
 fn map_transcription_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcription> {
+    let segments_json: Option<String> = row.get(6)?;
     Ok(Transcription {
         id: row.get(0)?,
         meeting_id: row.get(1)?,
@@ -570,9 +608,31 @@ fn map_transcription_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript
         provider_id: row.get(3)?,
         content: row.get(4)?,
         language: row.get(5)?,
-        created_at: row.get(6)?,
-        updated_at: row.get(7)?,
+        segments: parse_segments_json(segments_json),
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
     })
+}
+
+fn serialize_segments_json(
+    segments: Option<&[TranscriptionSegment]>,
+) -> AppResult<Option<String>> {
+    match segments {
+        None | Some([]) => Ok(None),
+        Some(items) => Ok(Some(
+            serde_json::to_string(items).map_err(|error| {
+                AppError::Message(format!("sérialisation segments : {error}"))
+            })?,
+        )),
+    }
+}
+
+fn parse_segments_json(raw: Option<String>) -> Option<Vec<TranscriptionSegment>> {
+    raw.and_then(|json| serde_json::from_str(&json).ok())
+}
+
+fn parse_speaker_map_json(raw: Option<String>) -> Option<HashMap<String, String>> {
+    raw.and_then(|json| serde_json::from_str(&json).ok())
 }
 
 fn map_summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
@@ -1031,6 +1091,7 @@ mod tests {
             "Mistral AI",
             "Bonjour",
             Some("fr"),
+            None,
         )
         .unwrap();
 
@@ -1402,5 +1463,74 @@ mod tests {
             .unwrap()
             .to_lowercase()
             .contains("dufour"));
+    }
+
+    #[test]
+    fn create_transcription_persists_segments_json() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Diarize".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let segments = vec![
+            TranscriptionSegment {
+                speaker: Some("SPEAKER_00".into()),
+                text: "Bonjour.".into(),
+                start: Some(0.0),
+                end: Some(1.0),
+            },
+            TranscriptionSegment {
+                speaker: Some("SPEAKER_01".into()),
+                text: "Salut.".into(),
+                start: Some(1.2),
+                end: Some(2.0),
+            },
+        ];
+
+        let saved = MeetingRepository::create_transcription(
+            &conn,
+            &meeting.id,
+            None,
+            "mistral",
+            "Mistral AI",
+            "[SPEAKER_00] Bonjour.\n[SPEAKER_01] Salut.",
+            Some("fr"),
+            Some(&segments),
+        )
+        .unwrap();
+
+        assert_eq!(saved.segments.as_ref().map(|s| s.len()), Some(2));
+        let latest = MeetingRepository::latest_transcription(&conn, &meeting.id)
+            .unwrap()
+            .expect("transcription");
+        assert_eq!(latest.segments.as_ref().map(|s| s.len()), Some(2));
+    }
+
+    #[test]
+    fn update_speaker_map_persists_on_meeting() {
+        let conn = open_in_memory().unwrap();
+        let meeting = MeetingRepository::create(
+            &conn,
+            CreateMeetingInput {
+                title: "Speakers".into(),
+                description: None,
+            },
+        )
+        .unwrap();
+
+        let map = HashMap::from([
+            ("SPEAKER_00".into(), "Marie".into()),
+            ("SPEAKER_01".into(), "Paul".into()),
+        ]);
+        let updated = MeetingRepository::update_speaker_map(&conn, &meeting.id, &map).unwrap();
+        assert_eq!(
+            updated.speaker_map.as_ref().and_then(|m| m.get("SPEAKER_00")),
+            Some(&"Marie".to_string())
+        );
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tauri::{AppHandle, State};
 
 use crate::audio::paths::ManagedAudioRoots;
@@ -96,5 +98,16 @@ pub fn update_meeting_title(
 ) -> Result<Meeting, String> {
     state
         .with_db(|conn| MeetingRepository::update_title(conn, &id, &title))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_meeting_speaker_map(
+    state: State<'_, AppState>,
+    id: String,
+    speaker_map: HashMap<String, String>,
+) -> Result<Meeting, String> {
+    state
+        .with_db(|conn| MeetingRepository::update_speaker_map(conn, &id, &speaker_map))
         .map_err(|e| e.to_string())
 }

@@ -527,6 +527,21 @@ mod tests {
     }
 
     #[test]
+    fn split_preserves_all_segment_content() {
+        let segments: Vec<String> = (0..10)
+            .map(|i| format!("[SPEAKER_{i:02} {i}.0s–{i}.5s] contenu segment {i}"))
+            .collect();
+        let text = segments.join("\n");
+        let chunks = split_transcription(&text, 80, 1).expect("split");
+        for segment in &segments {
+            assert!(
+                chunks.iter().any(|chunk| chunk.contains(segment)),
+                "segment manquant (pas de troncature silencieuse) : {segment}"
+            );
+        }
+    }
+
+    #[test]
     fn estimate_cost_is_documented_and_non_negative() {
         let cost = estimate_cost_usd("mistral", Some("mistral-small-latest"), 100_000, 4_096);
         assert!(cost >= 0.0);

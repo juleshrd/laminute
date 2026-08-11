@@ -212,7 +212,11 @@ impl SummaryProvider for OllamaProvider {
                 },
                 OllamaChatMessage {
                     role: "user".to_string(),
-                    content: structured_summary::build_user_prompt_for(prompt_mode, text),
+                    content: structured_summary::build_user_prompt_for(
+                        prompt_mode,
+                        text,
+                        options.speaker_identity.as_deref(),
+                    ),
                 },
             ],
             stream: false,

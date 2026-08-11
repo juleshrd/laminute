@@ -37,6 +37,7 @@ pub async fn run_structured_summary(
     jobs: Option<&AiJobState>,
     job_id: Option<&str>,
     progress: Option<ProgressCallback>,
+    speaker_identity: Option<Vec<(String, String)>>,
 ) -> Result<SummaryRunResult, AiError> {
     let max_tokens = DEFAULT_MAX_OUTPUT_TOKENS;
     let model_ref = model.as_deref();
@@ -67,6 +68,7 @@ pub async fn run_structured_summary(
             SummaryPromptMode::Full,
             cancel,
             meta,
+            speaker_identity,
         )
         .await;
     }
@@ -83,6 +85,7 @@ pub async fn run_structured_summary(
         job_id,
         progress,
         meta,
+        speaker_identity,
     )
     .await
 }
@@ -97,6 +100,7 @@ async fn run_single_pass(
     prompt_mode: SummaryPromptMode,
     cancel: &CancellationToken,
     meta: SummaryPipelineMeta,
+    speaker_identity: Option<Vec<(String, String)>>,
 ) -> Result<SummaryRunResult, AiError> {
     let summary_result = registry
         .summarize_text(
@@ -107,6 +111,7 @@ async fn run_single_pass(
                 model,
                 max_tokens: Some(max_tokens),
                 prompt_mode,
+                speaker_identity,
             },
             cancel,
         )
@@ -131,6 +136,7 @@ async fn run_map_reduce_pipeline(
     job_id: Option<&str>,
     progress: Option<ProgressCallback>,
     mut meta: SummaryPipelineMeta,
+    speaker_identity: Option<Vec<(String, String)>>,
 ) -> Result<SummaryRunResult, AiError> {
     let model_ref = model.as_deref();
     let token_budget = effective_input_token_budget(provider_id, model_ref, max_tokens)
@@ -181,6 +187,7 @@ async fn run_map_reduce_pipeline(
                     model: model.clone(),
                     max_tokens: Some(max_tokens),
                     prompt_mode: SummaryPromptMode::Partial,
+                    speaker_identity: speaker_identity.clone(),
                 },
                 cancel,
             )
@@ -234,6 +241,7 @@ async fn run_map_reduce_pipeline(
                 model: model.clone(),
                 max_tokens: Some(max_tokens),
                 prompt_mode: SummaryPromptMode::Reduce,
+                speaker_identity: speaker_identity.clone(),
             },
             cancel,
         )
@@ -380,10 +388,10 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("single pass");
-
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(result.meta.pipeline_used, Some(false));
         assert_eq!(result.structured.synthese, "full summary");
@@ -407,6 +415,7 @@ mod tests {
             &text,
             None,
             &CancellationToken::new(),
+            None,
             None,
             None,
             None,
@@ -504,6 +513,7 @@ mod tests {
             &text,
             None,
             &cancel,
+            None,
             None,
             None,
             None,

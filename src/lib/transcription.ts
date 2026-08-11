@@ -11,6 +11,13 @@ export interface TranscriptionProgress {
   meetingId?: string;
 }
 
+export interface TranscriptionSegment {
+  speaker?: string;
+  text: string;
+  start?: number;
+  end?: number;
+}
+
 export interface Transcription {
   id: string;
   meetingId: string;
@@ -18,6 +25,7 @@ export interface Transcription {
   providerId?: string;
   content: string;
   language?: string;
+  segments?: TranscriptionSegment[];
   createdAt: string;
   updatedAt: string;
 }

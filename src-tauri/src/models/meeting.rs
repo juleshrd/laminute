@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -41,6 +42,9 @@ pub struct Meeting {
     pub ended_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Labels techniques de diarisation → noms confirmés (ex. SPEAKER_00 → Marie).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker_map: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

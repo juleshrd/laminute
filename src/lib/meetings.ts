@@ -35,6 +35,7 @@ export interface MeetingDetail {
   transcriptions: TranscriptionMetadata[];
   summaries: SummaryMetadata[];
   actions: Action[];
+  speakerMap?: Record<string, string>;
 }
 
 export type TranscriptionMetadata = Omit<Transcription, "content">;
@@ -95,6 +96,16 @@ export function deleteMeeting(id: string): Promise<void> {
 
 export function updateMeetingTitle(id: string, title: string): Promise<MeetingSummary> {
   return invoke<MeetingSummary>("update_meeting_title", { id, title });
+}
+
+export function updateMeetingSpeakerMap(
+  id: string,
+  speakerMap: Record<string, string>,
+): Promise<{ id: string; speakerMap?: Record<string, string> }> {
+  return invoke<{ id: string; speakerMap?: Record<string, string> }>("update_meeting_speaker_map", {
+    id,
+    speakerMap,
+  });
 }
 
 export function meetingDisplayDate(

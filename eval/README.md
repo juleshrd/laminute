@@ -62,6 +62,16 @@ Voir `eval/thresholds.json` : `schema_ok_rate=1.0`, `critical_hallucination_rate
 2. Si les métriques changent intentionnellement, mettre à jour la baseline (`--write-baseline`) et décrire le changement dans la PR.
 3. La CI exécute l'eval offline ; un échec de seuil bloque le merge.
 
+## Langue et diarisation (JUL-200)
+
+| Fournisseur | Langue auto | Diarisation | Notes |
+| ----------- | ----------- | ----------- | ----- |
+| **Mistral** | Oui — langue renvoyée par l'API quand disponible | Oui (`diarize=true`) | En mode diarisation, la langue n'est pas forcée côté requête |
+| **OpenAI** | Oui | Oui (`gpt-4o-transcribe-diarize`) | Modèle dédié ; `language` omis quand diarize actif |
+| **Ollama** | Oui (selon modèle local) | Non | Transcription locale sans segments locuteur |
+
+Réglage **Langue de transcription** dans les paramètres IA : `Auto` (défaut) = détection provider ; `fr` / `en` = override explicite. Les segments diarisés sont persistés en JSON (`segments_json`) ; la cartographie locuteurs (`speaker_map_json`) est injectée dans le prompt de compte-rendu sans modifier le texte source.
+
 ## CI
 
 Le job `test_rust` exécute :

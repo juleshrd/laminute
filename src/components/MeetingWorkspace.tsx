@@ -88,6 +88,9 @@ export function MeetingWorkspace({ flow }: MeetingWorkspaceProps) {
               audioPath={flow.filePath}
               providerName={flow.providerName}
               selectedProvider={flow.selectedProvider}
+              speakerMap={flow.speakerMap}
+              speakerMapBusy={flow.speakerMapBusy}
+              onSpeakerMapChange={flow.handleSpeakerMapChange}
             />
           )}
         </>
