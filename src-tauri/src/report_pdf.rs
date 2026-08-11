@@ -29,6 +29,10 @@ pub struct MeetingReportPdfInput<'a> {
     pub display_date: &'a str,
     pub duration_label: &'a str,
     pub summary: &'a StructuredSummary,
+    pub provider_id: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub generated_at: Option<&'a str>,
+    pub validation_state: Option<&'a str>,
 }
 
 struct PdfWriter {
@@ -150,12 +154,26 @@ pub fn build_meeting_report_pdf(input: MeetingReportPdfInput<'_>) -> Result<Vec<
     writer.write_wrapped(input.title, 18.0, 8.0, true, NAVY);
     writer.y -= 4.0;
 
-    let meta = format!(
+    let mut meta = format!(
         "Statut : {}   |   Date : {}   |   Duree : {}",
         status_label_fr(input.status),
         sanitize_pdf_text(input.display_date),
         sanitize_pdf_text(input.duration_label),
     );
+    if let Some(provider) = input.provider_id.filter(|s| !s.is_empty()) {
+        meta.push_str(&format!("   |   Fournisseur : {}", sanitize_pdf_text(provider)));
+    }
+    if let Some(model) = input.model.filter(|s| !s.is_empty()) {
+        meta.push_str(&format!("   |   Modele : {}", sanitize_pdf_text(model)));
+    }
+    if let Some(validation) = input.validation_state.filter(|s| !s.is_empty()) {
+        let label = match validation {
+            "validated" => "Valide",
+            "edited" => "Corrige",
+            _ => "Genere",
+        };
+        meta.push_str(&format!("   |   Validation : {label}"));
+    }
     writer.write_wrapped(&meta, 9.0, 4.5, false, MUTED);
 
     writer.y -= 6.0;
@@ -172,7 +190,12 @@ pub fn build_meeting_report_pdf(input: MeetingReportPdfInput<'_>) -> Result<Vec<
     let decisions: Vec<String> = if input.summary.decisions.is_empty() {
         vec!["Aucune decision identifiee.".into()]
     } else {
-        input.summary.decisions.clone()
+        input
+            .summary
+            .decisions
+            .iter()
+            .map(|decision| decision.text().to_string())
+            .collect()
     };
     writer.write_section("Decisions", &decisions, !input.summary.decisions.is_empty());
 
@@ -359,6 +382,7 @@ mod tests {
                 description: Some("Version courte".into()),
                 responsable: Some("Alice".into()),
                 echeance: Some("2026-08-12".into()),
+                ..Default::default()
             }],
             risques: vec!["Delai serre".into()],
             questions_ouvertes: vec!["Budget ?".into()],
@@ -390,7 +414,12 @@ mod tests {
             display_date: "5 aout 2026",
             duration_label: "12:30",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .expect("pdf");
 
         assert!(bytes.starts_with(b"%PDF"));
@@ -409,11 +438,12 @@ mod tests {
                 description: Some(format!("Description detaillee de l'action {i}")),
                 responsable: Some(format!("Personne {i}")),
                 echeance: Some("2026-09-01".into()),
+                ..Default::default()
             })
             .collect();
         let summary = StructuredSummary {
             synthese: long_synth,
-            decisions: (1..=20).map(|i| format!("Decision {i}")).collect(),
+            decisions: (1..=20).map(|i| format!("Decision {i}").into()).collect(),
             actions: many_actions,
             risques: (1..=15).map(|i| format!("Risque {i}")).collect(),
             questions_ouvertes: (1..=15).map(|i| format!("Question {i} ?")).collect(),
@@ -425,7 +455,12 @@ mod tests {
             display_date: "8 aout 2026",
             duration_label: "45:00",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .expect("pdf");
 
         assert!(bytes.starts_with(b"%PDF"));
@@ -451,7 +486,12 @@ mod tests {
             display_date: "5 août 2026",
             duration_label: "1:00",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .expect("pdf");
 
         let payload = String::from_utf8_lossy(&bytes);
@@ -475,7 +515,12 @@ mod tests {
             display_date: "-",
             duration_label: "0:00",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .expect("pdf");
         let payload = String::from_utf8_lossy(&bytes);
         assert!(payload.contains("Aucune decision identifiee"));
@@ -498,7 +543,12 @@ mod tests {
             display_date: "1",
             duration_label: "1",
             summary: &summary,
-        })
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            })
         .expect("pdf");
         assert!(bytes.starts_with(b"%PDF"));
         assert!(bytes.len() > 500);

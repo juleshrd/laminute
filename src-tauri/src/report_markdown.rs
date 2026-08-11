@@ -9,6 +9,10 @@ pub struct MeetingReportMarkdownInput<'a> {
     pub display_date: &'a str,
     pub duration_label: &'a str,
     pub summary: &'a StructuredSummary,
+    pub provider_id: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub generated_at: Option<&'a str>,
+    pub validation_state: Option<&'a str>,
 }
 
 pub fn build_meeting_report_markdown(input: MeetingReportMarkdownInput<'_>) -> String {
@@ -22,6 +26,20 @@ pub fn build_meeting_report_markdown(input: MeetingReportMarkdownInput<'_>) -> S
         format!("| Statut | {} |", status_label_fr(input.status)),
         format!("| Date | {} |", input.display_date),
         format!("| Durée | {} |", input.duration_label),
+    ];
+    if let Some(provider) = input.provider_id.filter(|s| !s.is_empty()) {
+        sections.push(format!("| Fournisseur | {provider} |"));
+    }
+    if let Some(model) = input.model.filter(|s| !s.is_empty()) {
+        sections.push(format!("| Modèle | {model} |"));
+    }
+    if let Some(generated_at) = input.generated_at.filter(|s| !s.is_empty()) {
+        sections.push(format!("| Généré le | {generated_at} |"));
+    }
+    if let Some(validation) = input.validation_state.filter(|s| !s.is_empty()) {
+        sections.push(format!("| Validation | {} |", validation_label_fr(validation)));
+    }
+    sections.extend([
         String::new(),
         "## Synthèse".to_string(),
         String::new(),
@@ -36,12 +54,12 @@ pub fn build_meeting_report_markdown(input: MeetingReportMarkdownInput<'_>) -> S
         String::new(),
         "## Décisions".to_string(),
         String::new(),
-        bullet_list(&input.summary.decisions),
+        bullet_list_decisions(&input.summary.decisions),
         String::new(),
         "## Actions".to_string(),
         String::new(),
         format_actions(&input.summary.actions),
-    ];
+    ]);
 
     if !input.summary.risques.is_empty() {
         sections.extend([
@@ -74,6 +92,14 @@ fn status_label_fr(status: MeetingStatus) -> &'static str {
     }
 }
 
+fn validation_label_fr(state: &str) -> &'static str {
+    match state {
+        "validated" => "Validé",
+        "edited" => "Corrigé",
+        _ => "Généré",
+    }
+}
+
 fn bullet_list(items: &[String]) -> String {
     if items.is_empty() {
         return "_Aucun élément._".to_string();
@@ -81,6 +107,36 @@ fn bullet_list(items: &[String]) -> String {
     items
         .iter()
         .map(|item| format!("- {item}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn bullet_list_decisions(items: &[crate::ai::structured_summary::DecisionEntry]) -> String {
+    if items.is_empty() {
+        return "_Aucun élément._".to_string();
+    }
+    items
+        .iter()
+        .map(|item| {
+            let mut line = format!("- {}", item.text());
+            let sources = item.as_item().sources;
+            if !sources.is_empty() {
+                let proof = sources
+                    .iter()
+                    .filter_map(|source| {
+                        match (source.start_ms, source.end_ms) {
+                            (Some(start), Some(end)) => Some(format!("{start}–{end} ms")),
+                            _ => source.quote.clone(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                if !proof.is_empty() {
+                    line.push_str(&format!(" _(preuve : {proof})_"));
+                }
+            }
+            line
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -132,6 +188,7 @@ mod tests {
                 description: Some("Version courte".into()),
                 responsable: Some("Alice".into()),
                 echeance: Some("2026-08-12".into()),
+                ..Default::default()
             }],
             risques: vec!["Délai serré".into()],
             questions_ouvertes: vec!["Budget marketing ?".into()],
@@ -143,7 +200,12 @@ mod tests {
             display_date: "5 août 2026 à 14:00",
             duration_label: "12:30",
             summary: &summary,
-        });
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            });
 
         assert!(md.contains("# Comité produit"));
         assert!(md.contains("La Minute"));
@@ -180,7 +242,12 @@ mod tests {
             display_date: "01/01/2026",
             duration_label: "—",
             summary: &summary,
-        });
+        
+                provider_id: None,
+                model: None,
+                generated_at: None,
+                validation_state: None,
+            });
 
         assert!(md.contains("_Aucun élément._"));
         assert!(md.contains("_Aucune action identifiée._"));

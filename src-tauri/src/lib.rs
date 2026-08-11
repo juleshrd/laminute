@@ -32,9 +32,9 @@ use audio::{AudioError, AudioInputDevice, AudioInputSetup, AudioState, Recording
 use commands::{
     create_meeting, delete_all_local_data, delete_meeting, export_meeting,
     generate_structured_summary, get_latest_summary, get_latest_transcription,
-    get_local_storage_info, get_meeting, import_mp3_meeting, list_meetings,
-    list_transcription_versions, save_meeting_export, search_meetings, update_meeting_title,
-    update_meeting_speaker_map,
+    get_local_storage_info, get_meeting, import_mp3_meeting, list_meetings, list_summary_revisions,
+    list_transcription_versions, save_meeting_export, search_meetings, set_action_status,
+    update_meeting_speaker_map, update_meeting_title, update_structured_summary,
 };
 use db::open_and_migrate;
 use local_activity::LocalActivityGate;
@@ -205,6 +205,9 @@ pub fn run() {
             set_keep_audio_files,
             import_mp3_meeting,
             generate_structured_summary,
+            update_structured_summary,
+            set_action_status,
+            list_summary_revisions,
             export_meeting,
             save_meeting_export,
             get_local_storage_info,

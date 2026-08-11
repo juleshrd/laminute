@@ -46,16 +46,38 @@ export interface SetModelPreferencesInput {
   transcriptionLanguage?: string | null;
 }
 
+export type ItemOrigin = "generated" | "edited" | "validated" | "locked";
+export type SummaryValidationState = "generated" | "edited" | "validated";
+
+export interface EvidenceSource {
+  segmentIndex?: number;
+  startMs?: number;
+  endMs?: number;
+  quote?: string;
+}
+
+export interface StructuredDecisionItem {
+  texte: string;
+  id?: string;
+  sources?: EvidenceSource[];
+  origin?: ItemOrigin;
+}
+
+export type DecisionEntry = string | StructuredDecisionItem;
+
 export interface StructuredActionItem {
   titre: string;
   description?: string;
   responsable?: string;
   echeance?: string;
+  id?: string;
+  sources?: EvidenceSource[];
+  origin?: ItemOrigin;
 }
 
 export interface StructuredSummary {
   synthese: string;
-  decisions: string[];
+  decisions: DecisionEntry[];
   actions: StructuredActionItem[];
   risques: string[];
   questionsOuvertes: string[];
@@ -69,6 +91,9 @@ export interface Action {
   assignee?: string;
   dueDate?: string;
   status: string;
+  itemKey?: string;
+  sources?: EvidenceSource[];
+  origin?: ItemOrigin;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +103,9 @@ export interface SummaryRecord {
   meetingId: string;
   providerId?: string;
   content: string;
+  model?: string;
+  validationState?: SummaryValidationState;
+  validatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ai::structured_summary::{EvidenceSource, ItemOrigin};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionStatus {
@@ -40,6 +42,12 @@ pub struct Action {
     pub assignee: Option<String>,
     pub due_date: Option<String>,
     pub status: ActionStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<EvidenceSource>,
+    #[serde(default)]
+    pub origin: ItemOrigin,
     pub created_at: String,
     pub updated_at: String,
 }
