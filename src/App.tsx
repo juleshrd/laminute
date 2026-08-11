@@ -9,7 +9,11 @@ import {
 } from "./lib/preferences";
 import { useMeetingFlow } from "./hooks/useMeetingFlow";
 import { LmShell, type AppScreen } from "./components/LmShell";
-import { MeetingHistory } from "./components/MeetingHistory";
+import {
+  defaultHistoryNavigationState,
+  MeetingHistory,
+  type HistoryNavigationState,
+} from "./components/MeetingHistory";
 import { MeetingWorkspace } from "./components/MeetingWorkspace";
 import { OnboardingIA } from "./components/OnboardingIA";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -19,6 +23,9 @@ import "./App.css";
 function App() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>("meeting");
   const [historyMeetingId, setHistoryMeetingId] = useState<string | null>(null);
+  const [historyNavigation, setHistoryNavigation] = useState<HistoryNavigationState>(
+    () => defaultHistoryNavigationState(),
+  );
   const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingDone());
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
@@ -150,6 +157,8 @@ function App() {
           <MeetingHistory
             initialSelectedId={historyMeetingId}
             onSelectedIdChange={setHistoryMeetingId}
+            navigationState={historyNavigation}
+            onNavigationStateChange={setHistoryNavigation}
           />
         ) : null}
         {activeScreen === "settings" ? (
