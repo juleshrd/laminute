@@ -161,9 +161,7 @@ impl RotatingLogWriter {
             }
             let meta = entry.metadata()?;
             let len = meta.len();
-            let modified = meta
-                .modified()
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            let modified = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             total += len;
             entries.push((path, len, modified));
         }
@@ -277,12 +275,7 @@ pub fn new_correlation_id() -> String {
 }
 
 /// Enregistre un événement déjà destiné à l'utilisateur (message expurgé).
-pub fn record_event(
-    code: &str,
-    message: &str,
-    subsystem: &str,
-    correlation_id: Option<&str>,
-) {
+pub fn record_event(code: &str, message: &str, subsystem: &str, correlation_id: Option<&str>) {
     let redacted = redact_text(message);
     let event = DiagnosticEvent {
         code: code.to_string(),
@@ -368,10 +361,7 @@ fn redact_api_key_patterns(input: &str) -> String {
         }
 
         // sk- / sk_
-        if input.is_char_boundary(i)
-            && i + 3 <= input.len()
-            && input.is_char_boundary(i + 3)
-        {
+        if input.is_char_boundary(i) && i + 3 <= input.len() && input.is_char_boundary(i + 3) {
             let prefix = &lower[i..i + 3];
             if prefix == "sk-" || prefix == "sk_" {
                 let mut j = i + 3;
@@ -622,10 +612,7 @@ fn read_log_tail(logs_dir: &Path) -> String {
     let Ok(file) = File::open(&path) else {
         return String::new();
     };
-    let lines: Vec<String> = BufReader::new(file)
-        .lines()
-        .filter_map(Result::ok)
-        .collect();
+    let lines: Vec<String> = BufReader::new(file).lines().map_while(Result::ok).collect();
     let start = lines.len().saturating_sub(LOG_TAIL_LINES);
     lines[start..]
         .iter()
@@ -636,8 +623,8 @@ fn read_log_tail(logs_dir: &Path) -> String {
 
 fn build_bundle_files(snapshot: &DiagnosticsSnapshot) -> AppResult<Vec<BundleFile>> {
     let github_report = github_report_from_snapshot(snapshot);
-    let snapshot_json = serde_json::to_string_pretty(snapshot)
-        .map_err(|err| AppError::Message(err.to_string()))?;
+    let snapshot_json =
+        serde_json::to_string_pretty(snapshot).map_err(|err| AppError::Message(err.to_string()))?;
     let events_json = serde_json::to_string_pretty(&snapshot.recent_errors)
         .map_err(|err| AppError::Message(err.to_string()))?;
     let log_tail = read_log_tail(Path::new(&snapshot.logs_dir));
@@ -860,8 +847,7 @@ mod tests {
 
     #[test]
     fn redact_strips_transcription_body() {
-        let raw =
-            "code=ok\nTRANSCRIPTION: Bonjour ceci est le corps secret de la reunion\nOTHER=1";
+        let raw = "code=ok\nTRANSCRIPTION: Bonjour ceci est le corps secret de la reunion\nOTHER=1";
         let out = redact_text(raw);
         assert!(!out.contains("Bonjour ceci est le corps"), "{out}");
         assert!(out.contains("[REDACTED_CONTENT]"), "{out}");

@@ -44,3 +44,18 @@ impl AiError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_error_codes_are_stable() {
+        assert_eq!(AiError::Cancelled.code(), "cancelled");
+        assert_eq!(AiError::Other("x".into()).code(), "other");
+        assert_eq!(
+            AiError::UnknownProvider("x".into()).code(),
+            "unknown_provider"
+        );
+    }
+}
