@@ -30,6 +30,8 @@ export interface AiSettings {
   ollamaBaseUrl?: string;
   ollamaAllowRemote: boolean;
   diarizationEnabled: boolean;
+  /** `auto` ou code langue (`fr`, `en`, …). */
+  transcriptionLanguage?: string;
   transcriptionModel?: string;
   summaryModel?: string;
   transcriptionModels: ModelInfo[];
@@ -41,6 +43,7 @@ export interface SetModelPreferencesInput {
   transcriptionModel?: string | null;
   summaryModel?: string | null;
   diarizationEnabled?: boolean | null;
+  transcriptionLanguage?: string | null;
 }
 
 export interface StructuredActionItem {

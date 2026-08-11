@@ -12,7 +12,7 @@ use crate::ai::limits::{truncate_error_message, validate_transcription_audio_siz
 use crate::ai::model_catalog::{self, OPENAI_DIARIZE_MODEL};
 use crate::ai::models::{
     KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult, TranscriptionOptions,
-    TranscriptionResult,
+    TranscriptionResult, TranscriptionSegment,
 };
 use crate::ai::provider::AiProvider;
 use crate::ai::structured_summary;
@@ -86,6 +86,8 @@ struct OpenAiModel {
 #[derive(Debug, Deserialize)]
 struct OpenAiTranscriptionResponse {
     text: String,
+    #[serde(default)]
+    language: Option<String>,
     #[serde(default)]
     segments: Vec<OpenAiTranscriptionSegment>,
 }
@@ -268,6 +270,23 @@ impl TranscriptionProvider for OpenAiProvider {
             payload.text
         };
 
+        let segments = if diarize {
+            Some(
+                payload
+                    .segments
+                    .iter()
+                    .map(|s| TranscriptionSegment {
+                        speaker: s.speaker.clone(),
+                        text: s.text.clone(),
+                        start: s.start,
+                        end: s.end,
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         if text.trim().is_empty() {
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
@@ -278,7 +297,8 @@ impl TranscriptionProvider for OpenAiProvider {
         Ok(TranscriptionResult {
             text,
             model: model.to_string(),
-            language: options.language,
+            language: payload.language.or(options.language),
+            segments,
         })
     }
 }
@@ -308,7 +328,11 @@ impl SummaryProvider for OpenAiProvider {
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: structured_summary::build_user_prompt_for(prompt_mode, text),
+                    content: structured_summary::build_user_prompt_for(
+                        prompt_mode,
+                        text,
+                        options.speaker_identity.as_deref(),
+                    ),
                 },
             ],
             max_tokens: options.max_tokens,

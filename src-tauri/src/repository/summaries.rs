@@ -2,6 +2,7 @@ use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
 
+use crate::ai::speaker::apply_speaker_map_to_structured;
 use crate::ai::structured_summary::StructuredSummary;
 use crate::error::{AppError, AppResult};
 use crate::models::{Action, ActionStatus, MeetingStatus, Summary};
@@ -55,7 +56,13 @@ impl SummaryRepository {
         provider_display_name: Option<&str>,
         structured: &StructuredSummary,
     ) -> AppResult<(Summary, Vec<Action>)> {
-        MeetingRepository::get_by_id(conn, meeting_id)?;
+        let meeting = MeetingRepository::get_by_id(conn, meeting_id)?;
+        let mut structured_to_save = structured.clone();
+        if let Some(ref map) = meeting.speaker_map {
+            if !map.is_empty() {
+                apply_speaker_map_to_structured(&mut structured_to_save, map);
+            }
+        }
 
         if let Some(provider_id) = provider_id {
             let name = provider_display_name.unwrap_or(provider_id);
@@ -64,7 +71,7 @@ impl SummaryRepository {
 
         let now = Utc::now().to_rfc3339();
         let summary_id = Uuid::new_v4().to_string();
-        let content = serde_json::to_string(structured).map_err(|error| {
+        let content = serde_json::to_string(&structured_to_save).map_err(|error| {
             AppError::Message(format!("sérialisation du compte-rendu : {error}"))
         })?;
 
@@ -74,8 +81,8 @@ impl SummaryRepository {
             params![summary_id, meeting_id, provider_id, content, now, now],
         )?;
 
-        let mut actions = Vec::with_capacity(structured.actions.len());
-        for item in &structured.actions {
+        let mut actions = Vec::with_capacity(structured_to_save.actions.len());
+        for item in &structured_to_save.actions {
             let action_id = Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO actions (id, meeting_id, title, description, assignee, due_date, status, created_at, updated_at)

@@ -43,6 +43,12 @@ fn build_ai_settings(
         ollama_allow_remote: settings.ollama_allow_remote(),
         diarization_enabled: settings.diarization_enabled()
             && model_catalog::supports_diarization(provider_id),
+        transcription_language: Some(
+            settings
+                .transcription_language()
+                .map(str::to_string)
+                .unwrap_or_else(|| "auto".to_string()),
+        ),
         transcription_model: selected_provider_id
             .as_deref()
             .and_then(|id| settings.transcription_model_for(id)),
@@ -159,6 +165,12 @@ pub fn set_model_preferences(
         }
         settings
             .set_diarization_enabled(enabled)
+            .map_err(|e| e.to_string())?;
+    }
+
+    if input.transcription_language.is_some() {
+        settings
+            .set_transcription_language(input.transcription_language.clone())
             .map_err(|e| e.to_string())?;
     }
 

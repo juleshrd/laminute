@@ -7,6 +7,7 @@ use crate::ai::jobs::{meeting_job_key, summary_fallback_key, AiJobKind, AiJobSta
 use crate::ai::limits::validate_summary_input_text;
 use crate::ai::model_catalog;
 use crate::ai::summary_pipeline::run_structured_summary;
+use crate::ai::speaker::speaker_identity_pairs;
 use crate::ai::token_pipeline::SummaryPipelineMeta;
 use crate::ai::secrets;
 use crate::ai::structured_summary::StructuredSummary;
@@ -141,9 +142,22 @@ async fn generate_structured_summary_inner(
 
     let cancel = job.cancellation_token();
 
-    jobs.ensure_not_cancelled(job.job_id())
-        .map_err(AppError::Message)?;
+    jobs
+        .ensure_not_cancelled(job.job_id())
+        .map_err(|message| AppError::Message(message))?;
     gate.ensure_generation(activity)?;
+
+    let speaker_identity = match &resolved {
+        ResolvedSummaryInput::ExistingMeeting { meeting_id, .. } => db_state
+            .with_db(|conn| {
+                let meeting = MeetingRepository::get_by_id(conn, meeting_id)?;
+                Ok(meeting
+                    .speaker_map
+                    .map(|map| speaker_identity_pairs(&map))
+                    .filter(|pairs| !pairs.is_empty()))
+            })?,
+        ResolvedSummaryInput::PastedText { .. } => None,
+    };
 
     let summary_run = run_structured_summary(
         &ai_state.registry,
@@ -155,6 +169,7 @@ async fn generate_structured_summary_inner(
         Some(jobs),
         Some(job.job_id()),
         None,
+        speaker_identity,
     )
     .await
     .map_err(|err| {

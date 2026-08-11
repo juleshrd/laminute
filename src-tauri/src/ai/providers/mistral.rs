@@ -9,7 +9,7 @@ use crate::ai::error::AiError;
 use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::models::{
     KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult, TranscriptionOptions,
-    TranscriptionResult,
+    TranscriptionResult, TranscriptionSegment,
 };
 use crate::ai::provider::AiProvider;
 use crate::ai::structured_summary;
@@ -229,6 +229,23 @@ impl TranscriptionProvider for MistralProvider {
             payload.text
         };
 
+        let segments = if options.diarize {
+            Some(
+                payload
+                    .segments
+                    .iter()
+                    .map(|s| TranscriptionSegment {
+                        speaker: s.speaker_id.clone(),
+                        text: s.text.clone(),
+                        start: s.start,
+                        end: s.end,
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         if text.trim().is_empty() {
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
@@ -240,6 +257,7 @@ impl TranscriptionProvider for MistralProvider {
             text,
             model: payload.model.unwrap_or_else(|| model.to_string()),
             language: payload.language.or(options.language),
+            segments,
         })
     }
 }
@@ -300,7 +318,11 @@ impl SummaryProvider for MistralProvider {
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: structured_summary::build_user_prompt_for(prompt_mode, text),
+                    content: structured_summary::build_user_prompt_for(
+                        prompt_mode,
+                        text,
+                        options.speaker_identity.as_deref(),
+                    ),
                 },
             ],
             max_tokens: options.max_tokens,
@@ -482,6 +504,11 @@ mod tests {
         assert!(result.text.contains("[SPEAKER_00"));
         assert!(result.text.contains("[SPEAKER_01"));
         assert!(result.text.contains("Bonjour."));
+        assert_eq!(result.segments.as_ref().map(|s| s.len()), Some(2));
+        assert_eq!(
+            result.segments.as_ref().and_then(|s| s.first()).and_then(|s| s.speaker.as_deref()),
+            Some("SPEAKER_00")
+        );
     }
 
     #[tokio::test]

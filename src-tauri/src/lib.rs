@@ -34,6 +34,7 @@ use commands::{
     generate_structured_summary, get_latest_summary, get_latest_transcription,
     get_local_storage_info, get_meeting, import_mp3_meeting, list_meetings,
     list_transcription_versions, save_meeting_export, search_meetings, update_meeting_title,
+    update_meeting_speaker_map,
 };
 use db::open_and_migrate;
 use local_activity::LocalActivityGate;
@@ -180,6 +181,7 @@ pub fn run() {
             search_meetings,
             delete_meeting,
             update_meeting_title,
+            update_meeting_speaker_map,
             ai::commands::list_ai_providers,
             ai::commands::get_ai_settings,
             ai::commands::set_selected_provider,

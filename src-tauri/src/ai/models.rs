@@ -47,6 +47,9 @@ pub struct AiSettings {
     pub ollama_allow_remote: bool,
     /// Diarisation locuteurs activée pour la transcription (si le fournisseur le permet).
     pub diarization_enabled: bool,
+    /// Langue de transcription forcée. Absent ou `auto` = détection automatique.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcription_language: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcription_model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,6 +68,22 @@ pub struct SetModelPreferencesInput {
     pub summary_model: Option<String>,
     #[serde(default)]
     pub diarization_enabled: Option<bool>,
+    /// Langue de transcription forcée (`fr`, `en`, …). `null` / absent = détection automatique.
+    #[serde(default)]
+    pub transcription_language: Option<String>,
+}
+
+/// Segment structuré d'une transcription (diarisation).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptionSegment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<f64>,
 }
 
 /// Options de transcription (consommées par JUL-148+ / JUL-165).
@@ -84,6 +103,8 @@ pub struct TranscriptionResult {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub segments: Option<Vec<TranscriptionSegment>>,
 }
 
 /// Options de résumé (consommées par JUL-153+).
@@ -92,6 +113,8 @@ pub struct SummaryOptions {
     pub model: Option<String>,
     pub max_tokens: Option<u32>,
     pub prompt_mode: crate::ai::structured_summary::SummaryPromptMode,
+    /// Labels techniques → noms confirmés, injectés dans le prompt compte-rendu.
+    pub speaker_identity: Option<Vec<(String, String)>>,
 }
 
 impl Default for SummaryOptions {
@@ -100,6 +123,7 @@ impl Default for SummaryOptions {
             model: None,
             max_tokens: None,
             prompt_mode: crate::ai::structured_summary::SummaryPromptMode::Full,
+            speaker_identity: None,
         }
     }
 }

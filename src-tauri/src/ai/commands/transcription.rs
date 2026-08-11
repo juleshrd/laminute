@@ -374,7 +374,7 @@ pub async fn transcribe_audio_file(
     let cancel = job.cancellation_token();
     let activity = gate.begin_operation().map_err(|e| e.to_string())?;
 
-    let (provider_id, transcription_model, diarize) = {
+    let (provider_id, transcription_model, diarize, settings_language) = {
         let settings = ai_state
             .settings
             .lock()
@@ -385,11 +385,19 @@ pub async fn transcribe_audio_file(
             .unwrap_or_else(|| DEFAULT_PROVIDER_ID.to_string());
         let transcription_model = settings.transcription_model_for(&provider_id);
         let diarize = settings.diarization_enabled();
+        let settings_language = settings.transcription_language().map(str::to_string);
         let transcription_model =
             model_catalog::validate_transcription_model(&provider_id, transcription_model)
                 .map_err(|e| e.to_string())?;
-        (provider_id, transcription_model, diarize)
+        (provider_id, transcription_model, diarize, settings_language)
     };
+
+    let language = input
+        .language
+        .as_deref()
+        .filter(|value| !value.eq_ignore_ascii_case("auto") && !value.trim().is_empty())
+        .map(str::to_string)
+        .or(settings_language);
 
     let provider = ai_state
         .registry
@@ -606,7 +614,7 @@ pub async fn transcribe_audio_file(
             &upload_path,
             TranscriptionOptions {
                 model: transcription_model,
-                language: input.language.clone(),
+                language,
                 file_name,
                 diarize,
             },
@@ -706,6 +714,7 @@ pub async fn transcribe_audio_file(
                 &provider_display_name,
                 &result.text,
                 result.language.as_deref(),
+                result.segments.as_deref(),
             )?;
             MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Completed)?;
             Ok(saved)
@@ -783,6 +792,7 @@ mod tests {
             "Mistral AI",
             "Bonjour",
             Some("fr"),
+            None,
         )
         .expect("transcription");
 

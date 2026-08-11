@@ -328,6 +328,7 @@ mod tests {
                 text: "stub transcription".into(),
                 model: "stub-model".into(),
                 language: None,
+                segments: None,
             })
         }
     }

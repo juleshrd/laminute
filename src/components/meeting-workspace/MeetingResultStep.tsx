@@ -2,8 +2,14 @@ import { useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import type { GenerateStructuredSummaryOutput, ProviderInfo } from "../../lib/ai/types";
+import {
+  formatTranscriptionDisplay,
+  substituteSpeakerLabels,
+  type SpeakerMap,
+} from "../../lib/speakerMap";
 import type { Transcription } from "../../lib/transcription";
 import { StructuredSummaryView } from "../StructuredSummaryView";
+import { SpeakerMapEditor } from "./SpeakerMapEditor";
 import "../StructuredSummaryPanel.css";
 
 type ResultTab = "essential" | "transcript" | "audio";
@@ -15,6 +21,19 @@ interface MeetingResultStepProps {
   audioPath?: string | null;
   providerName?: string;
   selectedProvider?: ProviderInfo | null;
+  speakerMap?: SpeakerMap;
+  speakerMapBusy?: boolean;
+  onSpeakerMapChange?: (next: SpeakerMap) => void;
+}
+
+function displayActionLabel(
+  value: string | undefined,
+  speakerMap: SpeakerMap,
+): string | undefined {
+  if (!value) {
+    return value;
+  }
+  return substituteSpeakerLabels(value, speakerMap);
 }
 
 export function MeetingResultStep({
@@ -24,10 +43,16 @@ export function MeetingResultStep({
   audioPath = null,
   providerName,
   selectedProvider = null,
+  speakerMap = {},
+  speakerMapBusy = false,
+  onSpeakerMapChange,
 }: MeetingResultStepProps) {
   const [tab, setTab] = useState<ResultTab>("essential");
   const isLocal = selectedProvider?.capabilities.local ?? false;
   const structured = summary?.structured ?? null;
+  const transcriptText = transcription
+    ? formatTranscriptionDisplay(transcription, speakerMap)
+    : "";
 
   return (
     <section className="meeting-result">
@@ -77,7 +102,7 @@ export function MeetingResultStep({
             <>
               <article className="essential-summary">
                 <p className="lm-kicker">En une phrase</p>
-                <p>{structured.synthese}</p>
+                <p>{substituteSpeakerLabels(structured.synthese, speakerMap)}</p>
               </article>
               <div className="essential-grid">
                 <div>
@@ -85,7 +110,7 @@ export function MeetingResultStep({
                   {structured.decisions.length > 0 ? (
                     structured.decisions.map((decision) => (
                       <article key={decision} className="essential-card">
-                        <b>{decision}</b>
+                        <b>{substituteSpeakerLabels(decision, speakerMap)}</b>
                       </article>
                     ))
                   ) : (
@@ -100,10 +125,15 @@ export function MeetingResultStep({
                         key={`${action.titre}-${action.responsable ?? ""}`}
                         className="essential-card"
                       >
-                        <b>{action.titre}</b>
+                        <b>{substituteSpeakerLabels(action.titre, speakerMap)}</b>
                         {(action.responsable || action.echeance) && (
                           <span>
-                            {[action.responsable, action.echeance].filter(Boolean).join(" · ")}
+                            {[
+                              displayActionLabel(action.responsable, speakerMap),
+                              action.echeance,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         )}
                       </article>
@@ -116,7 +146,25 @@ export function MeetingResultStep({
               <details className="meeting-result__more">
                 <summary>Voir le compte-rendu complet</summary>
                 <StructuredSummaryView
-                  summary={structured}
+                  summary={{
+                    ...structured,
+                    synthese: substituteSpeakerLabels(structured.synthese, speakerMap),
+                    decisions: structured.decisions.map((d) =>
+                      substituteSpeakerLabels(d, speakerMap),
+                    ),
+                    actions: structured.actions.map((action) => ({
+                      ...action,
+                      titre: substituteSpeakerLabels(action.titre, speakerMap),
+                      description: action.description
+                        ? substituteSpeakerLabels(action.description, speakerMap)
+                        : action.description,
+                      responsable: displayActionLabel(action.responsable, speakerMap),
+                    })),
+                    risques: structured.risques.map((r) => substituteSpeakerLabels(r, speakerMap)),
+                    questionsOuvertes: structured.questionsOuvertes.map((q) =>
+                      substituteSpeakerLabels(q, speakerMap),
+                    ),
+                  }}
                   providerId={summary?.summary.providerId}
                   headingLevel={3}
                 />
@@ -132,10 +180,20 @@ export function MeetingResultStep({
         <div className="meeting-result__panel" role="tabpanel">
           {transcription ? (
             <div className="transcription-result">
-              <p>{transcription.content}</p>
+              {onSpeakerMapChange ? (
+                <SpeakerMapEditor
+                  segments={transcription.segments}
+                  speakerMap={speakerMap}
+                  disabled={speakerMapBusy}
+                  onChange={onSpeakerMapChange}
+                />
+              ) : null}
+              <p>{transcriptText}</p>
               {transcription.language ? (
                 <p className="meta">Langue détectée : {transcription.language}</p>
-              ) : null}
+              ) : (
+                <p className="meta">Langue : détection automatique</p>
+              )}
             </div>
           ) : (
             <p className="lm-subtle">Aucune transcription disponible.</p>

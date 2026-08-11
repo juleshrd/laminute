@@ -42,6 +42,8 @@ struct PersistedAiSettings {
     #[serde(default)]
     diarization_enabled: bool,
     #[serde(default)]
+    transcription_language: Option<String>,
+    #[serde(default)]
     provider_models: HashMap<String, ProviderModelPreferences>,
 }
 
@@ -68,6 +70,7 @@ impl Default for PersistedAiSettings {
             ollama_base_url: default_ollama_base_url(),
             ollama_allow_remote: false,
             diarization_enabled: false,
+            transcription_language: None,
             provider_models: HashMap::new(),
         }
     }
@@ -108,6 +111,13 @@ impl SettingsStore {
         self.data.diarization_enabled
     }
 
+    pub fn transcription_language(&self) -> Option<&str> {
+        self.data
+            .transcription_language
+            .as_deref()
+            .filter(|value| !value.eq_ignore_ascii_case("auto") && !value.trim().is_empty())
+    }
+
     pub fn set_selected_provider_id(
         &mut self,
         provider_id: Option<String>,
@@ -132,6 +142,21 @@ impl SettingsStore {
 
     pub fn set_diarization_enabled(&mut self, enabled: bool) -> Result<(), SettingsError> {
         self.data.diarization_enabled = enabled;
+        self.save()
+    }
+
+    pub fn set_transcription_language(
+        &mut self,
+        language: Option<String>,
+    ) -> Result<(), SettingsError> {
+        self.data.transcription_language = language.and_then(|value| {
+            let trimmed = value.trim().to_string();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
         self.save()
     }
 
