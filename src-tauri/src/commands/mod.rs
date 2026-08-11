@@ -11,4 +11,6 @@ pub use meetings::{
 pub use privacy::{
     delete_all_local_data, export_meeting, get_local_storage_info, save_meeting_export,
 };
-pub use summary::generate_structured_summary;
+pub use summary::{
+    generate_structured_summary, GenerateStructuredSummaryInput, GenerateStructuredSummaryOutput,
+};

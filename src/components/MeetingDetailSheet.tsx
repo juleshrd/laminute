@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
+import {
+  getAiRecoveryActions,
+  resumeSummaryForMeeting,
+  resumeTranscriptionForMeeting,
+  type AiRecoveryActions,
+} from "../lib/ai/api";
 import { deleteMeeting, getLatestSummary, getLatestTranscription } from "../lib/meetings";
 import { buildExportFilename, saveMeetingExport } from "../lib/privacy";
 import {
@@ -34,6 +40,8 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
   const [transcription, setTranscription] = useState<Transcription | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState<AiRecoveryActions | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
   const contentRequestId = useRef(0);
 
   const audioFile = detail.audioFiles[0];
@@ -45,6 +53,12 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
     detail.summaries[detail.summaries.length - 1]?.providerId ??
     transcription?.providerId ??
     detail.transcriptions[detail.transcriptions.length - 1]?.providerId;
+
+  useEffect(() => {
+    void getAiRecoveryActions(detail.id)
+      .then(setRecovery)
+      .catch(() => setRecovery(null));
+  }, [detail.id, detail.status, detail.transcriptions.length, detail.summaries.length]);
 
   useEffect(() => {
     const requestId = ++contentRequestId.current;
@@ -75,6 +89,42 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
         if (requestId === contentRequestId.current) setContentLoading(false);
       });
   }, [detail.id, tab]);
+
+  async function handleResumeTranscription() {
+    setRecoveryBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      await resumeTranscriptionForMeeting(detail.id);
+      setStatusMessage("Transcription reprise — consultez l'onglet Transcription.");
+      const actions = await getAiRecoveryActions(detail.id);
+      setRecovery(actions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reprise impossible.");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
+  async function handleRetrySummary() {
+    setRecoveryBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      await resumeSummaryForMeeting(detail.id);
+      setStatusMessage("Compte-rendu relancé — consultez l'onglet Essentiel.");
+      const actions = await getAiRecoveryActions(detail.id);
+      setRecovery(actions);
+      if (tab === "essential") {
+        const content = await getLatestSummary(detail.id);
+        setSummaryRecord(content);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Relance impossible.");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
 
   async function handleExport(kind: ExportKind) {
     setBusy(true);
@@ -147,6 +197,29 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
           {providerHint ? ` · ${providerHint}` : ""}
         </p>
       </header>
+
+      {(recovery?.canResumeTranscription || recovery?.canRetrySummary) && (
+        <div className="row controls meeting-detail__recovery">
+          {recovery.canResumeTranscription ? (
+            <button
+              type="button"
+              disabled={busy || recoveryBusy}
+              onClick={() => void handleResumeTranscription()}
+            >
+              Reprendre la transcription
+            </button>
+          ) : null}
+          {recovery.canRetrySummary ? (
+            <button
+              type="button"
+              disabled={busy || recoveryBusy}
+              onClick={() => void handleRetrySummary()}
+            >
+              Relancer le compte-rendu
+            </button>
+          ) : null}
+        </div>
+      )}
 
       <div className="row controls meeting-detail__actions">
         <button

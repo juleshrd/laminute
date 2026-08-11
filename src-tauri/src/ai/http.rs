@@ -5,6 +5,7 @@ use reqwest::redirect;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::error::AiError;
 use crate::ai::limits::{
@@ -77,20 +78,40 @@ pub async fn audio_file_part(
         .map_err(|err| AiError::Other(err.to_string()))
 }
 
-pub async fn read_provider_response(response: reqwest::Response) -> Result<String, AiError> {
+pub async fn send_cancellable(
+    request: reqwest::RequestBuilder,
+    cancel: &CancellationToken,
+) -> Result<reqwest::Response, AiError> {
+    let future = request.send();
+    tokio::pin!(future);
+    tokio::select! {
+        result = future => result.map_err(AiError::from),
+        _ = cancel.cancelled() => Err(AiError::Cancelled),
+    }
+}
+
+pub async fn read_provider_response(
+    response: reqwest::Response,
+    cancel: Option<&CancellationToken>,
+) -> Result<String, AiError> {
     read_limited_text(
         response,
         MAX_PROVIDER_RESPONSE_BYTES,
         validate_provider_response_size,
+        cancel,
     )
     .await
 }
 
-pub async fn read_provider_error(response: reqwest::Response) -> Result<String, AiError> {
+pub async fn read_provider_error(
+    response: reqwest::Response,
+    cancel: Option<&CancellationToken>,
+) -> Result<String, AiError> {
     read_limited_text(
         response,
         MAX_PROVIDER_ERROR_BYTES,
         validate_provider_error_size,
+        cancel,
     )
     .await
 }
@@ -99,13 +120,37 @@ async fn read_limited_text(
     mut response: reqwest::Response,
     max_bytes: usize,
     validate: fn(usize) -> Result<(), AiError>,
+    cancel: Option<&CancellationToken>,
 ) -> Result<String, AiError> {
+    if cancel.is_some_and(CancellationToken::is_cancelled) {
+        return Err(AiError::Cancelled);
+    }
+
     if let Some(len) = response.content_length() {
         validate(len as usize)?;
     }
 
     let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await? {
+    loop {
+        if cancel.is_some_and(CancellationToken::is_cancelled) {
+            return Err(AiError::Cancelled);
+        }
+
+        let chunk = tokio::select! {
+            chunk = response.chunk() => chunk?,
+            _ = async {
+                if let Some(token) = cancel {
+                    token.cancelled().await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            } => return Err(AiError::Cancelled),
+        };
+
+        let Some(chunk) = chunk else {
+            break;
+        };
+
         if body.len() + chunk.len() > max_bytes {
             validate(max_bytes + 1)?;
         }
@@ -172,6 +217,9 @@ pub fn extract_api_error_message(body: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
     fn map_http_error_unauthorized() {
@@ -211,5 +259,36 @@ mod tests {
         let message = err.to_string();
         assert!(!message.contains(&long));
         assert!(message.ends_with('…'));
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_slow_response_body_read() {
+        let mock_server = MockServer::start().await;
+        let body = "x".repeat(256 * 1024);
+        Mock::given(method("GET"))
+            .and(path("/slow"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(body)
+                    .set_delay(Duration::from_millis(200)),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+        let url = format!("{}/slow", mock_server.uri());
+        let client = build_client();
+
+        let handle = tokio::spawn(async move {
+            let response = client.get(&url).send().await.expect("send");
+            read_provider_response(response, Some(&cancel_clone)).await
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        cancel.cancel();
+
+        let result = handle.await.expect("join");
+        assert!(matches!(result, Err(AiError::Cancelled)));
     }
 }

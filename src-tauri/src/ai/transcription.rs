@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::error::AiError;
 use crate::ai::models::{TranscriptionOptions, TranscriptionResult};
@@ -14,5 +15,6 @@ pub trait TranscriptionProvider: AiProvider {
         api_key: &str,
         audio_path: &Path,
         options: TranscriptionOptions,
+        cancel: &CancellationToken,
     ) -> Result<TranscriptionResult, AiError>;
 }

@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn migrations_apply_cleanly_on_empty_database() {
         let conn = open_in_memory().expect("connexion mémoire");
-        assert_eq!(migration_count(&conn).unwrap(), 2);
+        assert_eq!(migration_count(&conn).unwrap(), 3);
     }
 
     #[test]
@@ -40,7 +40,7 @@ mod tests {
         run_migrations(&mut conn).expect("première passe");
         run_migrations(&mut conn).expect("deuxième passe");
 
-        assert_eq!(migration_count(&conn).unwrap(), 2);
+        assert_eq!(migration_count(&conn).unwrap(), 3);
     }
 
     #[test]
@@ -65,6 +65,7 @@ mod tests {
             tables,
             vec![
                 "actions",
+                "ai_jobs",
                 "ai_providers",
                 "audio_files",
                 "meetings",
