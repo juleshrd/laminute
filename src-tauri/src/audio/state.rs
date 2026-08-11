@@ -1,13 +1,11 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
 
 use super::devices::{list_input_devices, AudioInputDevice};
 use super::error::AudioError;
 use super::recording::{RecordingPhase, RecordingService, RecordingStatus};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PersistedSettings {
@@ -33,8 +31,8 @@ pub struct AudioState {
     selected_device_id: Mutex<Option<String>>,
     keep_audio_files: Mutex<bool>,
     recording: RecordingService,
-    settings_path: PathBuf,
-    recordings_dir: PathBuf,
+    settings_path: Mutex<PathBuf>,
+    recordings_dir: Mutex<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -45,12 +43,7 @@ pub struct AudioInputSetup {
 }
 
 impl AudioState {
-    pub fn initialize(app: &AppHandle) -> Result<Self, AudioError> {
-        let app_data_dir = app
-            .path()
-            .app_data_dir()
-            .map_err(|err| AudioError::Io(err.to_string()))?;
-
+    pub fn initialize(app_data_dir: PathBuf) -> Result<Self, AudioError> {
         let settings_path = app_data_dir.join("audio-settings.json");
         let recordings_dir = app_data_dir.join("recordings");
 
@@ -62,8 +55,8 @@ impl AudioState {
             selected_device_id: Mutex::new(selected_device_id),
             keep_audio_files: Mutex::new(keep_audio_files),
             recording: RecordingService::spawn(),
-            settings_path,
-            recordings_dir,
+            settings_path: Mutex::new(settings_path),
+            recordings_dir: Mutex::new(recordings_dir),
         })
     }
 
@@ -144,8 +137,13 @@ impl AudioState {
             .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))
             .map(|value| *value)?;
 
+        let settings_path = self
+            .settings_path
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou chemin audio indisponible".into()))?
+            .clone();
         save_settings(
-            &self.settings_path,
+            &settings_path,
             &PersistedSettings {
                 selected_device_id,
                 keep_audio_files,
@@ -168,11 +166,16 @@ impl AudioState {
             device_id = Some(self.prepare_input()?.selected_device.id);
         }
 
+        let recordings_dir = self
+            .recordings_dir
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou dossier audio indisponible".into()))?
+            .clone();
         self.recording.start(
             device_id.as_deref().ok_or_else(|| {
                 AudioError::DeviceNotFound("aucun périphérique sélectionné".into())
             })?,
-            &self.recordings_dir,
+            &recordings_dir,
         )
     }
 
@@ -205,11 +208,49 @@ impl AudioState {
             *keep = default_keep_audio_files();
         }
 
-        match fs::remove_file(&self.settings_path) {
+        let settings_path = self
+            .settings_path
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou chemin audio indisponible".into()))?
+            .clone();
+        match fs::remove_file(settings_path) {
             Ok(()) => Ok(()),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(err) => Err(AudioError::Io(err.to_string())),
         }
+    }
+
+    /// Bascule les écritures audio vers une nouvelle racine après une migration validée.
+    pub fn relocate(&self, app_data_dir: PathBuf) {
+        *self
+            .settings_path
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            app_data_dir.join("audio-settings.json");
+        *self
+            .recordings_dir
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = app_data_dir.join("recordings");
+    }
+
+    /// Écrit un instantané cohérent des préférences dans une nouvelle racine.
+    pub fn persist_to_root(&self, app_data_dir: &Path) -> Result<(), AudioError> {
+        let selected_device_id = self
+            .selected_device_id
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?
+            .clone();
+        let keep_audio_files = *self
+            .keep_audio_files
+            .lock()
+            .map_err(|_| AudioError::Internal("verrou état audio indisponible".into()))?;
+        save_settings(
+            &app_data_dir.join("audio-settings.json"),
+            &PersistedSettings {
+                selected_device_id,
+                keep_audio_files,
+            },
+        )
     }
 }
 

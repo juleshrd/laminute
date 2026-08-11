@@ -11,6 +11,7 @@ mod report_markdown;
 mod report_pdf;
 mod repository;
 mod retention;
+mod storage;
 
 pub use db::open_in_memory;
 pub use models::MeetingSearchFilters;
@@ -21,6 +22,7 @@ pub const APP_IDENTIFIER: &str = "app.laminute.desktop";
 use std::sync::Mutex;
 
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use audio::{AudioError, AudioInputDevice, AudioInputSetup, AudioState, RecordingStatus};
 use commands::{
@@ -93,6 +95,19 @@ fn set_keep_audio_files(
     state.set_keep_audio_files(keep)
 }
 
+fn show_startup_storage_error(app: &tauri::AppHandle, message: &str) {
+    let app = app.clone();
+    let message = message.to_string();
+    let _ = std::thread::spawn(move || {
+        app.dialog()
+            .message(message)
+            .title("Stockage local inaccessible")
+            .kind(MessageDialogKind::Error)
+            .blocking_show();
+    })
+    .join();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -100,18 +115,35 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            let app_data_dir = app
+            let default_app_data_dir = app
                 .path()
                 .app_data_dir()
                 .expect("répertoire de données applicatives introuvable");
+            let storage = match storage::StorageState::load(default_app_data_dir) {
+                Ok(storage) => storage,
+                Err(message) => {
+                    show_startup_storage_error(app.handle(), &message);
+                    return Err(std::io::Error::other(message).into());
+                }
+            };
+            let app_data_dir = storage.root();
+            let roots = audio::ManagedAudioRoots::from_app_data_dir(app_data_dir.clone());
+            roots.ensure_dirs()?;
+            app.asset_protocol_scope()
+                .allow_directory(&roots.imports_dir, true)?;
+            app.asset_protocol_scope()
+                .allow_directory(&roots.recordings_dir, true)?;
+
             let db_path = app_data_dir.join("laminute.db");
             let conn = open_and_migrate(&db_path).expect("initialisation SQLite");
 
+            app.manage(storage);
+            app.manage(storage::StorageSelectionState::default());
             app.manage(db::AppState {
                 db: Mutex::new(conn),
             });
 
-            let settings = ai::commands::init_settings(app.handle())?;
+            let settings = Mutex::new(ai::SettingsStore::load(app_data_dir.clone())?);
             let ai_state = AiAppState {
                 registry: ai::ProviderRegistry::new(),
                 settings,
@@ -122,14 +154,11 @@ pub fn run() {
             app.manage(ai::jobs::AiJobState::new());
             app.manage(LocalActivityGate::new());
 
-            let audio_state = AudioState::initialize(app.handle())?;
+            let audio_state = AudioState::initialize(app_data_dir.clone())?;
             app.manage(audio_state);
 
             // Nettoyage best-effort des imports interrompus (JUL-184).
-            let roots = audio::ManagedAudioRoots::from_app_data_dir(app_data_dir);
-            if let Err(err) = roots.ensure_dirs() {
-                eprintln!("[startup] impossible de créer les dossiers audio : {err}");
-            } else if let Err(err) = audio::import::cleanup_staging(&roots.imports_dir) {
+            if let Err(err) = audio::import::cleanup_staging(&roots.imports_dir) {
                 eprintln!("[startup] nettoyage staging imports : {err}");
             }
 
@@ -169,6 +198,9 @@ pub fn run() {
             export_meeting,
             save_meeting_export,
             get_local_storage_info,
+            storage::choose_local_storage_parent,
+            storage::prepare_local_storage_change,
+            storage::apply_local_storage_change,
             delete_all_local_data,
         ])
         .run(tauri::generate_context!())

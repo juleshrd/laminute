@@ -63,7 +63,7 @@ pub struct PurgeRequest<'a> {
 
 /// Exécute la purge exhaustive. Toute erreur disque/keyring est remontée.
 pub fn purge_all_local_data(req: PurgeRequest<'_>) -> AppResult<()> {
-    let _purge_guard = req.gate.begin_purge();
+    let _purge_guard = req.gate.begin_purge()?;
 
     if let Some(stop) = req.stop_recording {
         stop()?;

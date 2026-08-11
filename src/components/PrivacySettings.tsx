@@ -9,6 +9,7 @@ import {
   type LocalStorageInfo,
 } from "../lib/privacy";
 import { setOnboardingDone } from "../lib/preferences";
+import { StorageLocationControl } from "./StorageLocationControl";
 
 export function PrivacySettings() {
   const [storage, setStorage] = useState<LocalStorageInfo | null>(null);
@@ -80,40 +81,47 @@ export function PrivacySettings() {
       {loading && <p className="privacy-settings__loading">Chargement…</p>}
 
       {storage && (
-        <dl className="status-grid privacy-settings__storage">
-          <div>
-            <dt>Réunions enregistrées</dt>
-            <dd>{storage.meetingsCount}</dd>
-          </div>
-          <div>
-            <dt>Base de données</dt>
-            <dd className="mono">{storage.dbPath}</dd>
-          </div>
-          <div>
-            <dt>Imports</dt>
-            <dd className="mono">
-              {storage.importsDir}
-              {storage.importsBytes != null && (
-                <span className="privacy-settings__size">
-                  {" "}
-                  ({formatBytes(storage.importsBytes)})
-                </span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Enregistrements</dt>
-            <dd className="mono">
-              {storage.recordingsDir}
-              {storage.recordingsBytes != null && (
-                <span className="privacy-settings__size">
-                  {" "}
-                  ({formatBytes(storage.recordingsBytes)})
-                </span>
-              )}
-            </dd>
-          </div>
-        </dl>
+        <>
+          <StorageLocationControl storage={storage} onStorageChanged={load} />
+          <dl className="status-grid privacy-settings__storage">
+            <div>
+              <dt>Réunions enregistrées</dt>
+              <dd>{storage.meetingsCount}</dd>
+            </div>
+            <div>
+              <dt>Espace disponible</dt>
+              <dd>{formatBytes(storage.availableBytes)}</dd>
+            </div>
+            <div>
+              <dt>Base de données</dt>
+              <dd className="mono">{storage.dbPath}</dd>
+            </div>
+            <div>
+              <dt>Imports</dt>
+              <dd className="mono">
+                {storage.importsDir}
+                {storage.importsBytes != null && (
+                  <span className="privacy-settings__size">
+                    {" "}
+                    ({formatBytes(storage.importsBytes)})
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Enregistrements</dt>
+              <dd className="mono">
+                {storage.recordingsDir}
+                {storage.recordingsBytes != null && (
+                  <span className="privacy-settings__size">
+                    {" "}
+                    ({formatBytes(storage.recordingsBytes)})
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </>
       )}
 
       <details className="privacy-settings__policy">

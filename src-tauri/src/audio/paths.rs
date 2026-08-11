@@ -21,6 +21,9 @@ pub struct ManagedAudioRoots {
 
 impl ManagedAudioRoots {
     pub fn from_app(app: &AppHandle) -> Result<Self, AudioError> {
+        if let Some(storage) = app.try_state::<crate::storage::StorageState>() {
+            return Ok(Self::from_app_data_dir(storage.root()));
+        }
         let app_data_dir = app
             .path()
             .app_data_dir()
