@@ -4,7 +4,7 @@ _Dernière mise à jour : août 2026_
 
 ## Données stockées localement
 
-La Minute est une application **desktop** : vos réunions, fichiers audio importés ou enregistrés, transcriptions et comptes-rendus sont enregistrés **uniquement sur votre ordinateur**, dans le répertoire de données de l'application :
+La Minute est une application **desktop** : vos réunions, fichiers audio importés ou enregistrés, transcriptions et comptes-rendus sont enregistrés **uniquement sur votre ordinateur**, dans le dossier local que vous choisissez. Sans personnalisation, le répertoire de données de l'application est utilisé :
 
 - **macOS** : `~/Library/Application Support/app.laminute.desktop/`
 - **Linux** : `~/.local/share/app.laminute.desktop/`
@@ -17,6 +17,12 @@ Ce répertoire contient notamment :
 | Base de données       | `laminute.db`     |
 | Imports MP3           | `imports/`        |
 | Enregistrements micro | `recordings/`     |
+
+Au premier lancement et depuis **Réglages → Confidentialité et données locales**, vous pouvez choisir un autre emplacement. La Minute crée un sous-dossier `La Minute` dans le dossier parent sélectionné. La base, les réglages applicatifs et les audios sont copiés puis vérifiés avant la bascule ; l’ancien emplacement n’est supprimé qu’après validation. Toute donnée résiduelle impossible à supprimer est signalée.
+
+Un petit fichier `storage-config.json` reste dans le répertoire système indiqué ci-dessus afin que l’application retrouve le dossier choisi au prochain démarrage. Il contient uniquement le chemin local et une version de format. Les clés API restent dans le trousseau sécurisé du système et ne sont pas déplacées avec les données.
+
+Si le dossier choisi devient inaccessible — disque externe déconnecté, permissions retirées ou volume indisponible — La Minute bloque l’accès au stockage et affiche une erreur explicite au lieu de créer silencieusement une nouvelle base ailleurs.
 
 Les données y restent **jusqu'à ce que vous les supprimiez** (réunion par réunion ou effacement complet depuis les réglages « Confidentialité »).
 
@@ -46,7 +52,7 @@ La Minute n'initie ces appels que lorsque vous déclenchez une transcription ou 
 
 ## Export et suppression
 
-- **Export** : vous pouvez exporter une réunion (métadonnées, transcription, compte-rendu, actions) au format JSON depuis l'historique. L'export ne contient pas de clé API ni de chemin absolu vers vos fichiers.
+- **Export** : vous pouvez exporter une réunion (métadonnées, transcription, compte-rendu, actions) au format JSON, Markdown ou PDF depuis l'historique. L'export ne contient pas de clé API ni de chemin absolu vers vos fichiers.
 - **Suppression** : vous pouvez supprimer une réunion (données et fichier audio associé) ou effacer **toutes** les données locales depuis l'application. L'effacement complet ne supprime pas automatiquement les clés API du trousseau ; vous pouvez les retirer manuellement dans les réglages IA.
 
 ## Enregistrement et tiers

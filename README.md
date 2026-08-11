@@ -33,14 +33,14 @@ C’est le parcours le plus simple pour démarrer.
 
 1. Créez un compte (ou connectez-vous) sur [console.mistral.ai](https://console.mistral.ai/).
 2. Créez une **clé API**, puis copiez-la.
-3. Au premier lancement, laissez La Minute préparer les dossiers locaux. macOS demandera l’accès au microphone seulement lorsque vous démarrerez votre premier enregistrement.
+3. Au premier lancement, choisissez où La Minute doit conserver ses données, ou gardez le dossier proposé par défaut. macOS demandera l’accès au microphone seulement lorsque vous démarrerez votre premier enregistrement.
 4. Choisissez **Mistral AI**, collez la clé, enregistrez, puis **Validez**.
 
 Votre clé est stockée dans le trousseau de votre ordinateur (pas dans les exports de réunions).
 
 ## Premier usage
 
-Au premier lancement, l’assistant affiche les emplacements réellement utilisés, configure la conservation des audios et connecte le fournisseur IA. Le microphone système est demandé et sélectionné au premier enregistrement. L’assistant peut être relancé depuis **Réglages**.
+Au premier lancement, l’assistant affiche et permet de modifier l’emplacement réellement utilisé, configure la conservation des audios et connecte le fournisseur IA. Le microphone système est demandé et sélectionné au premier enregistrement. L’assistant peut être relancé depuis **Réglages** ; le stockage reste modifiable dans **Réglages → Confidentialité et données locales**.
 
 1. Importez un fichier **MP3**, ou lancez un **enregistrement**.
 2. Donnez un titre à la réunion.
@@ -96,7 +96,10 @@ Validation complète avant une PR (équivalent CI) :
 npm run check:ci
 ```
 
-Budgets de taille / démarrage : [docs/performance-budget.md](docs/performance-budget.md).  
+Budgets de taille / démarrage : [docs/performance-budget.md](docs/performance-budget.md).
+
+Comportement du stockage et des migrations : [docs/local-storage.md](docs/local-storage.md).
+
 Sécurité : [SECURITY.md](SECURITY.md). Code de conduite : [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ### Performance — recherche historique

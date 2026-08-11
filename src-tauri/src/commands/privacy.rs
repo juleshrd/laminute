@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::ai::structured_summary::parse_structured_summary;
@@ -54,11 +54,15 @@ impl ExportFormat {
 #[serde(rename_all = "camelCase")]
 pub struct LocalStorageInfo {
     pub meetings_count: i64,
+    pub root_dir: String,
+    pub default_root_dir: String,
+    pub is_custom: bool,
     pub db_path: String,
     pub imports_dir: String,
     pub recordings_dir: String,
     pub imports_bytes: Option<u64>,
     pub recordings_bytes: Option<u64>,
+    pub available_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -153,10 +157,11 @@ pub async fn save_meeting_export(
 
 #[tauri::command]
 pub fn get_local_storage_info(
-    app: AppHandle,
+    storage: State<'_, crate::storage::StorageState>,
     state: State<'_, AppState>,
 ) -> Result<LocalStorageInfo, String> {
-    let app_data_dir = app_data_dir(&app)?;
+    storage.ensure_accessible()?;
+    let app_data_dir = storage.root();
     let imports_dir = app_data_dir.join("imports");
     let recordings_dir = app_data_dir.join("recordings");
     let db_path = app_data_dir.join("laminute.db");
@@ -169,24 +174,28 @@ pub fn get_local_storage_info(
 
     Ok(LocalStorageInfo {
         meetings_count,
+        root_dir: app_data_dir.to_string_lossy().to_string(),
+        default_root_dir: storage.default_root().to_string_lossy().to_string(),
+        is_custom: storage.is_custom(),
         db_path: db_path.to_string_lossy().to_string(),
         imports_dir: imports_dir.to_string_lossy().to_string(),
         recordings_dir: recordings_dir.to_string_lossy().to_string(),
         imports_bytes: dir_size(&imports_dir),
         recordings_bytes: dir_size(&recordings_dir),
+        available_bytes: crate::storage::available_space(&app_data_dir).ok(),
     })
 }
 
 #[tauri::command]
 pub fn delete_all_local_data(
-    app: AppHandle,
+    storage: State<'_, crate::storage::StorageState>,
     state: State<'_, AppState>,
     ai_state: State<'_, crate::AiAppState>,
     audio_state: State<'_, crate::audio::AudioState>,
     transcription_state: State<'_, crate::ai::TranscriptionState>,
     gate: State<'_, crate::local_activity::LocalActivityGate>,
 ) -> Result<(), String> {
-    let app_data_dir = app_data_dir(&app)?;
+    let app_data_dir = storage.root();
     let paths = crate::purge::LocalDataPaths::new(app_data_dir);
     let provider_ids: Vec<String> = ai_state
         .registry
@@ -436,10 +445,6 @@ fn dir_size(path: &Path) -> Option<u64> {
         }
     }
     Some(total)
-}
-
-fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_data_dir().map_err(|err| err.to_string())
 }
 
 fn with_db<T, F>(state: &State<'_, AppState>, f: F) -> AppResult<T>

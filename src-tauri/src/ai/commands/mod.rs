@@ -1,6 +1,4 @@
-use std::sync::Mutex;
-
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::ai::model_catalog;
 use crate::ai::models::{AiSettings, KeyValidationResult, ProviderInfo, SetModelPreferencesInput};
@@ -222,15 +220,6 @@ pub async fn validate_api_key(
     };
 
     provider.validate_key(&key).await.map_err(|e| e.to_string())
-}
-
-pub fn init_settings(app: &AppHandle) -> Result<Mutex<SettingsStore>, crate::ai::error::AiError> {
-    let app_data_dir = app.path().app_data_dir().map_err(|e| {
-        crate::ai::error::AiError::Settings(crate::ai::settings::SettingsError::Path(e.to_string()))
-    })?;
-
-    let store = SettingsStore::load(app_data_dir)?;
-    Ok(Mutex::new(store))
 }
 
 pub fn sync_ollama_base_url(state: &AiAppState) {

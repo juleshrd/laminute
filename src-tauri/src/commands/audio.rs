@@ -21,7 +21,8 @@ pub fn import_mp3_meeting(
     gate: State<'_, LocalActivityGate>,
     source_path: String,
 ) -> Result<MeetingDetail, AudioError> {
-    gate.ensure_not_purging()
+    let activity = gate
+        .begin_operation()
         .map_err(|err| AudioError::Internal(err.to_string()))?;
 
     let roots = ManagedAudioRoots::from_app(&app)?;
@@ -32,6 +33,11 @@ pub fn import_mp3_meeting(
 
     // Validation + copie hors du verrou SQLite (fichiers jusqu'à 100 Mo).
     let staged = stage_mp3_import(&source, &roots.imports_dir)?;
+
+    if let Err(err) = gate.ensure_generation(activity) {
+        discard_imported_file(&staged.imported.dest_path);
+        return Err(AudioError::Internal(err.to_string()));
+    }
 
     finalize_mp3_import(&state, &title, &staged.imported).inspect_err(|_| {
         discard_imported_file(&staged.imported.dest_path);
