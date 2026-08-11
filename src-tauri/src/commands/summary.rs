@@ -2,7 +2,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-use crate::ai::jobs::{meeting_job_key, summary_fallback_key, AiJobKind, AiJobState};
+use crate::ai::error::AiError;
+use crate::ai::jobs::{meeting_job_key, summary_fallback_key, AiJobKind, AiJobState, AiJobStatus};
 use crate::ai::limits::validate_summary_input_text;
 use crate::ai::model_catalog;
 use crate::ai::models::SummaryOptions;
@@ -12,7 +13,7 @@ use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::local_activity::LocalActivityGate;
 use crate::models::{Action, CreateMeetingInput, Summary};
-use crate::repository::{MeetingRepository, SummaryRepository};
+use crate::repository::{AiJobRepository, MeetingRepository, SummaryRepository};
 use crate::retention;
 use crate::AiAppState;
 
@@ -120,6 +121,23 @@ async fn generate_structured_summary_inner(
         .begin(job_id.clone(), AiJobKind::Summary, job_key)
         .map_err(|e| AppError::Message(e.to_string()))?;
 
+    let _ = db_state.with_db(|conn| {
+        let meeting_id = match &resolved {
+            ResolvedSummaryInput::ExistingMeeting { meeting_id, .. } => Some(meeting_id.as_str()),
+            ResolvedSummaryInput::PastedText { .. } => None,
+        };
+        AiJobRepository::insert_running(
+            conn,
+            &job_id,
+            AiJobKind::Summary,
+            meeting_id,
+            None,
+            "summarizing",
+        )
+    });
+
+    let cancel = job.cancellation_token();
+
     jobs.ensure_not_cancelled(job.job_id())
         .map_err(AppError::Message)?;
     gate.ensure_generation(activity)?;
@@ -134,12 +152,29 @@ async fn generate_structured_summary_inner(
                 model,
                 max_tokens: Some(4096),
             },
+            &cancel,
         )
         .await
-        .map_err(|e| AppError::Message(e.to_string()))?;
+        .map_err(|err| {
+            if matches!(err, AiError::Cancelled) {
+                let _ = db_state.with_db(|conn| {
+                    AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled)
+                });
+            } else {
+                let _ = db_state.with_db(|conn| {
+                    AiJobRepository::update_status(conn, &job_id, AiJobStatus::Failed)
+                });
+            }
+            AppError::Message(err.to_string())
+        })?;
 
     jobs.ensure_not_cancelled(job.job_id())
-        .map_err(AppError::Message)?;
+        .map_err(|err| {
+            let _ = db_state.with_db(|conn| {
+                AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled)
+            });
+            AppError::Message(err)
+        })?;
 
     let structured = structured_summary::parse_structured_summary(&summary_result.text)
         .map_err(|e| AppError::Message(e.to_string()))?;
@@ -181,6 +216,9 @@ async fn generate_structured_summary_inner(
 
     retention::maybe_purge_audio_files(app, db_state, &meeting_id)?;
 
+    let _ = db_state.with_db(|conn| {
+        AiJobRepository::update_status(conn, &job_id, AiJobStatus::Completed)
+    });
     job.finish_completed();
 
     Ok(GenerateStructuredSummaryOutput {

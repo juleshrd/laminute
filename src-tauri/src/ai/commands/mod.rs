@@ -9,6 +9,7 @@ use crate::ai::settings::SettingsStore;
 use crate::AiAppState;
 
 pub mod transcription;
+pub mod recovery;
 
 pub use transcription::TranscriptionState;
 

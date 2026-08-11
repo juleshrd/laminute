@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::diarize::{self, DiarizedSegment};
@@ -180,6 +181,7 @@ impl TranscriptionProvider for OpenAiProvider {
         api_key: &str,
         audio_path: &Path,
         options: TranscriptionOptions,
+        cancel: &CancellationToken,
     ) -> Result<TranscriptionResult, AiError> {
         if api_key.trim().is_empty() {
             return Err(AiError::Other(
@@ -225,22 +227,23 @@ impl TranscriptionProvider for OpenAiProvider {
             }
         }
 
-        let response = self
-            .client
-            .post(format!("{}/audio/transcriptions", self.api_base))
-            .header("Authorization", format!("Bearer {api_key}"))
-            .multipart(form)
-            .send()
-            .await?;
+        let response = http::send_cancellable(
+            self.client
+                .post(format!("{}/audio/transcriptions", self.api_base))
+                .header("Authorization", format!("Bearer {api_key}"))
+                .multipart(form),
+            cancel,
+        )
+        .await?;
 
         let status = response.status();
 
         if !status.is_success() {
-            let body = http::read_provider_error(response).await?;
+            let body = http::read_provider_error(response, Some(cancel)).await?;
             return Err(http::map_http_error(status, &body, "OpenAI", self.id()));
         }
 
-        let body = http::read_provider_response(response).await?;
+        let body = http::read_provider_response(response, Some(cancel)).await?;
         let payload: OpenAiTranscriptionResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -285,6 +288,7 @@ impl SummaryProvider for OpenAiProvider {
         api_key: &str,
         text: &str,
         options: SummaryOptions,
+        cancel: &CancellationToken,
     ) -> Result<SummaryResult, AiError> {
         let model = options.model.unwrap_or_else(|| {
             model_catalog::default_summary_model("openai")
@@ -307,13 +311,14 @@ impl SummaryProvider for OpenAiProvider {
             max_tokens: options.max_tokens,
         };
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.api_base))
-            .header("Authorization", format!("Bearer {api_key}"))
-            .json(&request)
-            .send()
-            .await?;
+        let response = http::send_cancellable(
+            self.client
+                .post(format!("{}/chat/completions", self.api_base))
+                .header("Authorization", format!("Bearer {api_key}"))
+                .json(&request),
+            cancel,
+        )
+        .await?;
 
         if response.status() == StatusCode::UNAUTHORIZED {
             return Err(AiError::Provider {
@@ -324,14 +329,14 @@ impl SummaryProvider for OpenAiProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = http::read_provider_error(response).await?;
+            let body = http::read_provider_error(response, Some(cancel)).await?;
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
                 message: truncate_error_message(&format!("réponse inattendue ({status}) : {body}")),
             });
         }
 
-        let body = http::read_provider_response(response).await?;
+        let body = http::read_provider_response(response, Some(cancel)).await?;
         let payload: ChatCompletionResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -359,6 +364,10 @@ mod tests {
     use std::path::PathBuf;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn no_cancel() -> CancellationToken {
+        CancellationToken::new()
+    }
 
     fn write_temp_audio(name: &str, bytes: &[u8]) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -398,7 +407,7 @@ mod tests {
         let (_dir, audio_path) = write_temp_audio("empty.wav", &[]);
         let provider = OpenAiProvider::new();
         let error = provider
-            .transcribe("sk-test", &audio_path, opts(None, None, None, false))
+            .transcribe("sk-test", &audio_path, opts(None, None, None, false), &no_cancel())
             .await
             .unwrap_err();
         assert!(matches!(error, AiError::Other(_)));
@@ -425,6 +434,7 @@ mod tests {
                 "sk-test",
                 &audio_path,
                 opts(None, Some("fr"), Some("sample.wav"), false),
+                &no_cancel(),
             )
             .await
             .expect("transcription");
@@ -458,6 +468,7 @@ mod tests {
                 "sk-test",
                 &audio_path,
                 opts(Some("gpt-4o-transcribe"), None, Some("sample.wav"), true),
+                &no_cancel(),
             )
             .await
             .expect("diarized transcription");
@@ -495,6 +506,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect("summary");
@@ -528,6 +540,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect_err("oversized response");

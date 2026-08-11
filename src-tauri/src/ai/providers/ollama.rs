@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
@@ -193,6 +194,7 @@ impl SummaryProvider for OllamaProvider {
         _api_key: &str,
         text: &str,
         options: SummaryOptions,
+        cancel: &CancellationToken,
     ) -> Result<SummaryResult, AiError> {
         let base = self.validated_base_url()?;
         let models = self.fetch_models().await.unwrap_or_default();
@@ -213,16 +215,15 @@ impl SummaryProvider for OllamaProvider {
             stream: false,
         };
 
-        let response = self
-            .client
-            .post(format!("{base}/api/chat"))
-            .json(&request)
-            .send()
-            .await?;
+        let response = http::send_cancellable(
+            self.client.post(format!("{base}/api/chat")).json(&request),
+            cancel,
+        )
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = http::read_provider_error(response).await?;
+            let body = http::read_provider_error(response, Some(cancel)).await?;
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
                 message: if status == StatusCode::NOT_FOUND {
@@ -233,7 +234,7 @@ impl SummaryProvider for OllamaProvider {
             });
         }
 
-        let body = http::read_provider_response(response).await?;
+        let body = http::read_provider_response(response, Some(cancel)).await?;
         let payload: OllamaChatResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -258,6 +259,10 @@ mod tests {
     use super::*;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn no_cancel() -> CancellationToken {
+        CancellationToken::new()
+    }
 
     #[tokio::test]
     async fn validate_key_accepts_ping_without_api_key() {
@@ -309,6 +314,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect("summary");
@@ -332,6 +338,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect_err("must reject");
@@ -368,6 +375,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect_err("oversized response");

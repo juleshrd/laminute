@@ -23,7 +23,8 @@ async-trait = "0.1"
 keyring = "3"
 reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls", "stream"] }
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-util = "0.7"
 rusqlite = { version = "0.32", features = ["bundled"] }
 refinery = { version = "0.8", features = ["rusqlite"] }
 uuid = { version = "1", features = ["v4"] }

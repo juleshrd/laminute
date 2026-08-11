@@ -106,6 +106,7 @@ pub fn run() {
                 .expect("répertoire de données applicatives introuvable");
             let db_path = app_data_dir.join("laminute.db");
             let conn = open_and_migrate(&db_path).expect("initialisation SQLite");
+            ai::reconcile::reconcile_ai_jobs(&conn).expect("réconciliation jobs IA");
 
             app.manage(db::AppState {
                 db: Mutex::new(conn),
@@ -157,6 +158,9 @@ pub fn run() {
             ai::commands::transcription::transcribe_audio_file,
             ai::commands::transcription::get_transcription_progress,
             ai::commands::transcription::cancel_ai_job,
+            ai::commands::recovery::get_ai_recovery_actions,
+            ai::commands::recovery::resume_transcription_for_meeting,
+            ai::commands::recovery::resume_summary_for_meeting,
             set_selected_audio_input_device,
             prepare_audio_input,
             start_microphone_recording,
