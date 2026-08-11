@@ -52,6 +52,41 @@ export function generateStructuredSummary(
   });
 }
 
+export function updateStructuredSummary(input: {
+  meetingId: string;
+  structured: import("./types").StructuredSummary;
+  validationState?: import("./types").SummaryValidationState;
+  note?: string;
+}): Promise<import("./types").SummaryRecord> {
+  return invoke("update_structured_summary", { input });
+}
+
+export function setActionStatus(input: {
+  meetingId: string;
+  actionId: string;
+  status: string;
+}): Promise<import("./types").Action> {
+  return invoke("set_action_status", { input });
+}
+
+export function listSummaryRevisions(
+  meetingId: string,
+): Promise<
+  Array<{
+    id: string;
+    summaryId: string;
+    meetingId: string;
+    content: string;
+    validationState: import("./types").SummaryValidationState;
+    model?: string;
+    providerId?: string;
+    note?: string;
+    createdAt: string;
+  }>
+> {
+  return invoke("list_summary_revisions", { meetingId });
+}
+
 export function cancelAiJob(jobId: string): Promise<{ jobId: string; cancelled: boolean }> {
   return invoke<{ jobId: string; cancelled: boolean }>("cancel_ai_job", { jobId });
 }

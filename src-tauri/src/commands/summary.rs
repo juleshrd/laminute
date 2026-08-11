@@ -10,7 +10,7 @@ use crate::ai::summary_pipeline::run_structured_summary;
 use crate::ai::speaker::speaker_identity_pairs;
 use crate::ai::token_pipeline::SummaryPipelineMeta;
 use crate::ai::secrets;
-use crate::ai::structured_summary::StructuredSummary;
+use crate::ai::structured_summary::{parse_structured_summary, StructuredSummary};
 use crate::db::AppState;
 use crate::error::{AppError, AppResult};
 use crate::local_activity::LocalActivityGate;
@@ -159,6 +159,7 @@ async fn generate_structured_summary_inner(
         ResolvedSummaryInput::PastedText { .. } => None,
     };
 
+    let model_for_save = model.clone();
     let summary_run = run_structured_summary(
         &ai_state.registry,
         &provider_id,
@@ -198,12 +199,16 @@ async fn generate_structured_summary_inner(
 
     let (meeting_id, summary, actions) = db_state.with_db(|conn| match &resolved {
         ResolvedSummaryInput::ExistingMeeting { meeting_id, .. } => {
-            let (summary, actions) = SummaryRepository::save_structured_summary(
+            let previous = MeetingRepository::latest_summary(conn, meeting_id)?
+                .and_then(|summary| parse_optional_structured(&summary.content));
+            let (summary, actions) = SummaryRepository::save_structured_summary_with_meta(
                 conn,
                 meeting_id,
                 Some(&provider_id),
                 Some(&provider_display_name),
                 &structured,
+                model_for_save.as_deref(),
+                previous.as_ref(),
             )?;
             Ok((meeting_id.clone(), summary, actions))
         }
@@ -223,6 +228,8 @@ async fn generate_structured_summary_inner(
                 Some(&provider_id),
                 Some(&provider_display_name),
                 &structured,
+                model_for_save.as_deref(),
+                None,
             )?;
             tx.commit()?;
             Ok((meeting.id, summary, actions))
@@ -243,6 +250,74 @@ async fn generate_structured_summary_inner(
         actions,
         meta: pipeline_meta,
     })
+}
+
+fn parse_optional_structured(content: &str) -> Option<StructuredSummary> {
+    parse_structured_summary(content).ok()
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateStructuredSummaryInput {
+    pub meeting_id: String,
+    pub structured: StructuredSummary,
+    pub validation_state: Option<String>,
+    pub note: Option<String>,
+}
+
+#[tauri::command]
+pub fn update_structured_summary(
+    state: State<'_, AppState>,
+    input: UpdateStructuredSummaryInput,
+) -> Result<Summary, String> {
+    let validation = input
+        .validation_state
+        .as_deref()
+        .and_then(crate::ai::structured_summary::SummaryValidationState::from_str)
+        .unwrap_or(crate::ai::structured_summary::SummaryValidationState::Edited);
+    state
+        .with_db(|conn| {
+            SummaryRepository::update_structured_summary(
+                conn,
+                &input.meeting_id,
+                &input.structured,
+                validation,
+                input.note.as_deref(),
+            )
+        })
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetActionStatusInput {
+    pub meeting_id: String,
+    pub action_id: String,
+    pub status: String,
+}
+
+#[tauri::command]
+pub fn set_action_status(
+    state: State<'_, AppState>,
+    input: SetActionStatusInput,
+) -> Result<Action, String> {
+    let status = crate::models::ActionStatus::from_str(&input.status)
+        .ok_or_else(|| format!("statut d'action invalide : {}", input.status))?;
+    state
+        .with_db(|conn| {
+            SummaryRepository::set_action_status(conn, &input.meeting_id, &input.action_id, status)
+        })
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_summary_revisions(
+    state: State<'_, AppState>,
+    meeting_id: String,
+) -> Result<Vec<crate::models::SummaryRevision>, String> {
+    state
+        .with_db(|conn| SummaryRepository::list_revisions(conn, &meeting_id))
+        .map_err(|e| e.to_string())
 }
 
 fn resolve_input(
@@ -311,6 +386,8 @@ mod tests {
             Some("mistral"),
             Some("Mistral AI"),
             &structured,
+            Some("mistral-small-latest"),
+            None,
         )
         .unwrap();
         tx.commit().unwrap();

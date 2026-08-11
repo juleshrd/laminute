@@ -45,6 +45,10 @@ name = "bench_search"
 path = "examples/bench_search.rs"
 
 [[example]]
+name = "bench_ram"
+path = "examples/bench_ram.rs"
+
+[[example]]
 name = "e2e_smoke"
 path = "examples/e2e_smoke.rs"
 

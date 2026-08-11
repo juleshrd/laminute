@@ -5,6 +5,7 @@ import {
   getAiRecoveryActions,
   resumeSummaryForMeeting,
   resumeTranscriptionForMeeting,
+  updateStructuredSummary,
   type AiRecoveryActions,
 } from "../lib/ai/api";
 import { deleteMeeting, getLatestSummary, getLatestTranscription } from "../lib/meetings";
@@ -17,8 +18,9 @@ import {
   parseStoredSummary,
   type MeetingDetail,
 } from "../lib/meetings";
+import { decisionText } from "../lib/ai/parseStructuredSummary";
 import { StructuredSummaryView } from "./StructuredSummaryView";
-import type { SummaryRecord } from "../lib/ai/types";
+import type { StructuredSummary, SummaryRecord } from "../lib/ai/types";
 import type { Transcription } from "../lib/transcription";
 import "./StructuredSummaryPanel.css";
 
@@ -43,9 +45,11 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
   const [recovery, setRecovery] = useState<AiRecoveryActions | null>(null);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const contentRequestId = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [draftSummary, setDraftSummary] = useState<StructuredSummary | null>(null);
 
   const audioFile = detail.audioFiles[0];
-  const structured = summaryRecord ? parseStoredSummary(summaryRecord.content) : null;
+  const structured = draftSummary ?? (summaryRecord ? parseStoredSummary(summaryRecord.content) : null);
   const durationMs = meetingDurationMs(detail);
   const canExportReport = structured !== null;
   const providerHint =
@@ -77,8 +81,11 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
     void request
       .then((content) => {
         if (requestId !== contentRequestId.current) return;
-        if (tab === "essential") setSummaryRecord(content as SummaryRecord | null);
-        else setTranscription(content as Transcription | null);
+        if (tab === "essential") {
+          const record = content as SummaryRecord | null;
+          setSummaryRecord(record);
+          setDraftSummary(record ? parseStoredSummary(record.content) : null);
+        } else setTranscription(content as Transcription | null);
       })
       .catch((err) => {
         if (requestId === contentRequestId.current) {
@@ -320,9 +327,9 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
                 <div>
                   <h3>Décisions</h3>
                   {structured.decisions.length > 0 ? (
-                    structured.decisions.map((decision) => (
-                      <article key={decision} className="essential-card">
-                        <b>{decision}</b>
+                    structured.decisions.map((decision, index) => (
+                      <article key={`${decisionText(decision)}-${index}`} className="essential-card">
+                        <b>{decisionText(decision)}</b>
                       </article>
                     ))
                   ) : (
@@ -366,8 +373,79 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
                 <StructuredSummaryView
                   summary={structured}
                   providerId={summaryRecord?.providerId}
+                  model={summaryRecord?.model}
+                  validationState={summaryRecord?.validationState}
+                  generatedAt={summaryRecord?.createdAt}
+                  editable
                   headingLevel={4}
+                  onChange={setDraftSummary}
+                  onValidateSummary={() => {
+                    if (!draftSummary) return;
+                    setBusy(true);
+                    void updateStructuredSummary({
+                      meetingId: detail.id,
+                      structured: draftSummary,
+                      validationState: "validated",
+                      note: "validation humaine",
+                    })
+                      .then((record) => {
+                        setSummaryRecord(record);
+                        setDraftSummary(parseStoredSummary(record.content));
+                        setStatusMessage("Compte-rendu validé.");
+                      })
+                      .catch((err) => {
+                        setError(err instanceof Error ? err.message : "Validation impossible.");
+                      })
+                      .finally(() => setBusy(false));
+                  }}
+                  onEvidenceRequest={(request) => {
+                    const source = request.sources[0];
+                    if (!source) return;
+                    if (source.startMs != null && audioFile) {
+                      setTab("audio");
+                      window.setTimeout(() => {
+                        const audio = audioRef.current;
+                        if (!audio) return;
+                        audio.currentTime = source.startMs! / 1000;
+                        void audio.play().catch(() => undefined);
+                      }, 50);
+                      return;
+                    }
+                    setTab("transcript");
+                    setStatusMessage(
+                      source.quote
+                        ? `Preuve : « ${source.quote} »`
+                        : "Ouvrez la transcription pour vérifier le passage source.",
+                    );
+                  }}
                 />
+                <div className="structured-summary__actions">
+                  <button
+                    type="button"
+                    disabled={busy || !draftSummary}
+                    onClick={() => {
+                      if (!draftSummary) return;
+                      setBusy(true);
+                      void updateStructuredSummary({
+                        meetingId: detail.id,
+                        structured: draftSummary,
+                        validationState: "edited",
+                        note: "édition humaine",
+                      })
+                        .then((record) => {
+                          setSummaryRecord(record);
+                          setDraftSummary(parseStoredSummary(record.content));
+                          setStatusMessage("Corrections enregistrées.");
+                        })
+                        .catch((err) => {
+                          setError(err instanceof Error ? err.message : "Enregistrement impossible.");
+                        })
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    Enregistrer les corrections
+                  </button>
+                </div>
               </details>
             </>
           ) : (
@@ -400,6 +478,7 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
         <div className="meeting-result__panel" role="tabpanel">
           {audioFile ? (
             <audio
+              ref={audioRef}
               controls
               src={convertFileSrc(audioFile.filePath)}
               className="meeting-detail__audio"

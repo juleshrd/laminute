@@ -134,8 +134,8 @@ pub fn evaluate_scenario(scenario: &EvalScenario) -> ScenarioMetrics {
 
     let gold_decisions = &scenario.gold.decisions;
     let hyp_decisions = &scenario.hypothesis_summary.decisions;
-    let gold_decision_refs: Vec<&str> = gold_decisions.iter().map(String::as_str).collect();
-    let hyp_decision_refs: Vec<&str> = hyp_decisions.iter().map(String::as_str).collect();
+    let gold_decision_refs: Vec<&str> = gold_decisions.iter().map(|d| d.text()).collect();
+    let hyp_decision_refs: Vec<&str> = hyp_decisions.iter().map(|d| d.text()).collect();
     let (decision_precision, decision_recall) =
         precision_recall_strings(&gold_decision_refs, &hyp_decision_refs);
 
@@ -463,11 +463,11 @@ pub fn detect_critical_hallucination(scenario: &EvalScenario) -> bool {
             .gold
             .decisions
             .iter()
-            .any(|g| strings_match(g, decision))
+            .any(|g| strings_match(g.text(), decision.text()))
         {
             continue;
         }
-        if !anchored_in_transcription(decision, &transcription_norm) {
+        if !anchored_in_transcription(decision.text(), &transcription_norm) {
             return true;
         }
     }
@@ -595,7 +595,7 @@ mod tests {
             transcription: transcription.into(),
             gold: StructuredSummary {
                 synthese: "Synthèse gold.".into(),
-                decisions: gold_decisions.into_iter().map(|s| s.to_string()).collect(),
+                decisions: gold_decisions.into_iter().map(|s| s.into()).collect(),
                 actions: gold_actions
                     .into_iter()
                     .map(|(titre, resp, ech)| StructuredActionItem {
@@ -603,6 +603,7 @@ mod tests {
                         description: None,
                         responsable: resp.map(|s| s.to_string()),
                         echeance: ech.map(|s| s.to_string()),
+                ..Default::default()
                     })
                     .collect(),
                 risques: vec![],
@@ -610,7 +611,7 @@ mod tests {
             },
             hypothesis_summary: StructuredSummary {
                 synthese: "Synthèse hypothèse.".into(),
-                decisions: hyp_decisions.into_iter().map(|s| s.to_string()).collect(),
+                decisions: hyp_decisions.into_iter().map(|s| s.into()).collect(),
                 actions: hyp_actions
                     .into_iter()
                     .map(|(titre, resp, ech)| StructuredActionItem {
@@ -618,6 +619,7 @@ mod tests {
                         description: None,
                         responsable: resp.map(|s| s.to_string()),
                         echeance: ech.map(|s| s.to_string()),
+                ..Default::default()
                     })
                     .collect(),
                 risques: vec![],

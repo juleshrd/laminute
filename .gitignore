@@ -36,3 +36,5 @@ reports/eval/latest.md
 .env
 .env.*
 !.env.example
+reports/perf/*.json
+reports/perf/latest.json
