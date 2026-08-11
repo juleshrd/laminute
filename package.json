@@ -25,7 +25,9 @@
     "audit:npm": "npm audit --audit-level=high",
     "audit:rust": "cargo deny --config deny.toml --manifest-path src-tauri/Cargo.toml check",
     "check": "npm run format:check && npm run lint && npm run test && npm run build",
-    "check:ci": "npm run check && npm run audit:rust && npm run audit:npm"
+    "check:ci": "npm run check && npm run audit:rust && npm run audit:npm",
+    "test:e2e": "bash e2e/smoke-linux.sh",
+    "test:e2e:release": "bash e2e/smoke-linux.sh --release-bundle"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

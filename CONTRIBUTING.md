@@ -113,7 +113,11 @@ Les pull requests et les pushes sur `main` déclenchent le workflow [CI](.github
 | `test_rust`     | `npm run test:rust`                            |
 | `build`         | `npm run build`                                |
 | `size_budget`   | build web + binaire release, seuils documentés |
+| `e2e_smoke`     | `npm run test:e2e` (smoke natif JUL-204)       |
 | `audits`        | `npm run audit:rust` puis `npm run audit:npm`  |
+
+Niveaux E2E : voir [e2e/README.md](e2e/README.md) (`test:e2e` PR rapide, `test:e2e:release` post-bundle).
+Le workflow Release exécute aussi `bundle_smoke` multi-OS avant de sortir du draft.
 
 `npm run check:ci` exécute l’ensemble. Un job `summary` classe les échecs en **produit** (format, tests, build, audits) ou **infrastructure** (annulation runner / concurrence PR). Sur les PR, les anciens runs sont annulés ; un push sur `main` ne l’est jamais.
 
@@ -121,7 +125,8 @@ Les tags `v*` déclenchent le workflow [Release](.github/workflows/release.yml) 
 
 1. **validate** — tag sur `main`, versions alignées, `npm run check:ci`
 2. **build** (environnement GitHub `release`) — installateurs Linux / macOS / Windows, `latest.json`, signature **Minisign** obligatoire (`TAURI_SIGNING_PRIVATE_KEY`)
-3. **publish-meta** — `SHA256SUMS` + SBOM joints à la release
+3. **bundle_smoke** — smoke E2E natif multi-OS (garde avant publication)
+4. **publish-meta** — `SHA256SUMS` + SBOM joints à la release
 
 La signature / notarisation Apple (`APPLE_*` dans l’environnement `release`) est optionnelle : avec les cinq secrets, le DMG est signé et contrôlé ; sans aucun secret Apple, il reste publiable mais est marqué non signé/non notarié. Une configuration Apple partielle fait échouer le job pour éviter une signature ambiguë. Voir [docs/release-macos.md](docs/release-macos.md). Authenticode Windows n’est pas encore exigé ; voir [docs/release-windows.md](docs/release-windows.md).
 
