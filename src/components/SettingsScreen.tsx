@@ -7,6 +7,7 @@ import {
   setReduceMotionPreference,
 } from "../lib/preferences";
 import { AiProviderSettings } from "./AiProviderSettings";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PrivacySettings } from "./PrivacySettings";
 import { ToggleSwitch } from "./ToggleSwitch";
 
@@ -162,6 +163,10 @@ export function SettingsScreen({
 
       <section className="lm-panel lm-setting">
         <PrivacySettings />
+      </section>
+
+      <section className="lm-panel lm-setting">
+        <DiagnosticsPanel />
       </section>
     </div>
   );

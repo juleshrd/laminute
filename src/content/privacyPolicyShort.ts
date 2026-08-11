@@ -9,4 +9,6 @@ Fournisseurs IA :
 
 Vous pouvez exporter une réunion en JSON ou tout effacer depuis cette section. Informez les participants avant d'enregistrer.
 
+Un écran Diagnostic local (journaux bornés, bundle ZIP volontaire expurgé) reste sur votre machine jusqu'à partage manuel.
+
 Aucune télémétrie. Licence GPL-3.0.`;

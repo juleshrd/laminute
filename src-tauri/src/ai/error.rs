@@ -29,3 +29,18 @@ pub enum AiError {
     #[error("{0}")]
     Other(String),
 }
+
+impl AiError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::UnknownProvider(_) => "unknown_provider",
+            Self::NotImplemented(_) => "not_implemented",
+            Self::Network(_) => "network_error",
+            Self::Provider { .. } => "provider_error",
+            Self::Secret(_) => "secret_error",
+            Self::Settings(_) => "settings_error",
+            Self::Cancelled => "cancelled",
+            Self::Other(_) => "other",
+        }
+    }
+}

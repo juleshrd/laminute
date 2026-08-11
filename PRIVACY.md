@@ -17,6 +17,7 @@ Ce répertoire contient notamment :
 | Base de données       | `laminute.db`     |
 | Imports MP3           | `imports/`        |
 | Enregistrements micro | `recordings/`     |
+| Journaux locaux       | `logs/`           |
 
 Au premier lancement et depuis **Réglages → Confidentialité et données locales**, vous pouvez choisir un autre emplacement. La Minute crée un sous-dossier `La Minute` dans le dossier parent sélectionné. La base, les réglages applicatifs et les audios sont copiés puis vérifiés avant la bascule ; l’ancien emplacement n’est supprimé qu’après validation. Toute donnée résiduelle impossible à supprimer est signalée.
 
@@ -53,7 +54,21 @@ La Minute n'initie ces appels que lorsque vous déclenchez une transcription ou 
 ## Export et suppression
 
 - **Export** : vous pouvez exporter une réunion (métadonnées, transcription, compte-rendu, actions) au format JSON, Markdown ou PDF depuis l'historique. L'export ne contient pas de clé API ni de chemin absolu vers vos fichiers.
-- **Suppression** : vous pouvez supprimer une réunion (données et fichier audio associé) ou effacer **toutes** les données locales depuis l'application. L'effacement complet ne supprime pas automatiquement les clés API du trousseau ; vous pouvez les retirer manuellement dans les réglages IA.
+- **Suppression** : vous pouvez supprimer une réunion (données et fichier audio associé) ou effacer **toutes** les données locales depuis l'application (base, imports, enregistrements, réglages, **journaux** `logs/`). L'effacement complet ne supprime pas automatiquement les clés API du trousseau ; vous pouvez les retirer manuellement dans les réglages IA.
+
+## Diagnostic local et bundle de support
+
+Depuis **Réglages → Diagnostic et support**, La Minute affiche un état de santé local (version, système, chemins, schéma de base, fournisseur / modèles, trousseau, micro, updater, derniers codes d'erreur).
+
+Les **journaux locaux** (`logs/`) sont bornés (rotation et plafond disque). Ils enregistrent des **codes d'erreur**, messages techniques courts et identifiants de corrélation — **jamais** de clé API, de transcription, de compte-rendu ni de contenu audio.
+
+Vous pouvez **volontairement** générer un bundle ZIP de support :
+
+- un **aperçu exact** du contenu est affiché avant toute sauvegarde ;
+- le ZIP ne contient que des métadonnées de diagnostic, la queue des journaux déjà expurgée, et un rapport court pour GitHub Issues ;
+- aucune donnée de réunion ni secret n'est inclus par défaut (contrôlé par tests).
+
+Le bouton **Copier le rapport GitHub** place un résumé textuel (version / configuration / codes) dans le presse-papiers, sans quitter votre machine.
 
 ## Enregistrement et tiers
 
@@ -61,7 +76,7 @@ L'enregistrement via microphone peut capturer la voix d'autres participants. **I
 
 ## Télémétrie
 
-La Minute **n'envoie aucune télémétrie** ni donnée d'usage à ses développeurs. Seuls les appels que vous initiez vers le fournisseur IA configuré (Mistral, OpenAI, ou Ollama distant) quittent votre machine.
+La Minute **n'envoie aucune télémétrie** ni donnée d'usage à ses développeurs. Seuls les appels que vous initiez vers le fournisseur IA configuré (Mistral, OpenAI, ou Ollama distant) quittent votre machine. Le diagnostic et le bundle de support restent **strictement locaux** jusqu'à ce que *vous* choisissiez de les partager (fichier ou presse-papiers).
 
 ## Licence
 

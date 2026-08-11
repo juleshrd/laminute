@@ -2,6 +2,7 @@ mod ai;
 mod audio;
 mod commands;
 mod db;
+mod diagnostics;
 mod error;
 pub mod eval;
 mod export_write;
@@ -31,9 +32,10 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use audio::{AudioError, AudioInputDevice, AudioInputSetup, AudioState, RecordingStatus};
 use commands::{
     create_meeting, delete_all_local_data, delete_meeting, export_meeting,
-    generate_structured_summary, get_latest_summary, get_latest_transcription,
-    get_local_storage_info, get_meeting, import_mp3_meeting, list_meetings,
-    list_transcription_versions, save_meeting_export, search_meetings, update_meeting_title,
+    generate_structured_summary, get_diagnostics_snapshot, get_latest_summary,
+    get_latest_transcription, get_local_storage_info, get_meeting, import_mp3_meeting,
+    list_meetings, list_transcription_versions, preview_support_bundle, report_diagnostic_event,
+    save_meeting_export, save_support_bundle, search_meetings, update_meeting_title,
     update_meeting_speaker_map,
 };
 use db::open_and_migrate;
@@ -139,6 +141,10 @@ pub fn run() {
             app.asset_protocol_scope()
                 .allow_directory(&roots.recordings_dir, true)?;
 
+            if let Err(err) = diagnostics::init_logging(&app_data_dir) {
+                eprintln!("[startup] journal local indisponible : {err}");
+            }
+
             let db_path = app_data_dir.join("laminute.db");
             let conn = open_and_migrate(&db_path).expect("initialisation SQLite");
             ai::reconcile::reconcile_ai_jobs(&conn).expect("réconciliation jobs IA");
@@ -212,6 +218,10 @@ pub fn run() {
             storage::prepare_local_storage_change,
             storage::apply_local_storage_change,
             delete_all_local_data,
+            get_diagnostics_snapshot,
+            preview_support_bundle,
+            save_support_bundle,
+            report_diagnostic_event,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

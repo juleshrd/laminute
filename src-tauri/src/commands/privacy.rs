@@ -227,7 +227,7 @@ pub fn delete_all_local_data(
         reset_transcription: Some(&reset_transcription),
         clear_secrets: true,
     })
-    .map_err(|err| err.to_string())?;
+    .map_err(|err| crate::diagnostics::capture_app_error(&err, "purge"))?;
 
     // Resynchroniser Ollama sur l'URL par défaut après reset mémoire.
     crate::ai::commands::sync_ollama_base_url(&ai_state);

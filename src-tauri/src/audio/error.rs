@@ -54,7 +54,7 @@ pub enum AudioError {
 }
 
 impl AudioError {
-    fn code(&self) -> &'static str {
+    pub fn code(&self) -> &'static str {
         match self {
             Self::NoInputDevice => "no_input_device",
             Self::DeviceNotFound(_) => "device_not_found",

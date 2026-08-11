@@ -42,6 +42,10 @@ impl LocalDataPaths {
         self.app_data_dir.join(AUDIO_SETTINGS_FILE)
     }
 
+    pub fn logs_dir(&self) -> PathBuf {
+        crate::diagnostics::logs_dir(&self.app_data_dir)
+    }
+
     pub fn roots(&self) -> ManagedAudioRoots {
         ManagedAudioRoots::from_app_data_dir(self.app_data_dir.clone())
     }
@@ -81,6 +85,7 @@ pub fn purge_all_local_data(req: PurgeRequest<'_>) -> AppResult<()> {
 
     remove_if_exists(&req.paths.ai_settings_path())?;
     remove_if_exists(&req.paths.audio_settings_path())?;
+    clear_directory_contents(&req.paths.logs_dir())?;
 
     if let Some(settings) = req.ai_settings {
         let mut store = settings.lock().map_err(|_| {
@@ -271,6 +276,10 @@ mod tests {
         )
         .unwrap();
 
+        let logs = paths.logs_dir();
+        fs::create_dir_all(&logs).unwrap();
+        fs::write(logs.join("laminute.log"), format!("error {SENTINEL}")).unwrap();
+
         let conn = open_and_migrate(&paths.db_path()).unwrap();
         let meeting = MeetingRepository::create(
             &conn,
@@ -344,6 +353,15 @@ mod tests {
             .unwrap()
             .next()
             .is_none());
+        let logs_dir = paths.logs_dir();
+        assert!(
+            !logs_dir.exists()
+                || logs_dir
+                    .read_dir()
+                    .map(|mut d| d.next().is_none())
+                    .unwrap_or(true),
+            "logs/ doit être vide après purge"
+        );
 
         let settings_guard = settings.lock().unwrap();
         assert!(settings_guard.selected_provider_id().is_none());

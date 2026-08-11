@@ -4,6 +4,9 @@ mod privacy;
 mod summary;
 
 pub use audio::import_mp3_meeting;
+pub use crate::diagnostics::{
+    get_diagnostics_snapshot, preview_support_bundle, report_diagnostic_event, save_support_bundle,
+};
 pub use meetings::{
     create_meeting, delete_meeting, get_latest_summary, get_latest_transcription, get_meeting,
     list_meetings, list_transcription_versions, search_meetings, update_meeting_speaker_map,
