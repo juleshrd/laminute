@@ -1,0 +1,19 @@
+{
+  "id": "noise-hesitations",
+  "hypothesisSummary": {
+    "synthese": "Validation du budget formation malgré hésitations dans la transcription.",
+    "decisions": [
+      "Valider le budget formation"
+    ],
+    "actions": [
+      {
+        "titre": "Contacter le prestataire",
+        "description": null,
+        "responsable": "Julie",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

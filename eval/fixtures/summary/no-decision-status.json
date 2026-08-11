@@ -1,0 +1,10 @@
+{
+  "id": "no-decision-status",
+  "hypothesisSummary": {
+    "synthese": "Point d'avancement sans décision.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

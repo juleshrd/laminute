@@ -1,0 +1,49 @@
+{
+  "id": "bilingual-mixed-actions",
+  "tags": [
+    "bilingual",
+    "en",
+    "fr"
+  ],
+  "transcription": "OK pour le sprint. John will deploy staging tonight. Ensuite on fait la démo client vendredi.",
+  "gold": {
+    "synthese": "Déploiement staging et démo client planifiés.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Deploy staging",
+        "description": null,
+        "responsable": "John",
+        "echeance": "tonight"
+      },
+      {
+        "titre": "Faire la démo client",
+        "description": null,
+        "responsable": null,
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Déploiement staging et démo client planifiés.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Deploy staging",
+        "description": null,
+        "responsable": "John",
+        "echeance": "tonight"
+      },
+      {
+        "titre": "Faire la démo client",
+        "description": null,
+        "responsable": null,
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

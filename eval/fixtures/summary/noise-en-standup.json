@@ -1,0 +1,17 @@
+{
+  "id": "noise-en-standup",
+  "hypothesisSummary": {
+    "synthese": "Patch to ship today, owned by Mike.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Ship the patch",
+        "description": null,
+        "responsable": "Mike",
+        "echeance": "today"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "long-fr-comite",
+  "hypothesisSummary": {
+    "synthese": "Focus France maintenu six mois; scénario Allemagne à préparer.",
+    "decisions": [
+      "Maintenir le focus France pour six mois"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer un scénario Allemagne",
+        "description": null,
+        "responsable": "direction financière",
+        "echeance": "septembre"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": [
+      "Ouvrir le marché allemand maintenant ?"
+    ]
+  }
+}

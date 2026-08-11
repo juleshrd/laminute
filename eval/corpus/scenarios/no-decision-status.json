@@ -1,0 +1,22 @@
+{
+  "id": "no-decision-status",
+  "tags": [
+    "no_decision",
+    "fr"
+  ],
+  "transcription": "Point d'avancement uniquement. Rien à trancher aujourd'hui. On note que les tests progressent bien.",
+  "gold": {
+    "synthese": "Point d'avancement sans décision.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Point d'avancement sans décision.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

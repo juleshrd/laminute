@@ -1,0 +1,28 @@
+{
+  "id": "fr-questions-ouvertes",
+  "tags": [
+    "fr",
+    "no_decision"
+  ],
+  "transcription": "On n'a pas tranché sur le modèle de facturation ni sur le partenaire logistique. À creuser.",
+  "gold": {
+    "synthese": "Sujets de facturation et logistique restent ouverts.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": [
+      "Quel modèle de facturation ?",
+      "Quel partenaire logistique ?"
+    ]
+  },
+  "hypothesisSummary": {
+    "synthese": "Sujets de facturation et logistique restent ouverts.",
+    "decisions": [],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": [
+      "Quel modèle de facturation ?",
+      "Quel partenaire logistique ?"
+    ]
+  }
+}

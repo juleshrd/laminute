@@ -1,0 +1,26 @@
+{
+  "id": "fr-minimal",
+  "tags": [
+    "short",
+    "fr"
+  ],
+  "transcription": "Réunion annulée, report à demain.",
+  "gold": {
+    "synthese": "Réunion reportée à demain.",
+    "decisions": [
+      "Reporter la réunion à demain"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Réunion reportée à demain.",
+    "decisions": [
+      "Reporter la réunion à demain"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

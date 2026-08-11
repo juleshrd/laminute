@@ -1,0 +1,19 @@
+{
+  "id": "short-fr-planning",
+  "hypothesisSummary": {
+    "synthese": "Réunion courte de planification Q4.",
+    "decisions": [
+      "Valider le planning Q4"
+    ],
+    "actions": [
+      {
+        "titre": "Envoyer le devis",
+        "description": null,
+        "responsable": "Marie",
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

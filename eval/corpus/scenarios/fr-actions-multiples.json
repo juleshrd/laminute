@@ -1,0 +1,60 @@
+{
+  "id": "fr-actions-multiples",
+  "tags": [
+    "fr",
+    "multi"
+  ],
+  "transcription": "Trois actions : Nina met à jour le tableau de bord, Hugo corrige les exports PDF, et l'équipe QA relance la campagne de tests jeudi.",
+  "gold": {
+    "synthese": "Trois actions opérationnelles assignées.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Mettre à jour le tableau de bord",
+        "description": null,
+        "responsable": "Nina",
+        "echeance": null
+      },
+      {
+        "titre": "Corriger les exports PDF",
+        "description": null,
+        "responsable": "Hugo",
+        "echeance": null
+      },
+      {
+        "titre": "Relancer la campagne de tests",
+        "description": null,
+        "responsable": "équipe QA",
+        "echeance": "jeudi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Trois actions opérationnelles assignées.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Mettre à jour le tableau de bord",
+        "description": null,
+        "responsable": "Nina",
+        "echeance": null
+      },
+      {
+        "titre": "Corriger les exports PDF",
+        "description": null,
+        "responsable": "Hugo",
+        "echeance": null
+      },
+      {
+        "titre": "Relancer la campagne de tests",
+        "description": null,
+        "responsable": "équipe QA",
+        "echeance": "jeudi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

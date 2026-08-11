@@ -1,0 +1,55 @@
+{
+  "id": "multi-en-fr-noise",
+  "tags": [
+    "multi",
+    "bilingual",
+    "noise",
+    "fr",
+    "en"
+  ],
+  "transcription": "Euh OK so... on garde le scope minimal. Peter will write the release notes. Et on teste lundi.",
+  "gold": {
+    "synthese": "Scope minimal, release notes et tests lundi.",
+    "decisions": [
+      "Garder le scope minimal"
+    ],
+    "actions": [
+      {
+        "titre": "Write the release notes",
+        "description": null,
+        "responsable": "Peter",
+        "echeance": null
+      },
+      {
+        "titre": "Tester",
+        "description": null,
+        "responsable": null,
+        "echeance": "lundi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Scope minimal, release notes et tests lundi.",
+    "decisions": [
+      "Garder le scope minimal"
+    ],
+    "actions": [
+      {
+        "titre": "Write the release notes",
+        "description": null,
+        "responsable": "Peter",
+        "echeance": null
+      },
+      {
+        "titre": "Tester",
+        "description": null,
+        "responsable": null,
+        "echeance": "lundi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

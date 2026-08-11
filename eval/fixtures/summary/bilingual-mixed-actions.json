@@ -1,0 +1,23 @@
+{
+  "id": "bilingual-mixed-actions",
+  "hypothesisSummary": {
+    "synthese": "Déploiement staging et démo client planifiés.",
+    "decisions": [],
+    "actions": [
+      {
+        "titre": "Deploy staging",
+        "description": null,
+        "responsable": "John",
+        "echeance": "tonight"
+      },
+      {
+        "titre": "Faire la démo client",
+        "description": null,
+        "responsable": null,
+        "echeance": "vendredi"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

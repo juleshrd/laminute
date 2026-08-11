@@ -1,0 +1,40 @@
+{
+  "id": "en-long-strategy",
+  "tags": [
+    "long",
+    "en"
+  ],
+  "transcription": "Quarterly strategy session. We discussed market expansion, hiring plan, and compliance requirements. Decision: prioritize EU compliance before US launch. Action: legal team drafts updated privacy policy by end of week.",
+  "gold": {
+    "synthese": "Strategy session prioritizing EU compliance.",
+    "decisions": [
+      "Prioritize EU compliance before US launch"
+    ],
+    "actions": [
+      {
+        "titre": "Draft updated privacy policy",
+        "description": null,
+        "responsable": "legal team",
+        "echeance": "end of week"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Strategy session prioritizing EU compliance.",
+    "decisions": [
+      "Prioritize EU compliance before US launch"
+    ],
+    "actions": [
+      {
+        "titre": "Draft updated privacy policy",
+        "description": null,
+        "responsable": "legal team",
+        "echeance": "end of week"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

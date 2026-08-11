@@ -1,0 +1,40 @@
+{
+  "id": "relative-dates-fr",
+  "tags": [
+    "relative_dates",
+    "fr"
+  ],
+  "transcription": "On valide la migration pour la semaine prochaine. Karim envoie le plan détaillé d'ici demain soir.",
+  "gold": {
+    "synthese": "Migration validée pour la semaine prochaine.",
+    "decisions": [
+      "Valider la migration pour la semaine prochaine"
+    ],
+    "actions": [
+      {
+        "titre": "Envoyer le plan détaillé",
+        "description": null,
+        "responsable": "Karim",
+        "echeance": "demain soir"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  },
+  "hypothesisSummary": {
+    "synthese": "Migration validée pour la semaine prochaine.",
+    "decisions": [
+      "Valider la migration pour la semaine prochaine"
+    ],
+    "actions": [
+      {
+        "titre": "Envoyer le plan détaillé",
+        "description": null,
+        "responsable": "Karim",
+        "echeance": "demain soir"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

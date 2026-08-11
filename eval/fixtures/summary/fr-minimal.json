@@ -1,0 +1,12 @@
+{
+  "id": "fr-minimal",
+  "hypothesisSummary": {
+    "synthese": "Réunion reportée à demain.",
+    "decisions": [
+      "Reporter la réunion à demain"
+    ],
+    "actions": [],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "relative-dates-en",
+  "hypothesisSummary": {
+    "synthese": "Pricing revisit next week; competitive analysis due Friday.",
+    "decisions": [
+      "Revisit pricing next week"
+    ],
+    "actions": [
+      {
+        "titre": "Send competitive analysis",
+        "description": null,
+        "responsable": "Sarah",
+        "echeance": "Friday afternoon"
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

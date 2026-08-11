@@ -1,0 +1,19 @@
+{
+  "id": "multi-participants",
+  "hypothesisSummary": {
+    "synthese": "Accord pour un pilote limité à dix utilisateurs.",
+    "decisions": [
+      "Lancer le pilote limité à dix utilisateurs"
+    ],
+    "actions": [
+      {
+        "titre": "Assurer le suivi client",
+        "description": null,
+        "responsable": "Marc",
+        "echeance": null
+      }
+    ],
+    "risques": [],
+    "questionsOuvertes": []
+  }
+}

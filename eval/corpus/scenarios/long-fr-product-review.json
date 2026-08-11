@@ -1,0 +1,49 @@
+{
+  "id": "long-fr-product-review",
+  "tags": [
+    "long",
+    "fr",
+    "multi"
+  ],
+  "transcription": "Réunion produit de deux heures. Nous avons passé en revue la roadmap, les retours clients et les contraintes techniques. L'équipe design propose une refonte de l'onboarding. Décision : reporter la V3 au trimestre prochain pour stabiliser la V2. Action : Thomas prépare un document de spécifications d'ici la fin du mois. Risque identifié : dette technique sur le module d'export. Question ouverte : faut-il externaliser la transcription ?",
+  "gold": {
+    "synthese": "Revue produit approfondie avec report de la V3.",
+    "decisions": [
+      "Reporter la V3 au trimestre prochain"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer le document de spécifications",
+        "description": null,
+        "responsable": "Thomas",
+        "echeance": "fin du mois"
+      }
+    ],
+    "risques": [
+      "Dette technique sur le module d'export"
+    ],
+    "questionsOuvertes": [
+      "Faut-il externaliser la transcription ?"
+    ]
+  },
+  "hypothesisSummary": {
+    "synthese": "Revue produit approfondie avec report de la V3.",
+    "decisions": [
+      "Reporter la V3 au trimestre prochain"
+    ],
+    "actions": [
+      {
+        "titre": "Préparer le document de spécifications",
+        "description": null,
+        "responsable": "Thomas",
+        "echeance": "fin du mois"
+      }
+    ],
+    "risques": [
+      "Dette technique sur le module d'export"
+    ],
+    "questionsOuvertes": [
+      "Faut-il externaliser la transcription ?"
+    ]
+  }
+}
