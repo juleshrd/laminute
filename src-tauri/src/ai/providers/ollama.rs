@@ -129,6 +129,8 @@ struct OllamaChatRequest {
     model: String,
     messages: Vec<OllamaChatMessage>,
     stream: bool,
+    /// Schéma JSON structuré (Ollama `/api/chat` — `format`).
+    format: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -213,6 +215,7 @@ impl SummaryProvider for OllamaProvider {
                 },
             ],
             stream: false,
+            format: structured_summary::json_schema(),
         };
 
         let response = http::send_cancellable(
@@ -257,7 +260,7 @@ impl SummaryProvider for OllamaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_partial_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn no_cancel() -> CancellationToken {
@@ -294,6 +297,9 @@ mod tests {
             .await;
         Mock::given(method("POST"))
             .and(path("/api/chat"))
+            .and(body_partial_json(serde_json::json!({
+                "format": { "type": "object" }
+            })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "model": "llama3.2",
                 "message": {

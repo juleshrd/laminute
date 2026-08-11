@@ -106,6 +106,8 @@ struct ChatCompletionRequest {
     model: String,
     messages: Vec<ChatMessage>,
     max_tokens: Option<u32>,
+    /// JSON mode natif — les modèles non-chat (ex. completions legacy) ne le supportent pas.
+    response_format: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -309,6 +311,7 @@ impl SummaryProvider for OpenAiProvider {
                 },
             ],
             max_tokens: options.max_tokens,
+            response_format: structured_summary::openai_style_json_response_format(),
         };
 
         let response = http::send_cancellable(
@@ -362,7 +365,7 @@ impl SummaryProvider for OpenAiProvider {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_partial_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn no_cancel() -> CancellationToken {
@@ -488,6 +491,9 @@ mod tests {
         let mock_server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({
+                "response_format": { "type": "json_object" }
+            })))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "model": "gpt-4o-mini",
                 "choices": [{
