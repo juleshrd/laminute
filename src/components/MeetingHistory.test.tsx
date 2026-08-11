@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { MeetingHistory } from "./MeetingHistory";
 import type { MeetingDetail, MeetingListItem, MeetingSearchPage } from "../lib/meetings";
@@ -51,6 +51,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function searchCalls() {
+  return invokeMock.mock.calls.filter((call) => call[0] === "search_meetings");
+}
+
 describe("MeetingHistory", () => {
   beforeEach(() => {
     cleanup();
@@ -59,6 +63,12 @@ describe("MeetingHistory", () => {
     invokeMock.mockImplementation((command: string) => {
       if (command === "search_meetings") {
         return Promise.resolve(searchPage([meeting()]));
+      }
+      if (command === "list_ai_providers") {
+        return Promise.resolve([
+          { id: "mistral", displayName: "Mistral", capabilities: ["transcription", "summary"] },
+          { id: "ollama", displayName: "Ollama", capabilities: ["transcription", "summary"] },
+        ]);
       }
       if (command === "get_latest_summary" || command === "get_latest_transcription") {
         return Promise.resolve(null);
@@ -89,6 +99,9 @@ describe("MeetingHistory", () => {
 
   it("recherche via search_meetings et affiche l'extrait", async () => {
     invokeMock.mockImplementation((command: string, args?: { filters?: { query?: string } }) => {
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
+      }
       if (command === "search_meetings") {
         const q = args?.filters?.query;
         if (q === "Dufour") {
@@ -125,8 +138,77 @@ describe("MeetingHistory", () => {
     expect(screen.getByText(/client Dufour/)).toBeInTheDocument();
   });
 
+  it("envoie statut, dates et fournisseur à search_meetings", async () => {
+    render(<MeetingHistory />);
+    await flushSearchDebounce();
+    expect(await screen.findByText("Comité produit")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Statut"), { target: { value: "completed" } });
+    fireEvent.change(screen.getByLabelText("Fournisseur IA"), { target: { value: "mistral" } });
+    fireEvent.change(screen.getByLabelText("Du"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText("Au"), { target: { value: "2026-08-31" } });
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("search_meetings", {
+        filters: {
+          status: "completed",
+          providerId: "mistral",
+          dateFrom: "2026-08-01",
+          dateTo: "2026-08-31",
+        },
+      });
+    });
+  });
+
+  it("filtre la liste au clic sur un jour du calendrier", async () => {
+    invokeMock.mockImplementation((command: string, args?: { filters?: Record<string, string> }) => {
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
+      }
+      if (command === "search_meetings") {
+        const filters = args?.filters ?? {};
+        if (filters.dateFrom === "2026-08-05" && filters.dateTo === "2026-08-05" && !filters.query) {
+          return Promise.resolve(
+            searchPage([meeting({ id: "day", title: "Réunion du 5 août" })]),
+          );
+        }
+        if (filters.dateFrom && filters.dateTo && filters.dateFrom !== filters.dateTo) {
+          return Promise.resolve(
+            searchPage([
+              meeting({
+                id: "cal",
+                title: "Réunion calendrier",
+                startedAt: "2026-08-05T10:00:00Z",
+                createdAt: "2026-08-05T10:00:00Z",
+              }),
+            ]),
+          );
+        }
+        return Promise.resolve(searchPage([meeting()]));
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<MeetingHistory />);
+    await flushSearchDebounce();
+
+    const calendar = await screen.findByRole("grid", { name: "Calendrier des réunions" });
+    const dayButton = within(calendar).getByRole("button", { name: /^5 août/i });
+    fireEvent.click(dayButton);
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("search_meetings", {
+        filters: { dateFrom: "2026-08-05", dateTo: "2026-08-05" },
+      });
+    });
+    expect(await screen.findByRole("heading", { name: "Réunion du 5 août" })).toBeInTheDocument();
+  });
+
   it("affiche un état clair sans résultat", async () => {
     invokeMock.mockImplementation((command: string, args?: { filters?: { query?: string } }) => {
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
+      }
       if (command === "search_meetings") {
         if (args?.filters?.query) {
           return Promise.resolve(searchPage([]));
@@ -153,6 +235,9 @@ describe("MeetingHistory", () => {
     invokeMock.mockImplementation((command: string) => {
       if (command === "search_meetings") {
         return Promise.resolve(searchPage([meeting()]));
+      }
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
       }
       if (command === "get_meeting") {
         return Promise.resolve(detail());
@@ -194,6 +279,9 @@ describe("MeetingHistory", () => {
 
   it("charge la page suivante sans dupliquer les réunions déjà affichées", async () => {
     invokeMock.mockImplementation((command: string, args?: { filters?: { cursor?: string } }) => {
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
+      }
       if (command === "search_meetings") {
         if (args?.filters?.cursor === "cursor-2") {
           return Promise.resolve(
@@ -248,6 +336,7 @@ describe("MeetingHistory", () => {
 
     invokeMock.mockImplementation((command: string) => {
       if (command === "search_meetings") return Promise.resolve(searchPage([meeting()]));
+      if (command === "list_ai_providers") return Promise.resolve([]);
       if (command === "get_meeting") return Promise.resolve(detail());
       if (command === "get_latest_summary") return summary.promise;
       if (command === "get_latest_transcription") return transcription.promise;
@@ -292,6 +381,9 @@ describe("MeetingHistory", () => {
     const newSearch = deferred<ReturnType<typeof searchPage>>();
 
     invokeMock.mockImplementation((command: string, args?: { filters?: { query?: string } }) => {
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
+      }
       if (command === "search_meetings") {
         if (args?.filters?.query === "ancien") {
           return oldSearch.promise;
@@ -306,7 +398,9 @@ describe("MeetingHistory", () => {
 
     render(<MeetingHistory />);
     await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith("search_meetings", { filters: {} }),
+      expect(searchCalls().some((call) => JSON.stringify(call[1]) === '{"filters":{}}')).toBe(
+        true,
+      ),
     );
 
     fireEvent.change(screen.getByPlaceholderText("Rechercher dans toutes les réunions"), {
@@ -346,6 +440,9 @@ describe("MeetingHistory", () => {
             meeting({ id: "b", title: "Réunion B" }),
           ]),
         );
+      }
+      if (command === "list_ai_providers") {
+        return Promise.resolve([]);
       }
       if (command === "get_meeting") {
         return args?.id === "a" ? meetingA.promise : meetingB.promise;

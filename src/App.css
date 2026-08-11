@@ -1554,6 +1554,120 @@ select {
   display: flex;
 }
 
+.meeting-history__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.meeting-history__filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.meeting-history__filter-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--lm-muted);
+}
+
+.meeting-history__filter-row input,
+.meeting-history__filter-row select {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid var(--lm-line);
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--lm-glass-strong);
+  color: var(--lm-navy);
+  font: inherit;
+}
+
+.meeting-history__clear-dates {
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
+
+.meeting-history__calendar {
+  padding: 0.9rem 1rem;
+}
+
+.meeting-history__calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.meeting-history__calendar-header h3,
+.meeting-history__calendar-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.meeting-history__calendar-header button {
+  min-width: 2.5rem;
+}
+
+.meeting-history__calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+}
+
+.meeting-history__calendar-weekday {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--lm-muted);
+}
+
+.meeting-history__calendar-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border: 1px solid var(--lm-line);
+  border-radius: 0.55rem;
+  background: var(--lm-paper);
+  box-shadow: none;
+  font-size: 0.85rem;
+}
+
+.meeting-history__calendar-cell--empty {
+  border: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.meeting-history__calendar-cell--has-meetings {
+  border-color: color-mix(in srgb, var(--lm-accent) 45%, var(--lm-line));
+  background: color-mix(in srgb, var(--lm-soft) 70%, var(--lm-paper));
+}
+
+.meeting-history__calendar-cell--selected {
+  border-color: var(--lm-navy);
+  background: color-mix(in srgb, var(--lm-navy) 8%, var(--lm-paper));
+}
+
+.meeting-history__calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lm-accent);
+}
+
 .meeting-history__snippet {
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
