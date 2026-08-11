@@ -90,9 +90,13 @@ describe("OnboardingIA", () => {
     prepareFirstRun.mockResolvedValue({
       storage: {
         meetingsCount: 0,
+        rootDir: "/Users/test/Library/Application Support/app.laminute.desktop",
+        defaultRootDir: "/Users/test/Library/Application Support/app.laminute.desktop",
+        isCustom: false,
         dbPath: "/Users/test/Library/Application Support/app.laminute.desktop/laminute.db",
         importsDir: "/Users/test/Library/Application Support/app.laminute.desktop/imports",
         recordingsDir: "/Users/test/Library/Application Support/app.laminute.desktop/recordings",
+        availableBytes: 100_000_000,
       },
       keepAudioFiles: true,
       selectedDevice: { id: "mic-1", name: "Micro du Mac", isDefault: true },
@@ -130,6 +134,9 @@ describe("OnboardingIA", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Configurer l’app" }));
     expect(
       await screen.findByText(/Autorisation demandée au premier enregistrement/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Choisir un autre emplacement" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
 
@@ -218,9 +225,13 @@ describe("OnboardingIA", () => {
       .mockResolvedValueOnce({
         storage: {
           meetingsCount: 0,
+          rootDir: "/tmp",
+          defaultRootDir: "/tmp",
+          isCustom: false,
           dbPath: "/tmp/laminute.db",
           importsDir: "/tmp/imports",
           recordingsDir: "/tmp/recordings",
+          availableBytes: 100_000_000,
         },
         keepAudioFiles: true,
         selectedDevice: null,

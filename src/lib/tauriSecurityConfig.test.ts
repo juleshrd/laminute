@@ -3,6 +3,7 @@ import tauriConf from "../../src-tauri/tauri.conf.json";
 import capabilities from "../../src-tauri/capabilities/default.json";
 import entitlements from "../../src-tauri/Entitlements.plist?raw";
 import releaseWorkflow from "../../.github/workflows/release.yml?raw";
+import storageSource from "../../src-tauri/src/storage.rs?raw";
 
 function serializeCsp(csp: unknown): string {
   if (typeof csp === "string") {
@@ -67,6 +68,12 @@ describe("configuration sécurité Tauri", () => {
       expect(pattern).not.toBe("**");
       expect(pattern).not.toMatch(/\/\*\*$/);
     }
+  });
+
+  it("limite aussi la portée asset dynamique aux deux dossiers audio", () => {
+    expect(storageSource).toContain("allow_directory(&roots.imports_dir, true)");
+    expect(storageSource).toContain("allow_directory(&roots.recordings_dir, true)");
+    expect(storageSource).not.toContain("allow_directory(&prepared.destination, true)");
   });
 
   it("limite dialog à open/save et exclut opener", () => {

@@ -7,8 +7,10 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::ai::error::AiError;
 use crate::ai::jobs::{
-    meeting_job_key, transcription_fallback_key, AiJobKind, AiJobState, CancelAiJobOutput,
+    meeting_job_key, transcription_fallback_key, AiJobKind, AiJobState, AiJobStatus,
+    CancelAiJobOutput,
 };
 use crate::ai::limits::validate_transcription_audio_size;
 use crate::ai::model_catalog;
@@ -18,7 +20,7 @@ use crate::audio::paths::{ingest_if_needed, resolve_owned, ManagedAudioRoots};
 use crate::db::AppState;
 use crate::local_activity::LocalActivityGate;
 use crate::models::{CreateMeetingInput, MeetingStatus, Transcription};
-use crate::repository::MeetingRepository;
+use crate::repository::{AiJobRepository, MeetingRepository};
 use crate::retention;
 use crate::AiAppState;
 
@@ -34,7 +36,6 @@ fn system_now_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TranscriptionPhase {
@@ -202,11 +203,16 @@ impl Default for TranscriptionState {
     }
 }
 
+
 fn emit_progress(
     app: &AppHandle,
     transcription_state: &TranscriptionState,
+    db_state: Option<&AppState>,
     progress: TranscriptionProgress,
 ) {
+    if let Some(db_state) = db_state {
+        persist_job_phase(db_state, &progress.job_id, &progress.phase);
+    }
     transcription_state.store_progress(progress.clone());
     let _ = app.emit(TRANSCRIPTION_PROGRESS_EVENT, &progress);
 }
@@ -219,12 +225,38 @@ pub fn get_transcription_progress(
     get_transcription_progress_for_job(&state, job_id)
 }
 
+fn phase_to_str(phase: &TranscriptionPhase) -> &'static str {
+    match phase {
+        TranscriptionPhase::Idle => "idle",
+        TranscriptionPhase::Preparing => "preparing",
+        TranscriptionPhase::Uploading => "uploading",
+        TranscriptionPhase::Transcribing => "transcribing",
+        TranscriptionPhase::Saving => "saving",
+        TranscriptionPhase::Completed => "completed",
+        TranscriptionPhase::Failed => "failed",
+    }
+}
+
+fn persist_job_phase(db_state: &AppState, job_id: &str, phase: &TranscriptionPhase) {
+    let _ =
+        db_state.with_db(|conn| AiJobRepository::update_phase(conn, job_id, phase_to_str(phase)));
+}
+
+fn persist_job_status(db_state: &AppState, job_id: &str, status: AiJobStatus) {
+    let _ = db_state.with_db(|conn| AiJobRepository::update_status(conn, job_id, status));
+}
+
 #[tauri::command]
 pub fn cancel_ai_job(
     jobs: State<'_, AiJobState>,
+    db_state: State<'_, AppState>,
     job_id: String,
 ) -> Result<CancelAiJobOutput, String> {
-    jobs.cancel(&job_id)
+    let output = jobs.cancel(&job_id)?;
+    if output.cancelled {
+        persist_job_status(&db_state, &job_id, AiJobStatus::Cancelled);
+    }
+    Ok(output)
 }
 
 fn get_transcription_progress_for_job(
@@ -328,6 +360,18 @@ pub async fn transcribe_audio_file(
         .begin(job_id.clone(), AiJobKind::Transcription, job_key)
         .map_err(|err| err.to_string())?;
 
+    let _ = db_state.with_db(|conn| {
+        AiJobRepository::insert_running(
+            conn,
+            &job_id,
+            AiJobKind::Transcription,
+            input.meeting_id.as_deref(),
+            None,
+            "preparing",
+        )
+    });
+
+    let cancel = job.cancellation_token();
     let activity = gate.begin_operation().map_err(|e| e.to_string())?;
 
     let (provider_id, transcription_model, diarize) = {
@@ -374,6 +418,7 @@ pub async fn transcribe_audio_file(
     emit_progress(
         &app,
         &transcription_state,
+        Some(&db_state),
         TranscriptionProgress {
             job_id: job.job_id().to_string(),
             phase: TranscriptionPhase::Preparing,
@@ -391,6 +436,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -407,6 +453,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -422,6 +469,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -437,6 +485,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -486,6 +535,7 @@ pub async fn transcribe_audio_file(
     emit_progress(
         &app,
         &transcription_state,
+        Some(&db_state),
         TranscriptionProgress {
             job_id: job_id.clone(),
             phase: TranscriptionPhase::Preparing,
@@ -500,13 +550,15 @@ pub async fn transcribe_audio_file(
     let audio_file = db_state
         .with_db(|conn| {
             MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Processing)?;
-            MeetingRepository::attach_audio_file(
+            let audio_file = MeetingRepository::attach_audio_file(
                 conn,
                 &meeting_id,
                 &owned_path_str,
                 input.duration_ms,
                 format.as_deref(),
-            )
+            )?;
+            AiJobRepository::update_audio_file_id(conn, &job_id, &audio_file.id)?;
+            Ok(audio_file)
         })
         .map_err(|e| e.to_string())?;
 
@@ -519,6 +571,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -532,6 +585,7 @@ pub async fn transcribe_audio_file(
     emit_progress(
         &app,
         &transcription_state,
+        Some(&db_state),
         TranscriptionProgress {
             job_id: job_id.clone(),
             phase: TranscriptionPhase::Uploading,
@@ -544,7 +598,7 @@ pub async fn transcribe_audio_file(
     gate.ensure_generation(activity)
         .map_err(|e| e.to_string())?;
 
-    let result = ai_state
+    let transcribe_result = ai_state
         .registry
         .transcribe_audio(
             &provider_id,
@@ -556,9 +610,23 @@ pub async fn transcribe_audio_file(
                 file_name,
                 diarize,
             },
+            &cancel,
         )
-        .await
-        .map_err(|err| {
+        .await;
+
+    let result = match transcribe_result {
+        Ok(result) => result,
+        Err(err) => {
+            let cancelled = matches!(err, AiError::Cancelled);
+            persist_job_status(
+                &db_state,
+                &job_id,
+                if cancelled {
+                    AiJobStatus::Cancelled
+                } else {
+                    AiJobStatus::Failed
+                },
+            );
             let message = err.to_string();
             let _ = db_state.with_db(|conn| {
                 MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Draft)
@@ -566,6 +634,7 @@ pub async fn transcribe_audio_file(
             emit_progress(
                 &app,
                 &transcription_state,
+                Some(&db_state),
                 TranscriptionProgress {
                     job_id: job_id.clone(),
                     phase: TranscriptionPhase::Failed,
@@ -573,16 +642,22 @@ pub async fn transcribe_audio_file(
                     meeting_id: Some(meeting_id.clone()),
                 },
             );
-            message
-        })?;
+            if cancelled {
+                job.finish_cancelled();
+            }
+            return Err(message);
+        }
+    };
 
     if let Err(message) = jobs.ensure_not_cancelled(job.job_id()) {
+        persist_job_status(&db_state, &job_id, AiJobStatus::Cancelled);
         let _ = db_state.with_db(|conn| {
             MeetingRepository::update_status(conn, &meeting_id, MeetingStatus::Draft)
         });
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -590,12 +665,14 @@ pub async fn transcribe_audio_file(
                 meeting_id: Some(meeting_id.clone()),
             },
         );
+        job.finish_cancelled();
         return Err(message);
     }
 
     emit_progress(
         &app,
         &transcription_state,
+        Some(&db_state),
         TranscriptionProgress {
             job_id: job_id.clone(),
             phase: TranscriptionPhase::Saving,
@@ -608,6 +685,7 @@ pub async fn transcribe_audio_file(
         emit_progress(
             &app,
             &transcription_state,
+            Some(&db_state),
             TranscriptionProgress {
                 job_id: job_id.clone(),
                 phase: TranscriptionPhase::Failed,
@@ -639,6 +717,7 @@ pub async fn transcribe_audio_file(
     emit_progress(
         &app,
         &transcription_state,
+        Some(&db_state),
         TranscriptionProgress {
             job_id: job_id.clone(),
             phase: TranscriptionPhase::Completed,
@@ -648,6 +727,7 @@ pub async fn transcribe_audio_file(
     );
 
     job.finish_completed();
+    persist_job_status(&db_state, &job_id, AiJobStatus::Completed);
 
     Ok(TranscribeAudioOutput {
         job_id,

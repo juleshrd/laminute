@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use tokio_util::sync::CancellationToken;
+
 use crate::ai::error::AiError;
 use crate::ai::http;
 use crate::ai::models::{
@@ -98,13 +100,14 @@ impl ProviderRegistry {
         api_key: &str,
         text: &str,
         options: SummaryOptions,
+        cancel: &CancellationToken,
     ) -> Result<SummaryResult, AiError> {
         let provider = self.summary.get(provider_id).ok_or_else(|| {
             AiError::Other(format!(
                 "le fournisseur « {provider_id} » ne prend pas en charge le résumé structuré"
             ))
         })?;
-        SummaryProvider::summarize(provider.as_ref(), api_key, text, options).await
+        SummaryProvider::summarize(provider.as_ref(), api_key, text, options, cancel).await
     }
 
     pub async fn transcribe_audio(
@@ -113,13 +116,15 @@ impl ProviderRegistry {
         api_key: &str,
         audio_path: &Path,
         options: TranscriptionOptions,
+        cancel: &CancellationToken,
     ) -> Result<TranscriptionResult, AiError> {
         let provider = self.transcription.get(provider_id).ok_or_else(|| {
             AiError::Other(format!(
                 "le fournisseur « {provider_id} » ne prend pas en charge la transcription audio"
             ))
         })?;
-        TranscriptionProvider::transcribe(provider.as_ref(), api_key, audio_path, options).await
+        TranscriptionProvider::transcribe(provider.as_ref(), api_key, audio_path, options, cancel)
+            .await
     }
 }
 
@@ -135,6 +140,7 @@ mod tests {
     use crate::ai::capabilities::ProviderCapabilities;
     use crate::ai::models::{KeyValidationResult, ModelInfo};
     use async_trait::async_trait;
+    use tokio_util::sync::CancellationToken;
 
     struct StubSummaryProvider;
 
@@ -178,6 +184,7 @@ mod tests {
             _api_key: &str,
             text: &str,
             _options: SummaryOptions,
+            _cancel: &CancellationToken,
         ) -> Result<SummaryResult, AiError> {
             Ok(SummaryResult {
                 text: format!("stub:{text}"),
@@ -216,6 +223,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &CancellationToken::new(),
             )
             .await;
         assert!(matches!(result, Err(AiError::Other(_))));
@@ -239,6 +247,7 @@ mod tests {
                     file_name: None,
                     diarize: false,
                 },
+                &CancellationToken::new(),
             )
             .await;
         assert!(matches!(result, Err(AiError::Other(_))));
@@ -260,6 +269,7 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &CancellationToken::new(),
             )
             .await
             .expect("stub summary");
@@ -310,6 +320,7 @@ mod tests {
             _api_key: &str,
             _audio_path: &Path,
             _options: TranscriptionOptions,
+            _cancel: &CancellationToken,
         ) -> Result<TranscriptionResult, AiError> {
             Ok(TranscriptionResult {
                 text: "stub transcription".into(),
@@ -341,6 +352,7 @@ mod tests {
                     file_name: None,
                     diarize: false,
                 },
+                &CancellationToken::new(),
             )
             .await
             .expect("stub transcription");

@@ -55,3 +55,26 @@ export function generateStructuredSummary(
 export function cancelAiJob(jobId: string): Promise<{ jobId: string; cancelled: boolean }> {
   return invoke<{ jobId: string; cancelled: boolean }>("cancel_ai_job", { jobId });
 }
+
+export interface AiRecoveryActions {
+  meetingId: string;
+  canResumeTranscription: boolean;
+  canRetrySummary: boolean;
+  audioFilePath?: string;
+}
+
+export function getAiRecoveryActions(meetingId: string): Promise<AiRecoveryActions> {
+  return invoke<AiRecoveryActions>("get_ai_recovery_actions", { meetingId });
+}
+
+export function resumeTranscriptionForMeeting(
+  meetingId: string,
+): Promise<import("../transcription").TranscribeAudioOutput> {
+  return invoke("resume_transcription_for_meeting", { meetingId });
+}
+
+export function resumeSummaryForMeeting(
+  meetingId: string,
+): Promise<GenerateStructuredSummaryOutput> {
+  return invoke<GenerateStructuredSummaryOutput>("resume_summary_for_meeting", { meetingId });
+}

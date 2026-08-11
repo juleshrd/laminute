@@ -23,6 +23,9 @@ pub enum AiError {
     #[error("erreur de configuration : {0}")]
     Settings(#[from] settings::SettingsError),
 
+    #[error("traitement IA annulé")]
+    Cancelled,
+
     #[error("{0}")]
     Other(String),
 }

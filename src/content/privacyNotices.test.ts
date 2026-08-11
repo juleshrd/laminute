@@ -83,5 +83,7 @@ describe("textes d’accueil et politique courte", () => {
     expect(PRIVACY_POLICY_SHORT).toMatch(/Ollama/);
     expect(PRIVACY_POLICY_SHORT).toMatch(/loopback/);
     expect(PRIVACY_POLICY_SHORT).toMatch(/TLS/);
+    expect(PRIVACY_POLICY_SHORT).toMatch(/dossier local que vous choisissez/);
+    expect(PRIVACY_POLICY_SHORT).toMatch(/petit fichier de configuration/);
   });
 });

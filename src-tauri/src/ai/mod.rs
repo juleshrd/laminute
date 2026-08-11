@@ -10,6 +10,7 @@ pub mod models;
 pub mod ollama_url;
 pub mod provider;
 pub mod providers;
+pub mod reconcile;
 pub mod registry;
 pub mod secrets;
 pub mod settings;

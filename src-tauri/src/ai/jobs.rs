@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -13,12 +14,51 @@ pub enum AiJobKind {
     Summary,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AiJobStatus {
+impl AiJobKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Transcription => "transcription",
+            Self::Summary => "summary",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "transcription" => Some(Self::Transcription),
+            "summary" => Some(Self::Summary),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiJobStatus {
     Running,
     Completed,
     Failed,
     Cancelled,
+}
+
+impl AiJobStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "running" => Some(Self::Running),
+            "completed" => Some(Self::Completed),
+            "failed" => Some(Self::Failed),
+            "cancelled" => Some(Self::Cancelled),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -48,6 +88,7 @@ struct AiJobRecord {
     key: String,
     cancelled: bool,
     status: AiJobStatus,
+    cancel_token: CancellationToken,
     finished_at_ms: Option<u64>,
 }
 
@@ -89,7 +130,11 @@ impl AiJobState {
     }
 
     #[cfg(test)]
-    pub fn new_with_limits(now_ms_fn: fn() -> u64, finished_ttl_ms: u64, finished_lru_cap: usize) -> Self {
+    pub fn new_with_limits(
+        now_ms_fn: fn() -> u64,
+        finished_ttl_ms: u64,
+        finished_lru_cap: usize,
+    ) -> Self {
         Self {
             registry: Mutex::new(AiJobRegistry {
                 jobs: HashMap::new(),
@@ -148,6 +193,7 @@ impl AiJobState {
                 key,
                 cancelled: false,
                 status: AiJobStatus::Running,
+                cancel_token: CancellationToken::new(),
                 finished_at_ms: None,
             },
         );
@@ -174,6 +220,7 @@ impl AiJobState {
         if record.status == AiJobStatus::Running {
             record.cancelled = true;
             record.status = AiJobStatus::Cancelled;
+            record.cancel_token.cancel();
             return Ok(CancelAiJobOutput {
                 job_id: job_id.to_string(),
                 cancelled: true,
@@ -194,10 +241,21 @@ impl AiJobState {
         let Some(record) = registry.jobs.get(job_id) else {
             return Err("traitement IA introuvable".to_string());
         };
-        if record.cancelled || record.status == AiJobStatus::Cancelled {
+        if record.cancelled
+            || record.status == AiJobStatus::Cancelled
+            || record.cancel_token.is_cancelled()
+        {
             return Err("traitement IA annulé".to_string());
         }
         Ok(())
+    }
+
+    pub fn cancellation_token(&self, job_id: &str) -> Option<CancellationToken> {
+        let registry = self.registry.lock().ok()?;
+        registry
+            .jobs
+            .get(job_id)
+            .map(|record| record.cancel_token.clone())
     }
 
     fn finish(&self, job_id: &str, status: AiJobStatus) {
@@ -259,10 +317,7 @@ impl AiJobRegistry {
 
         // 1) TTL : purge des jobs terminés trop anciens.
         while let Some(front_job_id) = self.terminal_queue.front().cloned() {
-            let finished_at_ms = self
-                .jobs
-                .get(&front_job_id)
-                .and_then(|r| r.finished_at_ms);
+            let finished_at_ms = self.jobs.get(&front_job_id).and_then(|r| r.finished_at_ms);
 
             match finished_at_ms {
                 None => {
@@ -318,8 +373,19 @@ impl AiJobGuard<'_> {
         &self.job_id
     }
 
+    pub fn cancellation_token(&self) -> CancellationToken {
+        self.state
+            .cancellation_token(&self.job_id)
+            .unwrap_or_default()
+    }
+
     pub fn finish_completed(mut self) {
         self.state.finish(&self.job_id, AiJobStatus::Completed);
+        self.finished = true;
+    }
+
+    pub fn finish_cancelled(mut self) {
+        self.state.finish(&self.job_id, AiJobStatus::Cancelled);
         self.finished = true;
     }
 }
@@ -416,17 +482,19 @@ mod tests {
     #[test]
     fn cancellation_is_indexed_by_job_id() {
         let state = AiJobState::new();
-        let _job = state
+        let job = state
             .begin(
                 "job-1".into(),
                 AiJobKind::Summary,
                 meeting_job_key("meeting-1"),
             )
             .expect("job");
+        let token = job.cancellation_token();
         let output = state.cancel("job-1").expect("cancel");
         assert!(output.cancelled);
         assert_eq!(output.job_id, "job-1");
         assert!(state.ensure_not_cancelled("job-1").is_err());
+        assert!(token.is_cancelled());
         assert!(!state.cancel("missing").expect("missing").cancelled);
     }
 

@@ -11,6 +11,7 @@ import {
 import { BrandMark } from "./LmShell";
 import { ProviderCredentialsForm } from "./ProviderCredentialsForm";
 import { ProviderLogo } from "./ProviderLogo";
+import { StorageLocationControl } from "./StorageLocationControl";
 import { ToggleSwitch } from "./ToggleSwitch";
 import "./AiProviderSettings.css";
 
@@ -101,7 +102,7 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
     },
     storage: {
       title: "Vos données, au clair.",
-      body: "La Minute prépare ses dossiers privés et vous laisse choisir combien de temps garder les audios.",
+      body: "Choisissez où La Minute conserve ses données et combien de temps garder les audios.",
     },
     choose: {
       title: "Choisissez l’IA.",
@@ -233,8 +234,8 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
             <p className="lm-eyebrow">Stockage et microphone</p>
             <h2>Votre espace est préparé</h2>
             <p className="lm-subtle lm-onboarding-lead">
-              Les réunions restent dans le dossier privé de La Minute. Les exports PDF ou Markdown
-              vous demanderont toujours où enregistrer le fichier.
+              Choisissez l’emplacement local de la base et des audios. Les exports PDF ou Markdown
+              vous demanderont toujours séparément où enregistrer le fichier.
             </p>
 
             {loadingSetup ? <p className="lm-setup-loading">Vérification des dossiers…</p> : null}
@@ -273,6 +274,14 @@ export function OnboardingIA({ onComplete, onSkip }: OnboardingIAProps) {
                   </div>
                 </div>
               </div>
+            ) : null}
+
+            {setupStatus ? (
+              <StorageLocationControl
+                storage={setupStatus.storage}
+                compact
+                onStorageChanged={loadSetup}
+              />
             ) : null}
 
             <div className="lm-setup-preference">

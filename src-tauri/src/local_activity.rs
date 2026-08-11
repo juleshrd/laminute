@@ -29,7 +29,7 @@ impl LocalActivityGate {
     pub fn ensure_not_purging(&self) -> AppResult<()> {
         if self.purge_active.load(Ordering::SeqCst) {
             return Err(AppError::Message(
-                "suppression des données locales en cours — opération refusée".into(),
+                "maintenance des données locales en cours — opération refusée".into(),
             ));
         }
         Ok(())
@@ -46,17 +46,21 @@ impl LocalActivityGate {
         self.ensure_not_purging()?;
         if self.generation.load(Ordering::SeqCst) != token.0 {
             return Err(AppError::Message(
-                "opération annulée : les données locales ont été effacées".into(),
+                "opération annulée : le stockage local a été reconfiguré ou effacé".into(),
             ));
         }
         Ok(())
     }
 
     /// Marque la purge active et invalide tous les jetons en cours.
-    pub fn begin_purge(&self) -> PurgeGuard<'_> {
-        self.purge_active.store(true, Ordering::SeqCst);
+    pub fn begin_purge(&self) -> AppResult<PurgeGuard<'_>> {
+        self.purge_active
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| {
+                AppError::Message("une maintenance des données locales est déjà en cours".into())
+            })?;
         self.generation.fetch_add(1, Ordering::SeqCst);
-        PurgeGuard { gate: self }
+        Ok(PurgeGuard { gate: self })
     }
 
     #[cfg(test)]
@@ -93,7 +97,7 @@ mod tests {
         let gate = LocalActivityGate::new();
         let token = gate.begin_operation().unwrap();
         {
-            let _guard = gate.begin_purge();
+            let _guard = gate.begin_purge().unwrap();
             assert!(gate.ensure_generation(token).is_err());
             assert!(gate.begin_operation().is_err());
         }
@@ -108,7 +112,7 @@ mod tests {
         let gate = Arc::new(LocalActivityGate::new());
         let gate_purge = Arc::clone(&gate);
         let handle = thread::spawn(move || {
-            let _guard = gate_purge.begin_purge();
+            let _guard = gate_purge.begin_purge().unwrap();
             thread::sleep(std::time::Duration::from_millis(50));
         });
 

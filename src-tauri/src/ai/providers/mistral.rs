@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use tokio_util::sync::CancellationToken;
 
 use crate::ai::capabilities::ProviderCapabilities;
 use crate::ai::error::AiError;
@@ -156,6 +157,7 @@ impl TranscriptionProvider for MistralProvider {
         api_key: &str,
         audio_path: &Path,
         options: TranscriptionOptions,
+        cancel: &CancellationToken,
     ) -> Result<TranscriptionResult, AiError> {
         if api_key.trim().is_empty() {
             return Err(AiError::Other(
@@ -188,22 +190,23 @@ impl TranscriptionProvider for MistralProvider {
             form = form.text("language", language.clone());
         }
 
-        let response = self
-            .client
-            .post(format!("{}/audio/transcriptions", self.api_base))
-            .header("Authorization", format!("Bearer {api_key}"))
-            .multipart(form)
-            .send()
-            .await?;
+        let response = http::send_cancellable(
+            self.client
+                .post(format!("{}/audio/transcriptions", self.api_base))
+                .header("Authorization", format!("Bearer {api_key}"))
+                .multipart(form),
+            cancel,
+        )
+        .await?;
 
         let status = response.status();
 
         if !status.is_success() {
-            let body = http::read_provider_error(response).await?;
+            let body = http::read_provider_error(response, Some(cancel)).await?;
             return Err(http::map_http_error(status, &body, "Mistral", self.id()));
         }
 
-        let body = http::read_provider_response(response).await?;
+        let body = http::read_provider_response(response, Some(cancel)).await?;
         let payload: MistralTranscriptionResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -277,6 +280,7 @@ impl SummaryProvider for MistralProvider {
         api_key: &str,
         text: &str,
         options: SummaryOptions,
+        cancel: &CancellationToken,
     ) -> Result<SummaryResult, AiError> {
         let model = options.model.unwrap_or_else(|| {
             model_catalog::default_summary_model("mistral")
@@ -299,13 +303,14 @@ impl SummaryProvider for MistralProvider {
             max_tokens: options.max_tokens,
         };
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.api_base))
-            .header("Authorization", format!("Bearer {api_key}"))
-            .json(&request)
-            .send()
-            .await?;
+        let response = http::send_cancellable(
+            self.client
+                .post(format!("{}/chat/completions", self.api_base))
+                .header("Authorization", format!("Bearer {api_key}"))
+                .json(&request),
+            cancel,
+        )
+        .await?;
 
         if response.status() == StatusCode::UNAUTHORIZED {
             return Err(AiError::Provider {
@@ -316,14 +321,14 @@ impl SummaryProvider for MistralProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = http::read_provider_error(response).await?;
+            let body = http::read_provider_error(response, Some(cancel)).await?;
             return Err(AiError::Provider {
                 provider: self.id().to_string(),
                 message: truncate_error_message(&format!("réponse inattendue ({status}) : {body}")),
             });
         }
 
-        let body = http::read_provider_response(response).await?;
+        let body = http::read_provider_response(response, Some(cancel)).await?;
         let payload: ChatCompletionResponse =
             serde_json::from_str(&body).map_err(|err| AiError::Provider {
                 provider: self.id().to_string(),
@@ -349,8 +354,13 @@ impl SummaryProvider for MistralProvider {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::time::Duration;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn no_cancel() -> CancellationToken {
+        CancellationToken::new()
+    }
 
     fn write_temp_audio(name: &str, bytes: &[u8]) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -390,7 +400,12 @@ mod tests {
         let (_dir, audio_path) = write_temp_audio("empty.wav", &[]);
         let provider = MistralProvider::new();
         let error = provider
-            .transcribe("sk-test", &audio_path, opts(None, None, None, false))
+            .transcribe(
+                "sk-test",
+                &audio_path,
+                opts(None, None, None, false),
+                &no_cancel(),
+            )
             .await
             .unwrap_err();
         assert!(matches!(error, AiError::Other(_)));
@@ -419,6 +434,7 @@ mod tests {
                 "sk-test",
                 &audio_path,
                 opts(None, Some("fr"), Some("sample.wav"), false),
+                &no_cancel(),
             )
             .await
             .expect("transcription");
@@ -454,6 +470,7 @@ mod tests {
                 "sk-test",
                 &audio_path,
                 opts(None, Some("fr"), Some("sample.wav"), true),
+                &no_cancel(),
             )
             .await
             .expect("diarized transcription");
@@ -484,6 +501,7 @@ mod tests {
                 "sk-invalid",
                 &audio_path,
                 opts(None, None, Some("sample.mp3"), false),
+                &no_cancel(),
             )
             .await
             .unwrap_err();
@@ -507,7 +525,12 @@ mod tests {
         );
         let (_dir, audio_path) = write_temp_audio("audio.wav", b"fake-audio-bytes");
         let error = provider
-            .transcribe("sk-test", &audio_path, opts(None, None, None, false))
+            .transcribe(
+                "sk-test",
+                &audio_path,
+                opts(None, None, None, false),
+                &no_cancel(),
+            )
             .await
             .unwrap_err();
 
@@ -539,10 +562,51 @@ mod tests {
                     model: None,
                     max_tokens: None,
                 },
+                &no_cancel(),
             )
             .await
             .expect_err("oversized response");
 
         assert!(err.to_string().contains("trop volumineuse"));
+    }
+
+    #[tokio::test]
+    async fn summarize_cancellation_interrupts_slow_response() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(
+                        "{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"model\":\"m\"}",
+                    )
+                    .set_delay(Duration::from_secs(5)),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let provider = MistralProvider::with_api_base(
+            format!("{}/v1", mock_server.uri()),
+            http::build_client(),
+        );
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+        let handle = tokio::spawn(async move {
+            provider
+                .summarize(
+                    "sk-test",
+                    "Texte",
+                    SummaryOptions {
+                        model: None,
+                        max_tokens: None,
+                    },
+                    &cancel_clone,
+                )
+                .await
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        cancel.cancel();
+        let result = handle.await.expect("join");
+        assert!(matches!(result, Err(AiError::Cancelled)));
     }
 }
