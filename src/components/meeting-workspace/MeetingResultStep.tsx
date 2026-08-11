@@ -108,11 +108,15 @@ export function MeetingResultStep({
                 <div>
                   <h3>Décisions</h3>
                   {structured.decisions.length > 0 ? (
-                    structured.decisions.map((decision) => (
-                      <article key={decision} className="essential-card">
-                        <b>{substituteSpeakerLabels(decision, speakerMap)}</b>
-                      </article>
-                    ))
+                    structured.decisions.map((decision, index) => {
+                      const text =
+                        typeof decision === "string" ? decision : decision.texte;
+                      return (
+                        <article key={`${text}-${index}`} className="essential-card">
+                          <b>{substituteSpeakerLabels(text, speakerMap)}</b>
+                        </article>
+                      );
+                    })
                   ) : (
                     <p className="lm-subtle">Aucune décision identifiée.</p>
                   )}
@@ -149,9 +153,15 @@ export function MeetingResultStep({
                   summary={{
                     ...structured,
                     synthese: substituteSpeakerLabels(structured.synthese, speakerMap),
-                    decisions: structured.decisions.map((d) =>
-                      substituteSpeakerLabels(d, speakerMap),
-                    ),
+                    decisions: structured.decisions.map((d) => {
+                      if (typeof d === "string") {
+                        return substituteSpeakerLabels(d, speakerMap);
+                      }
+                      return {
+                        ...d,
+                        texte: substituteSpeakerLabels(d.texte, speakerMap),
+                      };
+                    }),
                     actions: structured.actions.map((action) => ({
                       ...action,
                       titre: substituteSpeakerLabels(action.titre, speakerMap),

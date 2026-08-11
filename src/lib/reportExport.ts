@@ -1,4 +1,5 @@
-import type { StructuredSummary } from "./ai/types";
+import type { DecisionEntry, StructuredSummary, SummaryValidationState } from "./ai/types";
+import { decisionText } from "./ai/parseStructuredSummary";
 import {
   formatDurationMs,
   meetingDisplayDate,
@@ -14,14 +15,23 @@ export interface ReportExportMeta {
   statusLabel: string;
   displayDate: string;
   durationLabel: string;
+  providerId?: string;
+  model?: string;
+  generatedAt?: string;
+  validationState?: SummaryValidationState;
 }
 
 export function reportExportMeta(detail: MeetingDetail): ReportExportMeta {
+  const latestSummary = detail.summaries[detail.summaries.length - 1];
   return {
     title: detail.title,
     statusLabel: meetingStatusLabel(detail.status),
     displayDate: meetingDisplayDate(detail),
     durationLabel: formatDurationMs(meetingDurationMs(detail)),
+    providerId: latestSummary?.providerId,
+    model: latestSummary?.model,
+    generatedAt: latestSummary?.createdAt,
+    validationState: latestSummary?.validationState,
   };
 }
 
@@ -30,6 +40,13 @@ function bulletList(items: string[]): string {
     return "_Aucun élément._";
   }
   return items.map((item) => `- ${item}`).join("\n");
+}
+
+function bulletDecisions(items: DecisionEntry[]): string {
+  if (items.length === 0) {
+    return "_Aucun élément._";
+  }
+  return items.map((item) => `- ${decisionText(item)}`).join("\n");
 }
 
 function formatActions(actions: StructuredSummary["actions"]): string {
@@ -55,6 +72,17 @@ function formatActions(actions: StructuredSummary["actions"]): string {
     .join("\n");
 }
 
+function validationLabel(state: SummaryValidationState | undefined): string {
+  switch (state) {
+    case "validated":
+      return "Validé";
+    case "edited":
+      return "Corrigé";
+    default:
+      return "Généré";
+  }
+}
+
 /** Construit un Markdown exploitable à partir du compte-rendu affiché. */
 export function buildReportMarkdown(meta: ReportExportMeta, summary: StructuredSummary): string {
   const sections: string[] = [
@@ -67,6 +95,18 @@ export function buildReportMarkdown(meta: ReportExportMeta, summary: StructuredS
     `| Statut | ${meta.statusLabel} |`,
     `| Date | ${meta.displayDate} |`,
     `| Durée | ${meta.durationLabel} |`,
+  ];
+  if (meta.providerId) {
+    sections.push(`| Fournisseur | ${meta.providerId} |`);
+  }
+  if (meta.model) {
+    sections.push(`| Modèle | ${meta.model} |`);
+  }
+  if (meta.generatedAt) {
+    sections.push(`| Généré le | ${meta.generatedAt} |`);
+  }
+  sections.push(`| Validation | ${validationLabel(meta.validationState)} |`);
+  sections.push(
     "",
     `## Synthèse`,
     "",
@@ -74,12 +114,12 @@ export function buildReportMarkdown(meta: ReportExportMeta, summary: StructuredS
     "",
     `## Décisions`,
     "",
-    bulletList(summary.decisions),
+    bulletDecisions(summary.decisions),
     "",
     `## Actions`,
     "",
     formatActions(summary.actions),
-  ];
+  );
 
   if (summary.risques.length > 0) {
     sections.push("", `## Risques`, "", bulletList(summary.risques));

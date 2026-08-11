@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "measuredAt": "2026-08-11T19:39:05.238458098+00:00",
+  "platform": "linux",
+  "process": "native-example",
+  "warmUpMs": 200,
+  "regressionMarginPct": 35.0,
+  "absoluteCeilingsKib": {
+    "ai_jobs_completed_cycles": 20304,
+    "history_search_pages": 20304,
+    "idle_after_warmup": 13797,
+    "import_near_limit_buffer": 14326,
+    "recording_writer_soak": 14677,
+    "return_near_baseline": 20304
+  },
+  "scenarios": {
+    "ai_jobs_completed_cycles": 8972,
+    "history_search_pages": 8972,
+    "idle_after_warmup": 4152,
+    "import_near_limit_buffer": 4544,
+    "recording_writer_soak": 4804,
+    "return_near_baseline": 8972
+  }
+}
