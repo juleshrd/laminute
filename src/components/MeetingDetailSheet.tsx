@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
-import { deleteMeeting } from "../lib/meetings";
+import { deleteMeeting, getLatestSummary, getLatestTranscription } from "../lib/meetings";
 import { buildExportFilename, saveMeetingExport } from "../lib/privacy";
 import {
   formatDurationMs,
@@ -12,6 +12,8 @@ import {
   type MeetingDetail,
 } from "../lib/meetings";
 import { StructuredSummaryView } from "./StructuredSummaryView";
+import type { SummaryRecord } from "../lib/ai/types";
+import type { Transcription } from "../lib/transcription";
 import "./StructuredSummaryPanel.css";
 
 interface MeetingDetailSheetProps {
@@ -28,14 +30,51 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [tab, setTab] = useState<DetailTab>("essential");
+  const [summaryRecord, setSummaryRecord] = useState<SummaryRecord | null>(null);
+  const [transcription, setTranscription] = useState<Transcription | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const contentRequestId = useRef(0);
 
   const audioFile = detail.audioFiles[0];
-  const transcription = detail.transcriptions[detail.transcriptions.length - 1];
-  const summaryRecord = detail.summaries[detail.summaries.length - 1];
   const structured = summaryRecord ? parseStoredSummary(summaryRecord.content) : null;
   const durationMs = meetingDurationMs(detail);
   const canExportReport = structured !== null;
-  const providerHint = summaryRecord?.providerId ?? transcription?.providerId;
+  const providerHint =
+    summaryRecord?.providerId ??
+    detail.summaries[detail.summaries.length - 1]?.providerId ??
+    transcription?.providerId ??
+    detail.transcriptions[detail.transcriptions.length - 1]?.providerId;
+
+  useEffect(() => {
+    const requestId = ++contentRequestId.current;
+    setContentError(null);
+    setSummaryRecord(null);
+    setTranscription(null);
+
+    if (tab === "audio") {
+      setContentLoading(false);
+      return;
+    }
+
+    setContentLoading(true);
+    const request =
+      tab === "essential" ? getLatestSummary(detail.id) : getLatestTranscription(detail.id);
+    void request
+      .then((content) => {
+        if (requestId !== contentRequestId.current) return;
+        if (tab === "essential") setSummaryRecord(content as SummaryRecord | null);
+        else setTranscription(content as Transcription | null);
+      })
+      .catch((err) => {
+        if (requestId === contentRequestId.current) {
+          setContentError(err instanceof Error ? err.message : "Chargement impossible.");
+        }
+      })
+      .finally(() => {
+        if (requestId === contentRequestId.current) setContentLoading(false);
+      });
+  }, [detail.id, tab]);
 
   async function handleExport(kind: ExportKind) {
     setBusy(true);
@@ -158,6 +197,11 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
           {error}
         </p>
       )}
+      {contentError && (
+        <p className="error" role="alert">
+          {contentError}
+        </p>
+      )}
 
       <div className="lm-tabs" role="tablist" aria-label="Contenu de la réunion">
         <button
@@ -191,7 +235,9 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
 
       {tab === "essential" ? (
         <div className="meeting-result__panel" role="tabpanel">
-          {structured ? (
+          {contentLoading ? (
+            <p className="lm-subtle">Chargement du compte-rendu…</p>
+          ) : structured ? (
             <>
               <article className="essential-summary">
                 <p className="lm-kicker">En une phrase</p>
@@ -259,7 +305,9 @@ export function MeetingDetailSheet({ detail, onBack, onDeleted }: MeetingDetailS
 
       {tab === "transcript" ? (
         <div className="meeting-result__panel" role="tabpanel">
-          {transcription ? (
+          {contentLoading ? (
+            <p className="lm-subtle">Chargement de la transcription…</p>
+          ) : transcription ? (
             <div className="meeting-detail__scroll">
               {transcription.providerId ? (
                 <p className="meta">Fournisseur : {transcription.providerId}</p>

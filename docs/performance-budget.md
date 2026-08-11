@@ -49,3 +49,26 @@ DISPLAY=:1 XDG_RUNTIME_DIR=/tmp/runtime-ubuntu npm run build:bundle   # optionne
 - `removeUnusedCommands` déjà actif
 - Plugin opener déjà absent des capacités
 - Alignement `reqwest` 0.13 pour réduire le double graphe avec l’updater
+
+## Régression RAM — contenus de réunion (JUL-196)
+
+Le chargement du détail de réunion ne sérialise désormais que les métadonnées
+des transcriptions et comptes-rendus. Les corps complets passent par des
+commandes dédiées (`get_latest_summary` et `get_latest_transcription`) après
+l’ouverture de l’onglet concerné. Les exports continuent d’utiliser le chemin
+interne complet, sans le faire transiter par la WebView.
+
+Protocole de mesure (5 transcriptions de 1 Mio chacune) :
+
+1. Créer une réunion de test avec cinq versions de transcription de 1 048 576
+   octets et cinq résumés.
+2. Mesurer la taille JSON de la réponse `get_meeting` et le RSS WebView après
+   l’ouverture de l’onglet **Essentiel**, puis **Audio**.
+3. Ouvrir **Transcription** et relever la taille de `get_latest_transcription`.
+
+Attendu : `get_meeting` reste indépendant des 5 Mio de transcriptions et les
+onglets **Essentiel** et **Audio** ne demandent jamais `get_latest_transcription`.
+L’onglet **Transcription** ne charge qu’une seule version. Le test repository
+`get_detail_excludes_heavy_content_and_full_detail_keeps_it_for_exports`
+vérifie explicitement que les champs `content` sont absents du payload IPC,
+tout en restant disponibles au chemin d’export.

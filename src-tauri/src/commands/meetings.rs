@@ -4,7 +4,7 @@ use crate::audio::paths::ManagedAudioRoots;
 use crate::db::AppState;
 use crate::models::{
     CreateMeetingInput, Meeting, MeetingDetail, MeetingSearchFilters, MeetingSearchPage,
-    MeetingSummary,
+    MeetingSummary, Summary, Transcription, TranscriptionMetadata,
 };
 use crate::repository::MeetingRepository;
 use crate::retention;
@@ -23,6 +23,36 @@ pub fn create_meeting(
 pub fn get_meeting(state: State<'_, AppState>, id: String) -> Result<MeetingDetail, String> {
     state
         .with_db(|conn| MeetingRepository::get_detail(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_latest_summary(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Option<Summary>, String> {
+    state
+        .with_db(|conn| MeetingRepository::latest_summary(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_latest_transcription(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Option<Transcription>, String> {
+    state
+        .with_db(|conn| MeetingRepository::latest_transcription(conn, &id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_transcription_versions(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Vec<TranscriptionMetadata>, String> {
+    state
+        .with_db(|conn| MeetingRepository::list_transcription_versions(conn, &id))
         .map_err(|e| e.to_string())
 }
 

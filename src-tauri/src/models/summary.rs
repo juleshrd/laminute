@@ -10,3 +10,13 @@ pub struct Summary {
     pub created_at: String,
     pub updated_at: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SummaryMetadata {
+    pub id: String,
+    pub meeting_id: String,
+    pub provider_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}

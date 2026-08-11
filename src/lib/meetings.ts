@@ -32,10 +32,13 @@ export interface MeetingDetail {
   createdAt: string;
   updatedAt: string;
   audioFiles: AudioFile[];
-  transcriptions: Transcription[];
-  summaries: SummaryRecord[];
+  transcriptions: TranscriptionMetadata[];
+  summaries: SummaryMetadata[];
   actions: Action[];
 }
+
+export type TranscriptionMetadata = Omit<Transcription, "content">;
+export type SummaryMetadata = Omit<SummaryRecord, "content">;
 
 export interface MeetingSearchFilters {
   query?: string;
@@ -68,6 +71,18 @@ export function listMeetings(): Promise<MeetingSummary[]> {
 
 export function getMeeting(id: string): Promise<MeetingDetail> {
   return invoke<MeetingDetail>("get_meeting", { id });
+}
+
+export function getLatestSummary(id: string): Promise<SummaryRecord | null> {
+  return invoke<SummaryRecord | null>("get_latest_summary", { id });
+}
+
+export function getLatestTranscription(id: string): Promise<Transcription | null> {
+  return invoke<Transcription | null>("get_latest_transcription", { id });
+}
+
+export function listTranscriptionVersions(id: string): Promise<TranscriptionMetadata[]> {
+  return invoke<TranscriptionMetadata[]>("list_transcription_versions", { id });
 }
 
 export function searchMeetings(filters: MeetingSearchFilters): Promise<MeetingSearchPage> {

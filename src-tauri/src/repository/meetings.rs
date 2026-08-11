@@ -5,8 +5,9 @@ use uuid::Uuid;
 use crate::audio::import::ImportedAudio;
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingListItem,
-    MeetingSearchFilters, MeetingSearchPage, MeetingStatus, MeetingSummary, Summary, Transcription,
+    Action, ActionStatus, AudioFile, CreateMeetingInput, Meeting, MeetingDetail, MeetingFullDetail,
+    MeetingListItem, MeetingSearchFilters, MeetingSearchPage, MeetingStatus, MeetingSummary,
+    Summary, SummaryMetadata, Transcription, TranscriptionMetadata,
 };
 
 pub struct MeetingRepository;
@@ -57,10 +58,60 @@ impl MeetingRepository {
         Ok(MeetingDetail {
             meeting,
             audio_files: Self::list_audio_files(conn, id)?,
+            transcriptions: Self::list_transcription_metadata(conn, id)?,
+            summaries: Self::list_summary_metadata(conn, id)?,
+            actions: Self::list_actions(conn, id)?,
+        })
+    }
+
+    pub fn get_full_detail(conn: &Connection, id: &str) -> AppResult<MeetingFullDetail> {
+        let meeting = Self::get_by_id(conn, id)?;
+
+        Ok(MeetingFullDetail {
+            meeting,
+            audio_files: Self::list_audio_files(conn, id)?,
             transcriptions: Self::list_transcriptions(conn, id)?,
             summaries: Self::list_summaries(conn, id)?,
             actions: Self::list_actions(conn, id)?,
         })
+    }
+
+    pub fn latest_transcription(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Option<Transcription>> {
+        Self::get_by_id(conn, meeting_id)?;
+        conn.query_row(
+            "SELECT id, meeting_id, audio_file_id, provider_id, content, language, created_at, updated_at
+             FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at DESC, id DESC LIMIT 1",
+            [meeting_id],
+            map_transcription_row,
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
+    pub fn latest_summary(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Option<Summary>> {
+        Self::get_by_id(conn, meeting_id)?;
+        conn.query_row(
+            "SELECT id, meeting_id, provider_id, content, created_at, updated_at
+             FROM summaries WHERE meeting_id = ?1 ORDER BY created_at DESC, id DESC LIMIT 1",
+            [meeting_id],
+            map_summary_row,
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
+    pub fn list_transcription_versions(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Vec<TranscriptionMetadata>> {
+        Self::get_by_id(conn, meeting_id)?;
+        Self::list_transcription_metadata(conn, meeting_id)
     }
 
     pub fn list(conn: &Connection) -> AppResult<Vec<MeetingSummary>> {
@@ -417,18 +468,7 @@ impl MeetingRepository {
              FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
-        let rows = stmt.query_map([meeting_id], |row| {
-            Ok(Transcription {
-                id: row.get(0)?,
-                meeting_id: row.get(1)?,
-                audio_file_id: row.get(2)?,
-                provider_id: row.get(3)?,
-                content: row.get(4)?,
-                language: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map([meeting_id], map_transcription_row)?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
@@ -439,17 +479,50 @@ impl MeetingRepository {
              FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
         )?;
 
+        let rows = stmt.query_map([meeting_id], map_summary_row)?;
+
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    fn list_transcription_metadata(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Vec<TranscriptionMetadata>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, audio_file_id, provider_id, language, created_at, updated_at
+             FROM transcriptions WHERE meeting_id = ?1 ORDER BY created_at ASC",
+        )?;
         let rows = stmt.query_map([meeting_id], |row| {
-            Ok(Summary {
+            Ok(TranscriptionMetadata {
+                id: row.get(0)?,
+                meeting_id: row.get(1)?,
+                audio_file_id: row.get(2)?,
+                provider_id: row.get(3)?,
+                language: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    fn list_summary_metadata(
+        conn: &Connection,
+        meeting_id: &str,
+    ) -> AppResult<Vec<SummaryMetadata>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, provider_id, created_at, updated_at
+             FROM summaries WHERE meeting_id = ?1 ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map([meeting_id], |row| {
+            Ok(SummaryMetadata {
                 id: row.get(0)?,
                 meeting_id: row.get(1)?,
                 provider_id: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
             })
         })?;
-
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -489,6 +562,30 @@ fn map_meeting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         ended_at: row.get(5)?,
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
+    })
+}
+
+fn map_transcription_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcription> {
+    Ok(Transcription {
+        id: row.get(0)?,
+        meeting_id: row.get(1)?,
+        audio_file_id: row.get(2)?,
+        provider_id: row.get(3)?,
+        content: row.get(4)?,
+        language: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+fn map_summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
+    Ok(Summary {
+        id: row.get(0)?,
+        meeting_id: row.get(1)?,
+        provider_id: row.get(2)?,
+        content: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
     })
 }
 
@@ -663,7 +760,7 @@ mod tests {
     }
 
     #[test]
-    fn get_detail_includes_related_entities() {
+    fn get_detail_excludes_heavy_content_and_full_detail_keeps_it_for_exports() {
         let conn = open_in_memory().unwrap();
         let meeting = MeetingRepository::create(
             &conn,
@@ -681,6 +778,23 @@ mod tests {
         assert_eq!(detail.summaries.len(), 1);
         assert_eq!(detail.actions.len(), 1);
         assert_eq!(detail.actions[0].status, ActionStatus::Pending);
+
+        let ipc_payload = serde_json::to_value(&detail).unwrap();
+        assert!(ipc_payload["transcriptions"][0].get("content").is_none());
+        assert!(ipc_payload["summaries"][0].get("content").is_none());
+
+        let full_detail = MeetingRepository::get_full_detail(&conn, &meeting.id).unwrap();
+        assert_eq!(full_detail.transcriptions[0].content, "Bonjour à tous");
+        assert_eq!(full_detail.summaries[0].content, "Réunion de lancement");
+
+        let latest = MeetingRepository::latest_transcription(&conn, &meeting.id).unwrap();
+        assert_eq!(latest.unwrap().content, "Bonjour à tous");
+        assert_eq!(
+            MeetingRepository::list_transcription_versions(&conn, &meeting.id)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
