@@ -91,10 +91,7 @@ impl MeetingRepository {
         .map_err(Into::into)
     }
 
-    pub fn latest_summary(
-        conn: &Connection,
-        meeting_id: &str,
-    ) -> AppResult<Option<Summary>> {
+    pub fn latest_summary(conn: &Connection, meeting_id: &str) -> AppResult<Option<Summary>> {
         Self::get_by_id(conn, meeting_id)?;
         conn.query_row(
             "SELECT id, meeting_id, provider_id, content, created_at, updated_at

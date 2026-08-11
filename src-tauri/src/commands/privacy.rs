@@ -611,7 +611,7 @@ mod tests {
         assert!(json.contains("Comité produit"));
         assert!(json.contains("Point d'avancement"));
 
-        let detail = MeetingRepository::get_detail(&conn, &meeting_id).unwrap();
+        let detail = MeetingRepository::get_full_detail(&conn, &meeting_id).unwrap();
         let summary = parse_structured_summary(&detail.summaries.last().unwrap().content).unwrap();
         let md = build_meeting_report_markdown(MeetingReportMarkdownInput {
             title: &detail.meeting.title,
