@@ -45,6 +45,10 @@ name = "bench_search"
 path = "examples/bench_search.rs"
 
 [[example]]
+name = "bench_ram"
+path = "examples/bench_ram.rs"
+
+[[example]]
 name = "eval_ai"
 path = "examples/eval_ai.rs"
 

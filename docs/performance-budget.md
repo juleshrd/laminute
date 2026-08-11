@@ -43,6 +43,33 @@ stat -c '%s' src-tauri/target/release/laminute
 DISPLAY=:1 XDG_RUNTIME_DIR=/tmp/runtime-ubuntu npm run build:bundle   # optionnel
 ```
 
+## RSS / soak (JUL-194)
+
+Le job CI `ram_budget` exécute `cargo run --example bench_ram -- --check` sur Linux.
+Il mesure le **RSS du processus natif** (pas la WebView) via `/proc/self/status` VmRSS.
+
+Scénarios (échelle CI réduite ; `LAMINUTE_RAM_FULL=1` pour la charge complète) :
+
+| Scénario | Intention |
+| -------- | --------- |
+| `idle_after_warmup` | RSS après warm-up |
+| `import_near_limit_buffer` | buffer proche d’une limite d’import (mock) |
+| `recording_writer_soak` | frames d’enregistrement bornées |
+| `history_search_pages` | pagination historique |
+| `ai_jobs_completed_cycles` | cycles de jobs terminés |
+| `return_near_baseline` | RSS après libération (l’allocateur peut garder de la mémoire OS) |
+
+Baseline versionnée : `reports/perf/baseline.json` (seuils absolus + marge de régression 35 %).
+Reproduction locale :
+
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --example bench_ram -- --check
+cargo run --manifest-path src-tauri/Cargo.toml --example bench_ram -- --write-baseline
+```
+
+Variance attendue : runners CI ± quelques MiB ; la marge et le slack de 8 MiB amortissent le bruit.
+La mesure WebView (processus GTK/WebKit séparé) n’est pas encore un seuil CI — documentée pour une phase 2.
+
 ## Nettoyage livré avec ce budget
 
 - Assets Vite/Tauri morts retirés de `public/`
