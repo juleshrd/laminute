@@ -114,21 +114,13 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiJobRecord> {
     Ok(AiJobRecord {
         job_id: row.get(0)?,
         kind: AiJobKind::from_str(&kind_str).ok_or_else(|| {
-            rusqlite::Error::InvalidColumnType(
-                1,
-                "kind".into(),
-                rusqlite::types::Type::Text,
-            )
+            rusqlite::Error::InvalidColumnType(1, "kind".into(), rusqlite::types::Type::Text)
         })?,
         meeting_id: row.get(2)?,
         audio_file_id: row.get(3)?,
         phase: row.get(4)?,
         status: AiJobStatus::from_str(&status_str).ok_or_else(|| {
-            rusqlite::Error::InvalidColumnType(
-                5,
-                "status".into(),
-                rusqlite::types::Type::Text,
-            )
+            rusqlite::Error::InvalidColumnType(5, "status".into(), rusqlite::types::Type::Text)
         })?,
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
@@ -167,9 +159,10 @@ mod tests {
         AiJobRepository::update_phase(&conn, "job-1", "uploading").expect("phase");
         AiJobRepository::update_status(&conn, "job-1", AiJobStatus::Cancelled).expect("status");
 
-        let latest = AiJobRepository::latest_for_meeting(&conn, &meeting.id, AiJobKind::Transcription)
-            .expect("latest")
-            .expect("record");
+        let latest =
+            AiJobRepository::latest_for_meeting(&conn, &meeting.id, AiJobKind::Transcription)
+                .expect("latest")
+                .expect("record");
         assert_eq!(latest.status, AiJobStatus::Cancelled);
         assert_eq!(latest.phase, "uploading");
     }
@@ -187,8 +180,14 @@ mod tests {
         .expect("meeting");
         MeetingRepository::update_status(&conn, &meeting.id, MeetingStatus::Processing)
             .expect("status");
-        MeetingRepository::attach_audio_file(&conn, &meeting.id, "/tmp/audio.wav", Some(1000), Some("wav"))
-            .expect("audio");
+        MeetingRepository::attach_audio_file(
+            &conn,
+            &meeting.id,
+            "/tmp/audio.wav",
+            Some(1000),
+            Some("wav"),
+        )
+        .expect("audio");
 
         AiJobRepository::insert_running(
             &conn,

@@ -15,8 +15,9 @@ pub fn reconcile_ai_jobs(conn: &Connection) -> AppResult<()> {
         };
 
         let completed = match job.kind {
-            AiJobKind::Transcription => MeetingRepository::latest_transcription(conn, meeting_id)?
-                .is_some(),
+            AiJobKind::Transcription => {
+                MeetingRepository::latest_transcription(conn, meeting_id)?.is_some()
+            }
             AiJobKind::Summary => MeetingRepository::latest_summary(conn, meeting_id)?.is_some(),
         };
 

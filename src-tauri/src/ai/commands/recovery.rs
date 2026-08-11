@@ -20,26 +20,23 @@ pub struct AiRecoveryActions {
     pub audio_file_path: Option<String>,
 }
 
-fn compute_recovery_actions(conn: &rusqlite::Connection, meeting_id: &str) -> AppResult<AiRecoveryActions> {
+fn compute_recovery_actions(
+    conn: &rusqlite::Connection,
+    meeting_id: &str,
+) -> AppResult<AiRecoveryActions> {
     let detail = MeetingRepository::get_detail(conn, meeting_id)?;
     let has_transcription = !detail.transcriptions.is_empty();
     let has_summary = !detail.summaries.is_empty();
     let has_audio = !detail.audio_files.is_empty();
     let recoverable = detail.meeting.status == MeetingStatus::Processing;
 
-    let interrupted_transcription = AiJobRepository::latest_for_meeting(
-        conn,
-        meeting_id,
-        AiJobKind::Transcription,
-    )?
-    .is_some_and(|job| job.status == AiJobStatus::Cancelled);
+    let interrupted_transcription =
+        AiJobRepository::latest_for_meeting(conn, meeting_id, AiJobKind::Transcription)?
+            .is_some_and(|job| job.status == AiJobStatus::Cancelled);
 
-    let interrupted_summary = AiJobRepository::latest_for_meeting(
-        conn,
-        meeting_id,
-        AiJobKind::Summary,
-    )?
-    .is_some_and(|job| job.status == AiJobStatus::Cancelled);
+    let interrupted_summary =
+        AiJobRepository::latest_for_meeting(conn, meeting_id, AiJobKind::Summary)?
+            .is_some_and(|job| job.status == AiJobStatus::Cancelled);
 
     let can_resume_transcription =
         has_audio && !has_transcription && (recoverable || interrupted_transcription);
@@ -50,7 +47,10 @@ fn compute_recovery_actions(conn: &rusqlite::Connection, meeting_id: &str) -> Ap
         meeting_id: meeting_id.to_string(),
         can_resume_transcription,
         can_retry_summary,
-        audio_file_path: detail.audio_files.first().map(|file| file.file_path.clone()),
+        audio_file_path: detail
+            .audio_files
+            .first()
+            .map(|file| file.file_path.clone()),
     })
 }
 

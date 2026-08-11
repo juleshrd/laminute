@@ -8,8 +8,8 @@ use crate::ai::secrets;
 use crate::ai::settings::SettingsStore;
 use crate::AiAppState;
 
-pub mod transcription;
 pub mod recovery;
+pub mod transcription;
 
 pub use transcription::TranscriptionState;
 

@@ -135,14 +135,9 @@ fn phase_to_str(phase: &TranscriptionPhase) -> &'static str {
     }
 }
 
-fn persist_job_phase(
-    db_state: &AppState,
-    job_id: &str,
-    phase: &TranscriptionPhase,
-) {
-    let _ = db_state.with_db(|conn| {
-        AiJobRepository::update_phase(conn, job_id, phase_to_str(phase))
-    });
+fn persist_job_phase(db_state: &AppState, job_id: &str, phase: &TranscriptionPhase) {
+    let _ =
+        db_state.with_db(|conn| AiJobRepository::update_phase(conn, job_id, phase_to_str(phase)));
 }
 
 fn persist_job_status(db_state: &AppState, job_id: &str, status: AiJobStatus) {

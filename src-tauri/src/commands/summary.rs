@@ -168,13 +168,11 @@ async fn generate_structured_summary_inner(
             AppError::Message(err.to_string())
         })?;
 
-    jobs.ensure_not_cancelled(job.job_id())
-        .map_err(|err| {
-            let _ = db_state.with_db(|conn| {
-                AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled)
-            });
-            AppError::Message(err)
-        })?;
+    jobs.ensure_not_cancelled(job.job_id()).map_err(|err| {
+        let _ = db_state
+            .with_db(|conn| AiJobRepository::update_status(conn, &job_id, AiJobStatus::Cancelled));
+        AppError::Message(err)
+    })?;
 
     let structured = structured_summary::parse_structured_summary(&summary_result.text)
         .map_err(|e| AppError::Message(e.to_string()))?;
@@ -216,9 +214,8 @@ async fn generate_structured_summary_inner(
 
     retention::maybe_purge_audio_files(app, db_state, &meeting_id)?;
 
-    let _ = db_state.with_db(|conn| {
-        AiJobRepository::update_status(conn, &job_id, AiJobStatus::Completed)
-    });
+    let _ = db_state
+        .with_db(|conn| AiJobRepository::update_status(conn, &job_id, AiJobStatus::Completed));
     job.finish_completed();
 
     Ok(GenerateStructuredSummaryOutput {

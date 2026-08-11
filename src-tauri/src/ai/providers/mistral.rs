@@ -400,7 +400,12 @@ mod tests {
         let (_dir, audio_path) = write_temp_audio("empty.wav", &[]);
         let provider = MistralProvider::new();
         let error = provider
-            .transcribe("sk-test", &audio_path, opts(None, None, None, false), &no_cancel())
+            .transcribe(
+                "sk-test",
+                &audio_path,
+                opts(None, None, None, false),
+                &no_cancel(),
+            )
             .await
             .unwrap_err();
         assert!(matches!(error, AiError::Other(_)));
@@ -520,7 +525,12 @@ mod tests {
         );
         let (_dir, audio_path) = write_temp_audio("audio.wav", b"fake-audio-bytes");
         let error = provider
-            .transcribe("sk-test", &audio_path, opts(None, None, None, false), &no_cancel())
+            .transcribe(
+                "sk-test",
+                &audio_path,
+                opts(None, None, None, false),
+                &no_cancel(),
+            )
             .await
             .unwrap_err();
 
@@ -567,7 +577,9 @@ mod tests {
             .and(path("/v1/chat/completions"))
             .respond_with(
                 ResponseTemplate::new(200)
-                    .set_body_string("{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"model\":\"m\"}")
+                    .set_body_string(
+                        "{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"model\":\"m\"}",
+                    )
                     .set_delay(Duration::from_secs(5)),
             )
             .mount(&mock_server)

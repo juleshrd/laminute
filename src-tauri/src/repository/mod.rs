@@ -1,6 +1,6 @@
+mod ai_jobs;
 mod meetings;
 mod summaries;
-mod ai_jobs;
 
 pub use ai_jobs::AiJobRepository;
 pub use meetings::MeetingRepository;
