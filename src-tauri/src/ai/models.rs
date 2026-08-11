@@ -91,6 +91,17 @@ pub struct TranscriptionResult {
 pub struct SummaryOptions {
     pub model: Option<String>,
     pub max_tokens: Option<u32>,
+    pub prompt_mode: crate::ai::structured_summary::SummaryPromptMode,
+}
+
+impl Default for SummaryOptions {
+    fn default() -> Self {
+        Self {
+            model: None,
+            max_tokens: None,
+            prompt_mode: crate::ai::structured_summary::SummaryPromptMode::Full,
+        }
+    }
 }
 
 /// Résultat de résumé (consommé par JUL-153+).

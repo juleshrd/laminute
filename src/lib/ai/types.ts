@@ -87,10 +87,18 @@ export interface GenerateStructuredSummaryInput {
   model?: string;
 }
 
+export interface SummaryPipelineMeta {
+  pipelineUsed?: boolean;
+  estimatedInputTokens?: number;
+  chunkCount?: number;
+  estimatedCostUsd?: number;
+}
+
 export interface GenerateStructuredSummaryOutput {
   jobId: string;
   meetingId: string;
   summary: SummaryRecord;
   structured: StructuredSummary;
   actions: Action[];
+  meta?: SummaryPipelineMeta;
 }

@@ -12,7 +12,7 @@ use crate::ai::limits::truncate_error_message;
 use crate::ai::models::{KeyValidationResult, ModelInfo, SummaryOptions, SummaryResult};
 use crate::ai::ollama_url;
 use crate::ai::provider::AiProvider;
-use crate::ai::structured_summary::{self, SYSTEM_PROMPT};
+use crate::ai::structured_summary;
 use crate::ai::summary::SummaryProvider;
 
 pub const DEFAULT_OLLAMA_BASE: &str = "http://127.0.0.1:11434";
@@ -202,16 +202,17 @@ impl SummaryProvider for OllamaProvider {
         let models = self.fetch_models().await.unwrap_or_default();
         let model = self.resolve_model(&options, &models);
 
+        let prompt_mode = options.prompt_mode;
         let request = OllamaChatRequest {
             model: model.clone(),
             messages: vec![
                 OllamaChatMessage {
                     role: "system".to_string(),
-                    content: SYSTEM_PROMPT.to_string(),
+                    content: structured_summary::system_prompt_for(prompt_mode).to_string(),
                 },
                 OllamaChatMessage {
                     role: "user".to_string(),
-                    content: structured_summary::build_user_prompt(text),
+                    content: structured_summary::build_user_prompt_for(prompt_mode, text),
                 },
             ],
             stream: false,
@@ -319,6 +320,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &no_cancel(),
             )
@@ -343,6 +345,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &no_cancel(),
             )
@@ -380,6 +383,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &no_cancel(),
             )

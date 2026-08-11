@@ -16,6 +16,8 @@ pub mod secrets;
 pub mod settings;
 pub mod structured_summary;
 pub mod summary;
+pub mod summary_pipeline;
+pub mod token_pipeline;
 pub mod transcription;
 
 pub use commands::TranscriptionState;

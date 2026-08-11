@@ -62,16 +62,16 @@ impl ProviderRegistry {
         registry
     }
 
-    fn register_ai(&mut self, provider: Arc<dyn AiProvider>) {
+    pub(crate) fn register_ai(&mut self, provider: Arc<dyn AiProvider>) {
         self.providers.insert(provider.id().to_string(), provider);
     }
 
-    fn register_transcription(&mut self, provider: Arc<dyn TranscriptionProvider>) {
+    pub(crate) fn register_transcription(&mut self, provider: Arc<dyn TranscriptionProvider>) {
         self.transcription
             .insert(provider.id().to_string(), provider);
     }
 
-    fn register_summary(&mut self, provider: Arc<dyn SummaryProvider>) {
+    pub(crate) fn register_summary(&mut self, provider: Arc<dyn SummaryProvider>) {
         self.summary.insert(provider.id().to_string(), provider);
     }
 
@@ -222,6 +222,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &CancellationToken::new(),
             )
@@ -268,6 +269,7 @@ mod tests {
                 SummaryOptions {
                     model: None,
                     max_tokens: None,
+                    ..Default::default()
                 },
                 &CancellationToken::new(),
             )
